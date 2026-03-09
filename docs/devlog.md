@@ -61,6 +61,14 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "
   - mouse click still works
 - chose this over a mouse-only clarification because reward choice is a hard stop in the combat loop and MVP-0 benefits from a fully legible keyboard path
 
+### Release hygiene pass: v0.1.1 packaging cleanup
+- cleaned stale `v0.1.0` archives out of `build/` so current exports are unambiguous
+- repacked Windows release zip to contain only `lantern_engine.exe` + `lantern_engine.pck`
+- created matching Linux archive `build/linux/lantern_engine-linux-v0.1.1.tar.gz` so release assets are version-consistent across platforms
+- canonical release artifacts for `v0.1.1` are now:
+  - `lantern_engine-windows-v0.1.1.zip`
+  - `lantern_engine-linux-v0.1.1.tar.gz`
+
 ### Expected follow-up
 - tune encounter pacing after first hands-on play session
 - split runtime script if team commits to MVP-1

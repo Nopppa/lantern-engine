@@ -75,10 +75,10 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Releases are expected to contain:
+Releases are expected to contain the canonical versioned archives:
 
-- Windows build directory
-- zipped Windows artifact
+- `lantern_engine-windows-vX.Y.Z.zip`
+- `lantern_engine-linux-vX.Y.Z.tar.gz`
 
 If export templates are missing on the machine, see `docs/devlog.md` for current blocker notes and exact export commands.
 

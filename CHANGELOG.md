@@ -10,6 +10,8 @@ Reward selection usability fix:
 - `E` and `Enter` confirm the highlighted reward
 - reward panel text + HUD copy now explain the real input flow
 - updated Windows export metadata to `0.1.1`
+- cleaned release packaging so `v0.1.1` ships as versioned Windows/Linux archives only
+- removed stale `v0.1.0` build artifacts and repacked Windows zip to include only the current `.exe` + `.pck`
 
 ## 0.1.0 - 2026-03-09
 
