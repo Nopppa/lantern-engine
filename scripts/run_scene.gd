@@ -4,6 +4,11 @@ class_name RunScene
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
 const PLAYER_RADIUS := 14.0
 const ENEMY_CONTACT_RADIUS := 20.0
+const BEAM_OUTER_COLOR := Color(0.45, 0.95, 1.0, 0.42)
+const BEAM_INNER_COLOR := Color(1.0, 0.96, 0.72, 0.95)
+const BOUNCE_COLOR := Color(0.62, 0.95, 1.0, 0.95)
+const PRISM_COLOR := Color(0.54, 0.93, 1.0, 1.0)
+const SHADOW_COLOR := Color(0.02, 0.03, 0.06, 0.78)
 const UPGRADE_POOL := [
 	{"id": "extra_bounce", "title": "+1 Bounce", "desc": "Refraction Beam gains one extra wall bounce.", "apply": "bounce"},
 	{"id": "beam_range", "title": "Longer Beam", "desc": "Refraction Beam range +180.", "apply": "range"},
@@ -42,7 +47,9 @@ var ui_layer: CanvasLayer
 var hud_label: RichTextLabel
 var status_label: RichTextLabel
 var reward_panel: PanelContainer
+var reward_title_label: Label
 var reward_buttons: Array[Button] = []
+var reward_selection_index := 0
 var world_layer: Node2D
 var fx_layer: Node2D
 var player_node: Node2D
@@ -90,31 +97,52 @@ func _setup_scene() -> void:
 	_build_hud()
 	queue_redraw()
 
+func _make_panel_style(bg: Color, border: Color, border_width: int = 2, radius: int = 8) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(radius)
+	return style
+
 func _build_hud() -> void:
 	hud_label = RichTextLabel.new()
 	hud_label.fit_content = true
 	hud_label.bbcode_enabled = true
 	hud_label.scroll_active = false
+	hud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_label.position = Vector2(20, 16)
-	hud_label.size = Vector2(480, 220)
+	hud_label.size = Vector2(460, 200)
+	hud_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.05, 0.07, 0.11, 0.84), Color(0.36, 0.5, 0.7, 0.95), 2, 10))
+	hud_label.add_theme_constant_override("margin_left", 14)
+	hud_label.add_theme_constant_override("margin_top", 10)
+	hud_label.add_theme_constant_override("margin_right", 14)
+	hud_label.add_theme_constant_override("margin_bottom", 10)
 	ui_layer.add_child(hud_label)
 	status_label = RichTextLabel.new()
 	status_label.fit_content = true
 	status_label.bbcode_enabled = true
 	status_label.scroll_active = false
-	status_label.position = Vector2(20, 132)
-	status_label.size = Vector2(520, 240)
+	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_label.position = Vector2(20, 170)
+	status_label.size = Vector2(460, 250)
+	status_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.04, 0.05, 0.09, 0.78), Color(0.27, 0.35, 0.52, 0.95), 2, 10))
+	status_label.add_theme_constant_override("margin_left", 14)
+	status_label.add_theme_constant_override("margin_top", 10)
+	status_label.add_theme_constant_override("margin_right", 14)
+	status_label.add_theme_constant_override("margin_bottom", 10)
 	ui_layer.add_child(status_label)
 	reward_panel = PanelContainer.new()
 	reward_panel.visible = false
 	reward_panel.position = Vector2(360, 170)
 	reward_panel.size = Vector2(560, 320)
+	reward_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.05, 0.07, 0.11, 0.95), Color(0.5, 0.78, 1.0, 1.0), 3, 12))
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 10)
 	reward_panel.add_child(vb)
-	var title := Label.new()
-	title.text = "Choose one Prism upgrade"
-	vb.add_child(title)
+	reward_title_label = Label.new()
+	reward_title_label.text = "Choose one Prism upgrade"
+	vb.add_child(reward_title_label)
 	for i in 3:
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(0, 72)
@@ -143,15 +171,16 @@ func _process(delta: float) -> void:
 		player_hp = player_max_hp
 		energy = max_energy
 		last_event = "Dev refill"
-	if Input.is_action_just_pressed("spawn_moth"):
+	if Input.is_action_just_pressed("spawn_moth") and not reward_pending:
 		_spawn_enemy("moth", _random_spawn())
-	if Input.is_action_just_pressed("spawn_hollow"):
+	if Input.is_action_just_pressed("spawn_hollow") and not reward_pending:
 		_spawn_enemy("hollow", _random_spawn())
 	if Input.is_action_just_pressed("grant_upgrade") and not reward_pending:
 		_show_rewards()
 	if Input.is_action_just_pressed("restart_run"):
 		_restart_run()
 	if reward_pending:
+		_handle_reward_input()
 		_update_ui()
 		queue_redraw()
 		return
@@ -287,7 +316,7 @@ func _place_prism(target: Vector2) -> void:
 	world_layer.add_child(prism_node)
 	var marker := Polygon2D.new()
 	marker.polygon = PackedVector2Array([Vector2(0, -20), Vector2(18, 0), Vector2(0, 20), Vector2(-18, 0)])
-	marker.color = Color("8be9fd")
+	marker.color = PRISM_COLOR
 	prism_node.add_child(marker)
 	prism_timer = prism_duration
 	last_event = "Prism Node deployed"
@@ -362,13 +391,40 @@ func _spawn_enemy(type: String, pos: Vector2) -> void:
 func _show_rewards() -> void:
 	reward_pending = true
 	reward_panel.visible = true
+	reward_selection_index = 0
 	var options: Array = UPGRADE_POOL.duplicate()
 	options.shuffle()
 	for i in reward_buttons.size():
 		var reward: Dictionary = options[i]
-		reward_buttons[i].text = "%s\n%s" % [reward["title"], reward["desc"]]
 		reward_buttons[i].set_meta("reward", reward)
+		reward_buttons[i].set_meta("display_text", "[%d] %s\n%s" % [i + 1, reward["title"], reward["desc"]])
+	_update_reward_button_states()
 	last_event = "Reward selection ready"
+
+func _handle_reward_input() -> void:
+	if Input.is_action_just_pressed("move_up") or Input.is_action_just_pressed("ui_up"):
+		reward_selection_index = wrapi(reward_selection_index - 1, 0, reward_buttons.size())
+		_update_reward_button_states()
+	elif Input.is_action_just_pressed("move_down") or Input.is_action_just_pressed("ui_down"):
+		reward_selection_index = wrapi(reward_selection_index + 1, 0, reward_buttons.size())
+		_update_reward_button_states()
+	elif Input.is_action_just_pressed("spawn_moth"):
+		_select_reward(0)
+	elif Input.is_action_just_pressed("spawn_hollow"):
+		_select_reward(1)
+	elif Input.is_physical_key_pressed(KEY_3):
+		_select_reward(2)
+	elif Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("ui_accept"):
+		_select_reward(reward_selection_index)
+
+func _update_reward_button_states() -> void:
+	for i in reward_buttons.size():
+		var selected := i == reward_selection_index
+		var prefix := "> " if selected else "  "
+		reward_buttons[i].text = "%s%s" % [prefix, String(reward_buttons[i].get_meta("display_text", ""))]
+		if selected:
+			reward_buttons[i].grab_focus()
+	reward_title_label.text = "Choose one Prism upgrade — [1/2/3] direct select, [W/S or ↑/↓] move, [E/Enter] confirm"
 
 func _select_reward(index: int) -> void:
 	if index >= reward_buttons.size():
@@ -410,9 +466,16 @@ func _restart_run() -> void:
 func _random_spawn() -> Vector2:
 	return Vector2(randf_range(840, 1080), randf_range(120, 600))
 
+func _bar(value: float, max_value: float, width: int = 14) -> String:
+	var filled := int(round(clamp(value / max(max_value, 0.001), 0.0, 1.0) * width))
+	return "[color=#f8f8f2]%s[/color][color=#4a5468]%s[/color]" % ["■".repeat(filled), "■".repeat(width - filled)]
+
 func _update_ui() -> void:
-	hud_label.text = "[b]Lantern Engine MVP-0[/b]\nHP %.0f / %.0f\nEnergy %.0f / %.0f\nBeam dmg %.0f | range %.0f | bounces %d\nEncounter %d / %d%s" % [player_hp, player_max_hp, energy, max_energy, beam_damage, beam_range, beam_bounces, min(encounter_index + 1, encounters.size()), encounters.size(), "\nPress R to restart" if run_over else ""]
-	status_label.text = "[b]Controls[/b] WASD move | LMB beam | RMB prism | E choose in menu | R restart\nF1 debug | F2 refill | F3 reward | 1/2 spawn enemies\n[b]Event[/b] %s\n[b]Enemies alive[/b] %d" % [last_event, _alive_enemy_count()]
+	var beam_ready := "[color=#8be9fd]READY[/color]" if beam_timer <= 0.0 else "[color=#ffb86c]%.2fs[/color]" % beam_timer
+	var prism_state := "[color=#8be9fd]ACTIVE %.1fs[/color]" % prism_timer if prism_node else "[color=#50fa7b]READY[/color]"
+	var objective := "Pick one upgrade" if reward_pending else ("Survive encounter and route beam through walls/prism" if not run_over else "Press R to restart")
+	hud_label.text = "[b]Lantern Engine MVP-0[/b]\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#a4b1cd]Beam status:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d    [color=#a4b1cd]Enemies:[/color] %d" % [objective, player_hp, player_max_hp, _bar(player_hp, player_max_hp), energy, max_energy, _bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), _alive_enemy_count()]
+	status_label.text = "[b]Readability legend[/b]\n[color=#f1fa8c]Warm beam core[/color] + [color=#8be9fd]cyan glow[/color] = live shot path\n[color=#8be9fd]Cyan ring on wall[/color] = bounce point\n[color=#8be9fd]Diamond + aura[/color] = Prism Node redirector\n[color=#ffb86c]Orange[/color] moth rushes | [color=#bd93f9]Purple[/color] hollow blinks\n\n[b]Controls[/b]\nWASD move | LMB beam | RMB prism | R restart\nReward panel: 1/2/3 choose | W/S or ↑/↓ move | E/Enter confirm\nF1 debug | F2 refill | F3 reward | 1/2 spawn enemies\n\n[b]Event[/b]\n%s" % [last_event]
 
 func _alive_enemy_count() -> int:
 	var alive := 0
@@ -422,21 +485,55 @@ func _alive_enemy_count() -> int:
 	return alive
 
 func _draw() -> void:
-	draw_rect(ARENA_RECT, Color("10141f"), true)
-	draw_rect(ARENA_RECT, Color("3a4a68"), false, 4.0)
-	draw_rect(Rect2(ARENA_RECT.position + Vector2(140, 130), Vector2(180, 140)), Color(0.18, 0.21, 0.28, 0.35), true)
-	draw_rect(Rect2(ARENA_RECT.position + Vector2(720, 320), Vector2(160, 150)), Color(0.18, 0.21, 0.28, 0.35), true)
+	var viewport_rect := get_viewport_rect()
+	draw_rect(viewport_rect, Color(0.01, 0.015, 0.03, 1.0), true)
+	draw_rect(ARENA_RECT.grow(28.0), Color(0.02, 0.04, 0.07, 0.88), true)
+	draw_rect(ARENA_RECT, Color("111827"), true)
+	draw_rect(Rect2(ARENA_RECT.position + Vector2(10, 10), ARENA_RECT.size - Vector2(20, 20)), Color(0.08, 0.11, 0.18, 0.92), true)
+	for x in range(int(ARENA_RECT.position.x) + 64, int(ARENA_RECT.end.x), 128):
+		draw_line(Vector2(x, ARENA_RECT.position.y + 14), Vector2(x, ARENA_RECT.end.y - 14), Color(0.3, 0.42, 0.58, 0.08), 1.0)
+	for y in range(int(ARENA_RECT.position.y) + 64, int(ARENA_RECT.end.y), 128):
+		draw_line(Vector2(ARENA_RECT.position.x + 14, y), Vector2(ARENA_RECT.end.x - 14, y), Color(0.3, 0.42, 0.58, 0.08), 1.0)
+	draw_rect(ARENA_RECT, Color(0.46, 0.68, 0.95, 0.95), false, 6.0)
+	draw_rect(ARENA_RECT.grow(-8.0), Color(0.76, 0.9, 1.0, 0.18), false, 2.0)
+	draw_rect(Rect2(ARENA_RECT.position + Vector2(140, 130), Vector2(180, 140)), Color(0.18, 0.21, 0.28, 0.26), true)
+	draw_rect(Rect2(ARENA_RECT.position + Vector2(720, 320), Vector2(160, 150)), Color(0.18, 0.21, 0.28, 0.26), true)
 	if prism_node:
-		draw_circle(prism_node.position, 34.0, Color(0.2, 0.9, 1.0, 0.08))
+		var pulse := 0.78 + 0.22 * sin(Time.get_ticks_msec() / 160.0)
+		draw_circle(prism_node.position, 40.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.08 * pulse))
+		draw_arc(prism_node.position, 26.0, 0.0, TAU, 40, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.85), 3.0)
+		draw_arc(prism_node.position, 18.0, 0.0, TAU, 32, Color(1.0, 1.0, 1.0, 0.45), 1.5)
+		draw_line(prism_node.position + Vector2(-24, 0), prism_node.position + Vector2(24, 0), Color(1.0, 1.0, 1.0, 0.16), 2.0)
+		draw_line(prism_node.position + Vector2(0, -24), prism_node.position + Vector2(0, 24), Color(1.0, 1.0, 1.0, 0.16), 2.0)
+		var prism_preview_dir := facing.rotated(deg_to_rad(55.0 if facing.y >= 0.0 else -55.0)).normalized()
+		draw_line(prism_node.position, prism_node.position + prism_preview_dir * 46.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.4), 2.0)
 	for enemy: Dictionary in enemies:
 		if not is_instance_valid(enemy["node"]):
 			continue
 		var color: Color = Color("ffb86c") if enemy["type"] == "moth" else Color("bd93f9")
 		if enemy["flash"] > 0.0:
 			color = Color.WHITE
+		draw_circle(enemy["node"].position + Vector2(4, 6), enemy["radius"] + 2.0, SHADOW_COLOR)
+		draw_circle(enemy["node"].position, enemy["radius"] + 4.0, Color(color.r, color.g, color.b, 0.18))
 		draw_circle(enemy["node"].position, enemy["radius"], color)
-	for segment in beam_segments:
-		draw_line(segment[0], segment[1], Color(1.0, 0.96, 0.65, 0.9), 6.0)
-		draw_circle(segment[1], 8.0, Color(0.9, 1.0, 1.0, 0.8))
-	draw_circle(player_pos, PLAYER_RADIUS + beam_flash * 6.0, Color("f1fa8c"))
-	draw_line(player_pos, player_pos + facing * 24.0, Color.BLACK, 3.0)
+		draw_arc(enemy["node"].position, enemy["radius"] + 6.0, 0.0, TAU, 24, Color(1.0, 1.0, 1.0, 0.08), 1.0)
+	for i in range(beam_segments.size()):
+		var segment: Array = beam_segments[i]
+		draw_line(segment[0], segment[1], BEAM_OUTER_COLOR, 12.0)
+		draw_line(segment[0], segment[1], BEAM_INNER_COLOR, 5.0)
+		draw_circle(segment[0], 5.0, Color(1.0, 1.0, 1.0, 0.28))
+		var end_radius := 11.0 if i < beam_segments.size() - 1 else 8.0
+		var end_color := BOUNCE_COLOR if i < beam_segments.size() - 1 else Color(0.92, 1.0, 1.0, 0.82)
+		draw_circle(segment[1], end_radius, Color(end_color.r, end_color.g, end_color.b, 0.22))
+		draw_circle(segment[1], end_radius * 0.55, end_color)
+	draw_circle(player_pos + Vector2(4, 6), PLAYER_RADIUS + 4.0, SHADOW_COLOR)
+	draw_circle(player_pos, PLAYER_RADIUS + 9.0 + beam_flash * 8.0, Color(0.95, 0.98, 0.63, 0.14 + beam_flash * 0.22))
+	draw_circle(player_pos, PLAYER_RADIUS + beam_flash * 5.0, Color("f1fa8c"))
+	draw_arc(player_pos, PLAYER_RADIUS + 5.0, 0.0, TAU, 24, Color(1.0, 1.0, 1.0, 0.18), 1.5)
+	draw_line(player_pos, player_pos + facing * 24.0, Color.BLACK, 4.0)
+	draw_line(player_pos, player_pos + facing * 24.0, Color(0.16, 0.2, 0.28, 1.0), 2.0)
+	var mouse_world := get_global_mouse_position()
+	if ARENA_RECT.has_point(mouse_world):
+		draw_arc(mouse_world, 10.0, 0.0, TAU, 20, Color(0.85, 0.95, 1.0, 0.45), 1.5)
+		draw_line(mouse_world + Vector2(-6, 0), mouse_world + Vector2(6, 0), Color(0.85, 0.95, 1.0, 0.25), 1.0)
+		draw_line(mouse_world + Vector2(0, -6), mouse_world + Vector2(0, 6), Color(0.85, 0.95, 1.0, 0.25), 1.0)

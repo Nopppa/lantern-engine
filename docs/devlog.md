@@ -45,6 +45,22 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "
 - Linux export succeeded
 - packaged artifacts created under `build/windows/` and `build/linux/`
 
+### Readability / visual pass
+- strengthened arena contrast so the playable space reads as a lit stage inside surrounding darkness instead of a flat dark rectangle
+- upgraded beam rendering to a warm core + cyan glow with explicit endpoint markers, making bounces and redirect chains easier to parse at a glance
+- gave Prism Node a clearer gameplay silhouette with aura rings, crosshair-like guides, and a faint redirect preview so its function reads before the player tests it
+- rebuilt the HUD as boxed status panels with bar-style HP/energy readouts, explicit beam/prism readiness, and a tiny readability legend for the prototype language
+
+### Follow-up fix pass: reward selection clarity
+- review surfaced the biggest MVP-0 usability issue: the HUD implied keyboard reward selection, but the panel itself only exposed mouse clicks
+- fixed this by implementing explicit keyboard support instead of downgrading docs/HUD to mouse-only
+- current reward input is now consistent across HUD, panel text, and docs:
+  - `1/2/3` direct select
+  - `W/S` or `↑/↓` move highlight
+  - `E` or `Enter` confirm highlighted option
+  - mouse click still works
+- chose this over a mouse-only clarification because reward choice is a hard stop in the combat loop and MVP-0 benefits from a fully legible keyboard path
+
 ### Expected follow-up
 - tune encounter pacing after first hands-on play session
 - split runtime script if team commits to MVP-1

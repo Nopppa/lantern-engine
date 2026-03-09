@@ -16,7 +16,7 @@ Godot 4 prototype for the **first testable Lantern Engine phase**. This repo del
   - **Moth** chaser
   - **Hollow** ambusher/blinker
 - basic hit / death feedback
-- one reward/upgrade choice step between encounters
+- one reward/upgrade choice step between encounters with clear mouse + keyboard selection
 - restart / retry loop
 - dev shortcuts for rapid iteration
 
@@ -43,6 +43,8 @@ See `docs/mvp0-scope.md` for exact scope boundaries.
 - `LMB` cast Refraction Beam
 - `RMB` place Prism Node
 - `R` restart run
+- reward panel: `1/2/3` direct select, `W/S` or `↑/↓` move, `E`/`Enter` confirm
+- mouse click on reward buttons also works
 - `F1` toggle debug text
 - `F2` refill HP + Energy
 - `F3` force reward selection

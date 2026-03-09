@@ -6,6 +6,8 @@
 - `LMB` cast Refraction Beam toward cursor
 - `RMB` place Prism Node
 - `R` restart run
+- reward panel: `1/2/3` direct select, `W/S` or `↑/↓` move highlight, `E`/`Enter` confirm
+- mouse click on a reward button also selects it
 
 ## Debug / dev controls
 
@@ -31,9 +33,10 @@
 
 ### Reward verification
 1. clear encounter 1
-2. choose `+1 Bounce`
-3. in encounter 2, intentionally bank the beam twice
-4. confirm the extra segment visibly exists
+2. verify reward panel shows keyboard hint text
+3. press `1`, `2`, or `3` to take a reward immediately, or use `W/S` / `↑/↓` then `E` or `Enter`
+4. confirm the panel closes and the next encounter begins
+5. if you picked `+1 Bounce`, intentionally bank the beam twice in encounter 2 and confirm the extra segment visibly exists
 
 ### Retry loop
 1. let enemies kill player or press `R`
