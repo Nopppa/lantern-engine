@@ -5,7 +5,7 @@
 - `WASD` move
 - `LMB` cast Refraction Beam toward cursor
 - `RMB` place Prism Node
-- `Q` trigger Prism Surge from the active Prism Node (consumes the node, damages and shoves nearby enemies, and jams enemy special abilities briefly)
+- `Q` trigger Prism Surge from the active Prism Node (consumes the node, damages and shoves nearby enemies, sears them with Light Burn, and jams enemy special abilities briefly)
 - `R` restart run
 - reward panel: `1/2/3` direct select, `W/S` or `↑/↓` move highlight, `E`/`Enter` confirm
 - mouse click on a reward button also selects it
@@ -39,9 +39,10 @@
 1. place Prism Node near a pack of enemies
 2. press `Q`
 3. confirm the node collapses into a cyan burst ring
-4. confirm nearby enemies take damage, get shoved away from the node, have special abilities jammed briefly, and the node is consumed
-5. specifically hit a Hollow during windup or before its next blink and confirm the blink is interrupted / delayed during the jam window
-6. if `Surge Capacitors` appears, take it and confirm the larger blast / shorter cooldown are noticeable
+4. confirm nearby enemies take burst damage, get shoved away from the node, ignite with a visible Light Burn ring/timer, have special abilities jammed briefly, and the node is consumed
+5. wait a moment and confirm Light Burn ticks land for a few seconds with readable flashes / timer decay
+6. specifically hit a Hollow during windup or before its next blink and confirm the blink is interrupted / delayed during the jam window
+7. if `Surge Capacitors` appears, take it and confirm the larger blast / shorter cooldown are noticeable
 
 ### Reward verification
 1. clear encounter 1
@@ -59,11 +60,12 @@
 
 ## Current playtest focus
 
-For the current `v0.4.2` patch-3 build, testers should pay extra attention to:
+For the current `v0.4.3` patch-4 build, testers should pay extra attention to:
 
-- Prism Surge value: does `Q` create a real tactical decision now that it also jams enemy specials?
+- Prism Surge value: does `Q` create a real tactical decision now that it also applies Light Burn on top of the special jam?
 - node tension: does consuming the Prism Node for an AOE burst create interesting timing choices versus keeping it for beam redirects?
 - reward readability: does `Surge Capacitors` read clearly when it appears in the reward pool?
+- burn readability: can you tell at a glance which enemies are Light Burning and roughly how much longer it will last?
 - baseline safety: do `F2`, `F3`, `F1`, `F4`, `Q`, and `R` all behave reliably in the shipped build, including Prism HUD readiness after consuming a node?
 
 Use the relevant playtest notes under `docs/playtests/` when capturing observations.
@@ -88,4 +90,4 @@ Raw Godot export outputs land here:
 
 For the current version, the canonical packaged artifact to distribute is:
 
-- `build/windows/lantern_engine-windows-v0.4.2.zip`
+- `build/windows/lantern_engine-windows-v0.4.3.zip`

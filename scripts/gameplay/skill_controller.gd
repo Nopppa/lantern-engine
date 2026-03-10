@@ -27,6 +27,9 @@ static func cast_prism_surge(run: RunScene) -> void:
 		hit_count += 1
 		enemy["hp"] -= run.prism_surge_damage
 		enemy["special_lock_timer"] = max(float(enemy.get("special_lock_timer", 0.0)), run.prism_surge_special_lock_duration)
+		enemy["light_burn_timer"] = max(float(enemy.get("light_burn_timer", 0.0)), run.prism_surge_light_burn_duration)
+		enemy["light_burn_tick_timer"] = min(float(enemy.get("light_burn_tick_timer", 0.0)), 0.12)
+		enemy["light_burn_pulse"] = max(float(enemy.get("light_burn_pulse", 0.0)), 0.55)
 		RunSummary.note_damage_dealt(run, run.prism_surge_damage)
 		enemy["flash"] = 0.35
 		var push_dir: Vector2 = (enemy["node"].position - origin).normalized()
@@ -56,6 +59,6 @@ static func cast_prism_surge(run: RunScene) -> void:
 	RunSummary.note_skill_cast(run, "prism_surge")
 	SfxController.play(run, "beam")
 	if hit_count > 0:
-		run.last_event = "Prism Surge burst for %.0f across %d target%s and jammed specials" % [run.prism_surge_damage, hit_count, "" if hit_count == 1 else "s"]
+		run.last_event = "Prism Surge seared %d target%s with Light Burn and jammed specials" % [hit_count, "" if hit_count == 1 else "s"]
 	else:
 		run.last_event = "Prism Surge discharged with no target in the blast"

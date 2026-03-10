@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.3 - 2026-03-10
+
+Focused follow-up patch for Prism Surge's debuff identity:
+
+- added **Light Burn** to Prism Surge: enemies caught in the blast are seared for 4.0s, taking 1.5 damage every 0.5s while the existing shove, refund, and special-jam behavior remain intact
+- made the debuff readable in moment-to-moment play with a warm luminous burn ring, a live duration arc around afflicted enemies, and hit feedback when each burn tick lands
+- kept the implementation in the extracted gameplay/data layer by extending Surge auth/data plus enemy debuff ticking instead of re-growing `run_scene.gd`
+- updated only the shipped copy/artifact metadata needed for the new Light Burn behavior
+- validated with headless boot and Windows export; packaged a fresh Windows release artifact for GitHub Releases
+
 ## 0.4.2 - 2026-03-10
 
 Focused follow-up patch for the first Prism Surge playtest notes:

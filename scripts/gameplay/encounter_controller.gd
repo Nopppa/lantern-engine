@@ -50,9 +50,9 @@ static func spawn_enemy(run: RunScene, type: String, pos: Vector2) -> void:
 	if type == "moth":
 		sprite.polygon = PackedVector2Array([Vector2(-14, 0), Vector2(0, -10), Vector2(14, 0), Vector2(0, 10)])
 		sprite.color = Color("ffb86c")
-		run.enemies.append({"node": node, "type": type, "hp": 24.0, "speed": 116.0, "radius": 16.0, "contact_damage": 14.0, "alive": true, "flash": 0.0, "death_timer": 0.0, "attack_timer": 0.0, "special_lock_timer": 0.0})
+		run.enemies.append({"node": node, "type": type, "hp": 24.0, "speed": 116.0, "radius": 16.0, "contact_damage": 14.0, "alive": true, "flash": 0.0, "death_timer": 0.0, "attack_timer": 0.0, "special_lock_timer": 0.0, "light_burn_timer": 0.0, "light_burn_tick_timer": 0.0, "light_burn_pulse": 0.0})
 	else:
 		sprite.polygon = PackedVector2Array([Vector2(-12, -12), Vector2(12, -12), Vector2(12, 12), Vector2(-12, 12)])
 		sprite.color = Color("bd93f9")
-		run.enemies.append({"node": node, "type": type, "hp": 34.0, "speed": 92.0, "radius": 16.0, "contact_damage": 19.0, "alive": true, "flash": 0.0, "death_timer": 0.0, "attack_timer": 1.3, "special_lock_timer": 0.0, "revealed_by_light": false, "shimmer_timer": 0.0, "blink_windup": 0.0, "blink_winding_up": false, "blink_transiting": false, "blink_transit_timer": 0.0, "blink_transit_duration": 0.0, "blink_transit_start": Vector2.ZERO, "blink_transit_end": Vector2.ZERO})
+		run.enemies.append({"node": node, "type": type, "hp": 34.0, "speed": 92.0, "radius": 16.0, "contact_damage": 19.0, "alive": true, "flash": 0.0, "death_timer": 0.0, "attack_timer": 1.3, "special_lock_timer": 0.0, "light_burn_timer": 0.0, "light_burn_tick_timer": 0.0, "light_burn_pulse": 0.0, "revealed_by_light": false, "shimmer_timer": 0.0, "blink_windup": 0.0, "blink_winding_up": false, "blink_transiting": false, "blink_transit_timer": 0.0, "blink_transit_duration": 0.0, "blink_transit_start": Vector2.ZERO, "blink_transit_end": Vector2.ZERO})
 	node.add_child(sprite)

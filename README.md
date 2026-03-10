@@ -1,6 +1,6 @@
 # Lantern Engine — MVP-1 Patch 3
 
-Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but complete authored run. `v0.4.2` ships the third MVP-1 patch with the Prism ready/recharge HUD fix plus a clearer Prism Surge identity, alongside the authored run, run summary, cleaner data-driven content layer, and Prism Node upgrade depth — still without stepping into miniboss scope.
+Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but complete authored run. `v0.4.3` ships a tight Prism Surge identity follow-up: the burst still shoves, refunds, and jams specials, but now also sears enemies with a short Light Burn that is clearly telegraphed in-game.
 
 ## What is included
 
@@ -9,7 +9,7 @@ Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but com
 - Energy resource + regen
 - one Prism primary skill: **Refraction Beam**
 - one placeable setup skill: **Prism Node**
-- one Prism detonation skill: **Prism Surge** (burst damage + shove + short special-ability jam)
+- one Prism detonation skill: **Prism Surge** (burst damage + shove + short special-ability jam + Light Burn)
 - beam wall-bounce support plus Prism redirect chaining
 - 2 enemy archetypes:
   - **Moth** chaser
@@ -80,11 +80,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.4.2` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.4.3` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.4.2.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.4.3.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 

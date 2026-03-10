@@ -1,5 +1,29 @@
 # Devlog
 
+## 2026-03-10 — v0.4.3 MVP-1 Patch 4 Prism Surge Light Burn Pass
+
+This pass stayed deliberately narrow: preserve the `v0.4.2` special-jam identity, then layer in one readable luminous-corrosion debuff on top instead of widening into a broader combat rebalance.
+
+What changed:
+- added `Light Burn` to Prism Surge so enemies hit by the burst are seared for `4.0s`, taking `1.5` damage every `0.5s` while the original burst damage, shove, energy refund, and special lock remain intact
+- added readable in-game burn feedback with a warm inner glow, a visible duration arc, and short burn-tick flashes so the debuff state is legible without extra UI panels
+- kept runtime ownership clean by extending `scripts/data/skill_defs.gd`, `scripts/gameplay/skill_controller.gd`, `scripts/gameplay/enemy_controller.gd`, and spawn dictionaries in `scripts/gameplay/encounter_controller.gd` instead of dumping this state into `run_scene.gd`
+- updated shipped control/readme/changelog/version copy only where needed for the new behavior and artifact version
+
+Validation:
+```bash
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --quit
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
+```
+
+Validation result:
+- headless boot passed
+- Windows export passed
+- packaged Windows release artifact prepared for GitHub Release upload
+
+Recommended next step:
+- do one focused tuning playtest around whether Hollow should get a slightly stronger burn-specific reaction than Moths, without changing the current damage model unless testers say Surge still feels too soft
+
 ## 2026-03-10 — v0.4.2 MVP-1 Patch 3 Prism Truth + Surge Identity Pass
 
 This pass stayed intentionally narrow: fix the tester-visible Prism readiness lie first, then give Prism Surge one clearer combat identity without widening into a rebalance pass.

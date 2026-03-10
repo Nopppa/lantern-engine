@@ -1,6 +1,8 @@
 extends RefCounted
 class_name EnemyController
 
+const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
+
 static func update_enemies(run: RunScene, delta: float) -> void:
 	for enemy: Dictionary in run.enemies:
 		if not enemy["alive"]:
@@ -8,6 +10,9 @@ static func update_enemies(run: RunScene, delta: float) -> void:
 			continue
 		enemy["flash"] = max(enemy["flash"] - delta, 0.0)
 		enemy["special_lock_timer"] = max(float(enemy.get("special_lock_timer", 0.0)) - delta, 0.0)
+		_tick_light_burn(run, enemy, delta)
+		if not enemy["alive"]:
+			continue
 		var to_player: Vector2 = run.player_pos - enemy["node"].position
 		var dir := _safe_direction_from_player(to_player)
 		if enemy["type"] == "moth":
@@ -23,6 +28,33 @@ static func _tick_dead_enemy(enemy: Dictionary, delta: float) -> void:
 	enemy["node"].scale = Vector2.ONE * max(enemy["death_timer"] * 2.0, 0.1)
 	if enemy["death_timer"] <= 0.0 and is_instance_valid(enemy["node"]):
 		enemy["node"].queue_free()
+
+static func _tick_light_burn(run: RunScene, enemy: Dictionary, delta: float) -> void:
+	var burn_timer: float = float(enemy.get("light_burn_timer", 0.0))
+	if burn_timer <= 0.0:
+		enemy["light_burn_timer"] = 0.0
+		enemy["light_burn_tick_timer"] = 0.0
+		enemy["light_burn_pulse"] = max(float(enemy.get("light_burn_pulse", 0.0)) - delta * 1.8, 0.0)
+		return
+	burn_timer = max(burn_timer - delta, 0.0)
+	enemy["light_burn_timer"] = burn_timer
+	var burn_tick_timer: float = float(enemy.get("light_burn_tick_timer", run.prism_surge_light_burn_tick)) - delta
+	while burn_tick_timer <= 0.0 and burn_timer > 0.0 and enemy["alive"]:
+		enemy["hp"] -= run.prism_surge_light_burn_damage
+		RunSummary.note_damage_dealt(run, run.prism_surge_light_burn_damage)
+		enemy["flash"] = max(float(enemy.get("flash", 0.0)), 0.16)
+		enemy["light_burn_pulse"] = 0.38
+		run._add_hit_flash(enemy["node"].position, enemy["radius"] + 12.0, Color(1.0, 0.94, 0.62, 0.7), 0.12)
+		if enemy["hp"] <= 0.0:
+			enemy["alive"] = false
+			enemy["death_timer"] = 0.35
+			RunSummary.note_kill(run, String(enemy["type"]))
+			run._add_hit_flash(enemy["node"].position, enemy["radius"] + 22.0, Color(1.0, 0.97, 0.78, 0.95), 0.22)
+			run.last_event = "Light Burn consumed a %s" % String(enemy["type"])
+			break
+		burn_tick_timer += run.prism_surge_light_burn_tick
+	enemy["light_burn_tick_timer"] = max(burn_tick_timer, 0.0)
+	enemy["light_burn_pulse"] = max(float(enemy.get("light_burn_pulse", 0.0)) - delta * 1.6, 0.0)
 
 static func _safe_direction_from_player(to_player: Vector2) -> Vector2:
 	if to_player.length_squared() < 4.0:
