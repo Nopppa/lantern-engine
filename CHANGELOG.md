@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.5 - 2026-03-10
+
+Final MVP-0 polish / finish pass:
+
+- tightened reward readability with a larger reward panel, clearer selected-state styling, direct beam-stat context while paused, and short delta-focused reward text so testers can parse the upgrade impact faster
+- added lightweight impact polish: beam hits now spawn short radial hit flashes at the contact point, with a larger confirmation pop on kills
+- added tiny synthesized runtime SFX for beam fire, hit, kill, reward navigation, and reward confirm without introducing external asset pipeline overhead
+- documented the finish-pass validation note and marked MVP-0 as effectively complete pending normal tester confirmation on the packaged Windows artifact
+- validated with headless boot and Windows export
+
 ## 0.3.4 - 2026-03-10
 
 Regression fix + enemy runtime extraction pass:

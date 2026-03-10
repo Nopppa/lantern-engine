@@ -50,12 +50,12 @@
 
 ## Current playtest focus
 
-For the current `v0.3.4` stabilization build, testers should pay extra attention to:
+For the current `v0.3.5` finish-pass build, testers should pay extra attention to:
 
-- debug shortcut reliability: do `F2` refill and `F3` reward trigger work even when UI focus/end panels are present?
-- enemy pacing after extraction: do Moths and Hollows still pressure at the same cadence as before the controller split?
-- beam readability: does the pulse/bounce/redirect path still read clearly after the safety pass?
-- baseline controls: do `F1`, `F4`, and `R` remain easy to discover and use?
+- reward readability: does the reward pause make the currently highlighted choice and its practical stat gain obvious without extra explanation?
+- combat feedback: do beam hits/kills read more cleanly thanks to the compact impact flash?
+- lightweight audio polish: do the tiny beam/hit/reward cues help feedback without feeling distracting?
+- baseline safety: do `F2`, `F3`, `F1`, `F4`, and `R` still behave reliably after the polish pass?
 
 Use the relevant playtest notes under `docs/playtests/` when capturing observations.
 
@@ -79,4 +79,4 @@ Raw Godot export outputs land here:
 
 For the current version, the canonical packaged artifact to distribute is:
 
-- `build/windows/lantern_engine-windows-v0.3.4.zip`
+- `build/windows/lantern_engine-windows-v0.3.5.zip`

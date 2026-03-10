@@ -7,6 +7,7 @@ const RewardController = preload("res://scripts/gameplay/reward_controller.gd")
 const EncounterController = preload("res://scripts/gameplay/encounter_controller.gd")
 const BeamResolver = preload("res://scripts/gameplay/beam_resolver.gd")
 const EnemyController = preload("res://scripts/gameplay/enemy_controller.gd")
+const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
 const HudText = preload("res://scripts/ui/hud_text.gd")
 
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
@@ -59,6 +60,9 @@ var beam_segments: Array = []
 var lit_zones: Array = []
 var beam_flash := 0.0
 var beam_pulse_timer := 0.0
+var hit_flashes: Array = []
+var sfx_players := {}
+var sfx_cache := {}
 var ui_layer: CanvasLayer
 var hud_label: RichTextLabel
 var status_label: RichTextLabel
@@ -101,6 +105,7 @@ func _setup_scene() -> void:
 	ui_layer = CanvasLayer.new()
 	add_child(ui_layer)
 	_build_hud()
+	SfxController.setup(self)
 	queue_redraw()
 
 func _make_panel_style(bg: Color, border: Color, border_width: int = 2, radius: int = 8) -> StyleBoxFlat:
@@ -184,6 +189,7 @@ func _process(delta: float) -> void:
 	prism_timer = max(prism_timer - delta, 0.0)
 	beam_flash = max(beam_flash - delta * 4.5, 0.0)
 	beam_pulse_timer = max(beam_pulse_timer - delta, 0.0)
+	_update_hit_flashes(delta)
 	if beam_pulse_timer <= 0.0 and not beam_segments.is_empty():
 		beam_segments.clear()
 	lit_zones = _build_lit_zones()
@@ -308,12 +314,22 @@ func _restart_run() -> void:
 	reward_panel.visible = false
 	end_panel.visible = false
 	beam_segments.clear()
+	hit_flashes.clear()
 	beam_pulse_timer = 0.0
 	_start_encounter(0)
 	last_event = "Run restarted"
 
 func _random_spawn() -> Vector2:
 	return Vector2(randf_range(840, 1080), randf_range(120, 600))
+
+func _add_hit_flash(pos: Vector2, radius: float, color: Color, duration: float = 0.14) -> void:
+	hit_flashes.append({"pos": pos, "radius": radius, "color": color, "timer": duration, "duration": duration})
+
+func _update_hit_flashes(delta: float) -> void:
+	for i in range(hit_flashes.size() - 1, -1, -1):
+		hit_flashes[i]["timer"] = max(float(hit_flashes[i]["timer"]) - delta, 0.0)
+		if hit_flashes[i]["timer"] <= 0.0:
+			hit_flashes.remove_at(i)
 
 func _build_lit_zones() -> Array:
 	var zones: Array = []
@@ -347,7 +363,12 @@ func _update_ui() -> void:
 	hud_label.text = "[b]Lantern Engine MVP-0.3[/b]\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#f1fa8c]Flashlight[/color] %s    [color=#a4b1cd]Beam:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d    [color=#a4b1cd]Enemies:[/color] %d\n[color=#a4b1cd]Immortal:[/color] %s" % [objective, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, flashlight_text, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), _alive_enemy_count(), immortal_text]
 	var help_hint := "[color=#8be9fd]F1 show full help[/color]" if help_collapsed else "[color=#8be9fd]F1 hide full help[/color]"
 	var immortal_hint := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
-	if help_collapsed and not reward_pending and not run_over:
+	if reward_pending:
+		if reward_title_label:
+			reward_title_label.text = "Choose one Prism upgrade — current beam: %.0f dmg | %.0f range | %d bounce" % [beam_damage, beam_range, beam_bounces]
+		RewardController.update_button_states(self)
+		status_label.text = "[b]Reward pause[/b]\nChoose one clear beam upgrade before the next encounter.\n\n[color=#8be9fd]1/2/3[/color] direct pick\n[color=#8be9fd]W/S or ↑/↓[/color] move highlight\n[color=#8be9fd]E / Enter[/color] confirm highlighted reward\n\n[b]Current beam[/b]\n%.0f dmg | %.0f range | %d bounce" % [beam_damage, beam_range, beam_bounces]
+	elif help_collapsed and not run_over:
 		status_label.text = "[b]Event[/b]\n%s\n\n%s\n[color=#6272a4]Key actions: F1 help | F flashlight | R restart | F4 immortal %s[/color]" % [last_event, help_hint, immortal_hint]
 	else:
 		status_label.text = "[b]Readability legend[/b]\n[color=#f1fa8c]Warm core[/color] + [color=#8be9fd]cyan bloom[/color] = live beam path\n[color=#8be9fd]Cyan wall ring[/color] = bounce / redirect point\n[color=#8be9fd]Diamond aura[/color] = Prism Node\n[color=#ffb86c]Orange[/color] moth | [color=#bd93f9]Purple[/color] hollow\n\n[b]Controls[/b]\nWASD move | LMB beam | RMB prism | F flashlight | R restart\nReward: 1/2/3 or W/S + E/Enter\nF1 help | F2 refill | F3 reward | F4 immortal | 1/2 spawn\n\n[b]Event[/b]\n%s" % [last_event]
@@ -374,6 +395,12 @@ func _draw() -> void:
 	draw_rect(Rect2(ARENA_RECT.position + Vector2(10, 10), ARENA_RECT.size - Vector2(20, 20)), Color(0.06, 0.08, 0.14, 0.95), true)
 	for zone: Dictionary in lit_zones:
 		draw_circle(zone["pos"], zone["radius"], zone["color"])
+	for flash: Dictionary in hit_flashes:
+		var flash_t := clampf(float(flash["timer"]) / float(flash["duration"]), 0.0, 1.0)
+		var flash_radius := lerpf(float(flash["radius"]) * 1.55, float(flash["radius"]) * 0.72, 1.0 - flash_t)
+		var flash_color: Color = flash["color"]
+		draw_circle(flash["pos"], flash_radius, Color(flash_color.r, flash_color.g, flash_color.b, 0.12 * flash_t))
+		draw_arc(flash["pos"], flash_radius, 0.0, TAU, 20, Color(1.0, 1.0, 1.0, 0.45 * flash_t), 2.0)
 	for x in range(int(ARENA_RECT.position.x) + 64, int(ARENA_RECT.end.x), 128):
 		draw_line(Vector2(x, ARENA_RECT.position.y + 14), Vector2(x, ARENA_RECT.end.y - 14), Color(0.3, 0.42, 0.58, 0.08), 1.0)
 	for y in range(int(ARENA_RECT.position.y) + 64, int(ARENA_RECT.end.y), 128):

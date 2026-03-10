@@ -18,7 +18,7 @@ Delivered in this repo:
 - restart/retry
 - documentation pass
 
-## Current state: MVP-0.3.4 stabilization + enemy/runtime extraction completed
+## Current state: MVP-0 complete as of v0.3.5
 
 Recently completed:
 
@@ -29,19 +29,18 @@ Recently completed:
 - second structural pass completed in v0.3.3 around beam resolution and encounter orchestration
 - tester-visible debug regressions fixed in v0.3.4 (`F2` refill and `F3` reward trigger)
 - enemy runtime update/state handling extracted in v0.3.4 to `scripts/gameplay/enemy_controller.gd`
+- final v0.3.5 polish tightened reward readability and added lightweight hit-flash / synthesized audio feedback without expanding scope
+- MVP-0 is now considered effectively complete for tester handoff unless a new serious regression appears
 
-## Next sensible milestone: MVP-0.x safety cleanup + feel verification
+## Immediate posture: ship + only fix real regressions
 
-Recommended next steps:
+Do now:
 
-1. group shared mutable run state more cleanly to reduce flag sprawl
-2. keep playtesting enemy pacing after the controller split; adjust only if fresh evidence shows drift
-3. keep playtesting beam readability after the safety pass; current beam resolver ownership is now in the right place
-4. tighten reward/UI readability only if new playtests still expose friction
-5. add lightweight hit-flash/audio polish after runtime structure is safer
-6. keep documenting playtest findings in persistent files
+1. distribute the current Windows tester artifact
+2. treat new work as bugfix-only unless a tester finds a concrete MVP-0 blocker
+3. keep persistent playtest notes if any regressions or clarity gaps appear
 
-## After validation: MVP-1
+## Next milestone: MVP-1
 
 Only proceed if the core beam/refraction loop feels strong.
 

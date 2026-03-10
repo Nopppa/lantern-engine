@@ -1,6 +1,6 @@
 # Lantern Engine — MVP-0 Prism Mechanic Proof
 
-Godot 4 prototype for the **first testable Lantern Engine phase**. This repo deliberately ships a tight, playable MVP-0 instead of a broad systems skeleton.
+Godot 4 prototype for the **first testable Lantern Engine phase**. `v0.3.5` is treated as the completed MVP-0 handoff build unless a new blocker regression appears. This repo deliberately ships a tight, playable MVP-0 instead of a broad systems skeleton.
 
 ## What is included
 
@@ -32,7 +32,7 @@ Explicitly *not* implemented yet:
 - save persistence
 - multiple schools
 - broad content pipeline
-- art/audio polish pass
+- art/audio content pass beyond the tiny synthesized MVP feedback cues
 - meta progression
 - boss/miniboss
 - full data-driven combat authoring
@@ -78,11 +78,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.3.4` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.3.5` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.3.4.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.3.5.zip`
 
 Windows builds are the default tester artifacts. Linux builds are optional and only produced when explicitly requested.
 

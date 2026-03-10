@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-03-10 — v0.3.5 Final MVP-0 Polish / Finish Pass
+
+This was the intended last MVP-0 pass unless fresh tester evidence finds a real blocker.
+
+What changed:
+- widened the reward panel slightly and gave it stronger selected-state styling so the active choice reads instantly
+- surfaced current beam stats directly during reward pause, reducing HUD cross-referencing while choosing upgrades
+- rewrote reward button copy toward short stat-delta language instead of only title + description flavor
+- added small radial hit flashes on beam contact and a slightly larger pop on kills for faster combat confirmation
+- added tiny synthesized runtime SFX for beam fire, hit, kill, reward navigation, and reward confirm without adding external audio assets
+- documented a new finish-pass validation note under `docs/playtests/2026-03-10-playtest-09.md`
+
+Why this pass now:
+- the latest tester reported the game worked, so this was no longer a redesign moment; it was a finish-polish moment
+- the earlier controller extraction work lowered the risk enough to add a little feedback juice safely
+- reward readability and feedback clarity were the last explicitly queued MVP-0 items in the roadmap
+
+Validation target:
+- headless boot
+- Windows export
+- packaged Windows tester artifact and release refresh
+
+State after this pass:
+- MVP-0 is considered complete unless a new serious tester-visible regression is found
+- recommended next work should move to MVP-1 planning/content, not continue indefinite MVP-0 churn
+
 ## 2026-03-10 — v0.3.4 Regression Fix + Enemy Runtime Extraction
 
 This pass handled the first tester-visible regressions from the post-`v0.3.3` build before continuing the next planned structural extraction.

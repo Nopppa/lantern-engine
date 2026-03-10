@@ -1,6 +1,8 @@
 extends RefCounted
 class_name BeamResolver
 
+const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
+
 static func cast_beam(run: RunScene, target: Vector2) -> void:
 	if run.beam_timer > 0.0:
 		run.last_event = "Beam on cooldown"
@@ -13,6 +15,8 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 	run.beam_flash = 1.0
 	run.beam_pulse_timer = run.BEAM_PULSE_DURATION
 	run.beam_segments.clear()
+	run.hit_flashes.clear()
+	SfxController.play(run, "beam")
 	var direction := (target - run.player_pos).normalized()
 	if direction == Vector2.ZERO:
 		direction = run.facing
@@ -106,8 +110,15 @@ static func damage_enemies_along_segment(run: RunScene, a: Vector2, b: Vector2, 
 		if hit.size() > 0:
 			enemy["hp"] -= damage
 			enemy["flash"] = 0.25
+			var hit_pos: Vector2 = hit["point"]
+			var hit_color := Color(1.0, 0.82, 0.45, 0.95) if enemy["type"] == "moth" else Color(0.88, 0.72, 1.0, 0.95)
+			run._add_hit_flash(hit_pos, enemy["radius"] + 12.0, hit_color)
 			run.last_event = "Hit %s for %.0f" % [enemy["type"], damage]
 			if enemy["hp"] <= 0.0:
 				enemy["alive"] = false
 				enemy["death_timer"] = 0.35
+				run._add_hit_flash(enemy["node"].position, enemy["radius"] + 22.0, Color(1.0, 0.96, 0.76, 1.0), 0.22)
+				SfxController.play(run, "kill")
 				run.last_event = "%s eliminated" % String(enemy["type"]).capitalize()
+			else:
+				SfxController.play(run, "hit")

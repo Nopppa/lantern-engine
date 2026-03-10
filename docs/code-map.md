@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: post `v0.3.4` stabilization + enemy runtime extraction pass
+Current internal state: post `v0.3.5` MVP-0 finish pass
 
 ## Purpose
 
@@ -41,6 +41,11 @@ Use this before making structural changes so new work lands in the right file in
   - reward highlight / focus / button state
   - reward selection and upgrade application
   - reward flow progression to next encounter or run-complete state
+  - small readability polish for selected-state styling and stat-delta copy
+
+- `scripts/gameplay/sfx_controller.gd`
+  - tiny runtime-generated WAV cues for beam fire, hit, kill, reward move, and reward confirm
+  - keeps MVP-0 audio polish asset-light and export-safe
 
 - `scripts/gameplay/encounter_controller.gd`
   - encounter completion checks
@@ -106,7 +111,9 @@ These responsibilities still remain in the main runtime coordinator:
 
 ## Recommended next structural step
 
-If/when the next internal refactor pass happens, consider:
+For MVP-0, stop here unless a real regression appears.
+
+When MVP-1 starts, consider:
 1. introducing a lightweight shared run-state container or clearer state grouping
 2. only after that, splitting lighting/rendering helpers further if the runtime still feels too coupled
 3. avoid duplicating combat ownership now that `beam_resolver.gd` and `enemy_controller.gd` hold the core simulation rules
