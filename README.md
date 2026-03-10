@@ -1,72 +1,95 @@
-# Lantern Engine — MVP-1 Patch 5
+# Lantern Engine — Light Lab Pivot
 
-Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but complete authored run. `v0.4.4` ships the first Hollow Matriarch miniboss pass: round 5 clears its regular pack first, then the Matriarch enters as a controlled miniboss finisher built from authored boss data.
+Godot 4 prototype now centered on a permanent **Light Lab** instead of treating the old wave-survival arena as the main game direction. `v0.5.0` makes the lab the default runtime so light behavior, authored surfaces, and dead/alive blending become the primary validation loop.
 
-## What is included
+## Current primary runtime
 
-- top-down player movement
-- one authored test arena
-- Energy resource + regen
-- one Prism primary skill: **Refraction Beam**
-- one placeable setup skill: **Prism Node**
-- one Prism detonation skill: **Prism Surge** (burst damage + shove + short special-ability jam + Light Burn)
-- beam wall-bounce support plus Prism redirect chaining
-- first miniboss: **Hollow Matriarch** as the round-5 finisher
-- 2 enemy archetypes:
-  - **Moth** chaser
-  - **Hollow** ambusher/blinker
-- authored 5-encounter run chain
-- reward/upgrade choice step between encounters with clear mouse + keyboard selection
-- Prism upgrade depth that now affects redirect damage, redirect catch radius, redirect bend angle, and post-redirect bounce continuation
-- simple end-of-run summary populated from runtime events
-- cleaner data-driven encounter + upgrade authoring split out of the main scene script
-- restart / retry loop
-- dev shortcuts for rapid iteration, including immortality toggle
-- short pulse-style Refraction Beam presentation instead of a long-held laser trace
-- lightweight functional lit-zone readability pass around player, prism, targets, and fresh beam path
+The project now boots straight into the **Light Lab**:
 
-## Scope discipline
+- permanent authored lab map
+- no auto-wave flow
+- no forced encounter completion state
+- manual debug spawning for validation
+- surface/material response testing first
+- flashlight + beam readability first
+- dead/alive blend prototyping first
 
-This is a **small MVP-1 patch**, not a vertical slice and not a content explosion.
+The older wave-survival run still exists in the repo as temporary legacy scaffolding (`scenes/run_scene.tscn`, `scripts/run_scene.gd`, encounter data, reward flow), but it is no longer the primary target or default scene flow.
 
-Explicitly *not* implemented yet:
+## Light Lab content shipped in v0.5.0
 
-- procedural generation
-- save persistence
-- multiple schools
-- broad content validator pipeline
-- meta progression
-- full production art/audio pass
+- surrounding outer walls
+- several internal wall segments for routing / occlusion tests
+- authored material bays for:
+  - brick
+  - wood
+  - wet stone / wet surface
+  - mirror
+  - glass
+  - prism routing station
+- dead/alive blend test zones
+- open validation deck for manual spawn tests
+- manual Prism Node placement plus fixed prism station routing
 
-See `docs/milestones.md` for current milestone posture.
+## Light behavior shipped now
+
+### Surface material first pass
+
+Readable gameplay-first differences are now authored for:
+
+- **Brick** — absorbs heavily
+- **Wood** — soft diffusion, limited reflection
+- **Wet stone** — noticeably more reflective than brick/wood, slightly rough
+- **Mirror** — clear strong reflection
+- **Glass** — partial transmission plus a weaker reflected branch
+- **Prism** — special gameplay redirect interaction
+
+### Flashlight validation
+
+The flashlight now behaves as a proper gameplay light query in the lab:
+
+- cone-based
+- distance falloff
+- brighter center / softer edge
+- queryable local intensity used by gameplay checks and blend response
+
+### Dead/alive blend prototype
+
+The lab floor now uses a temporary rendering-side dead/alive blend grid:
+
+- illuminated cells blend toward **ALIVE**
+- cells fade back toward **DEAD** when light leaves
+- authored base-alive zones remain restored
+- no destructive pixel rewriting
 
 ## Controls
 
-- `WASD` move
-- `LMB` cast Refraction Beam
-- `RMB` place Prism Node
-- `Q` trigger Prism Surge from the active node
-- `R` restart run
-- reward panel: `1/2/3` direct select, `W/S` or `↑/↓` move, `E`/`Enter` confirm
-- mouse click on reward buttons also works
-- `F1` show/hide the full help legend (shown by default on first launch; compact event/status panel stays visible after collapsing)
-- `F2` refill HP + Energy
-- `F3` force reward selection
-- `F4` toggle immortality for testing
-- `1` spawn Moth
-- `2` spawn Hollow
+### Core
 
-See `docs/run-controls.md` for full control notes and `docs/playtests/PLAYTEST-02-CHECKLIST.md` for the focused tester checklist that triggered the v0.2.1 cleanup pass.
+- `WASD` move
+- `LMB` cast validation beam
+- `RMB` place Prism Node
+- `Q` trigger Prism Surge from active node
+- `F` toggle flashlight
+- `R` reset lab
+- `F1` help
+- `F2` refill HP + Energy
+- `F4` toggle immortality
+
+### Manual debug spawn / probes
+
+- `1` spawn Moth at cursor
+- `2` spawn Hollow at cursor
+- `3` spawn Hollow Matriarch at cursor
+- `4` place Prism Node at cursor
+- `5` toggle cursor material/intensity probe
+- `6` toggle beam-hit debug markers
+- `7` toggle enemy HP labels
+- `8` toggle dead/alive base-state setup
 
 ## Run locally
 
 ### Open in Godot editor
-
-```bash
-godot --path /opt/openclaw/projects/lantern_engine
-```
-
-### Run from CLI
 
 ```bash
 godot --path /opt/openclaw/projects/lantern_engine
@@ -80,31 +103,21 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.4.4` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.5.0` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.4.4.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.5.0.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 
-Godot export presets point to the unarchived executable under `build/windows/`; the versioned `.zip` file is the canonical release artifact to hand to testers.
-
-If export templates are missing on the machine, see `docs/devlog.md` for current blocker notes and exact export commands.
-
 ## Repo docs
 
-- `docs/vision.md`
-- `docs/architecture.md`
-- `docs/architecture-mvp0.md`
-- `docs/architecture-v0.3-internal-refactor-plan.md`
-- `docs/code-map.md`
+- `docs/visio.md`
+- `docs/ohjeet.md`
+- `docs/light_engine.md`
 - `docs/milestones.md`
+- `docs/roadmap/current-state.md`
+- `docs/code-map.md`
 - `docs/devlog.md`
-- `docs/mvp0-scope.md`
-- `docs/run-controls.md`
 - `CHANGELOG.md`
-
-## Version
-
-See `VERSION`.

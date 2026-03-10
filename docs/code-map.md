@@ -1,154 +1,65 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: post `v0.4.4` Hollow Matriarch miniboss pass
+Current internal state: `v0.5.0` Light Lab pivot shipped
 
 ## Purpose
 
-This file tells future contributors and agents where responsibilities currently live after the first internal refactor pass.
-Use this before making structural changes so new work lands in the right file instead of drifting back into `scripts/run_scene.gd`.
+This file tells future contributors where the new Light Lab responsibilities now live so the project does not slide back into one giant arena script.
 
-## Current high-level structure
+## Scenes
 
-### Scenes
 - `scenes/main.tscn`
-  - project entry scene
+  - project bootstrap scene
+- `scenes/light_lab_scene.tscn`
+  - new primary runtime / validation map
 - `scenes/run_scene.tscn`
-  - main gameplay scene used by the MVP runtime
+  - legacy wave-survival prototype runtime kept for reference
 
-### Main scripts
+## Main scripts
+
 - `scripts/main.gd`
-  - bootstrap / scene entry behavior
+  - now boots the Light Lab scene by default
+- `scripts/light_lab_scene.gd`
+  - top-level coordinator for the permanent validation map
+  - owns Light Lab scene assembly, player loop, lab UI, and rendering glue
 - `scripts/run_scene.gd`
-  - still the main runtime coordinator
-  - still owns the risky gameplay core that has NOT been extracted yet
+  - legacy run prototype coordinator
+  - kept in repo but de-emphasized
 
-## Extracted modules
+## New Light Lab modules
 
 ### Data
-- `scripts/data/encounter_defs.gd`
-  - authored encounter definitions / spawn data
-  - source of the current 5-encounter MVP-1 run chain
-  - includes encounter titles, summaries, spawn lists, and reward-tag hints
+- `scripts/data/light_materials.gd`
+  - first-pass authored surface material definitions
+  - readable reflectivity / diffusion / transmission / absorption tuning
 
-- `scripts/data/upgrade_defs.gd`
-  - reward / upgrade pool definitions
-  - source of current core + Prism upgrade authoring, including Prism Surge support upgrades
-  - drives reward filtering by encounter tags
+### Gameplay / simulation
+- `scripts/gameplay/light_surface_resolver.gd`
+  - lab beam routing against authored surfaces
+  - mirror reflection, glass transmission, wet reflection, wood diffusion, brick absorption, prism redirect handling
 
-- `scripts/data/skill_defs.gd`
-  - authored baseline data for active Prism skills
-  - currently seeds Prism Surge stats into runtime instead of hardcoding them only in scene state
+- `scripts/gameplay/dead_alive_grid.gd`
+  - rendering-side dead/alive blend state cache for the floor
+  - tracks temporary exposure and base alive/restored zones
 
-- `scripts/data/boss_defs.gd`
-  - authored boss-data loader/cache
-  - currently loads `scripts/data/bosses/hollow_matriarch.json` into runtime so miniboss tuning values live in data instead of inline scene code
-
-### Gameplay
-- `scripts/gameplay/run_summary.gd`
-  - owns the run-summary tracker schema
-  - records encounter, upgrade, combat, and damage metrics
-  - builds the end-of-run report shown in the center panel
-
-- `scripts/gameplay/reward_controller.gd`
-  - reward panel creation
-  - reward modal input
-  - reward highlight / focus / button state
-  - reward selection and upgrade application
-  - reward flow progression to the next authored encounter
-  - encounter-tag-aware reward filtering with fallback when the pool gets thin
-  - small readability polish for selected-state styling and stat-delta copy
-
-- `scripts/gameplay/sfx_controller.gd`
-  - tiny runtime-generated WAV cues for beam fire, hit, kill, reward move, and reward confirm
-  - keeps MVP-0 audio polish asset-light and export-safe
-
+### Existing reusable modules still used by the lab
 - `scripts/gameplay/encounter_controller.gd`
-  - encounter completion checks
-  - encounter start/reset flow
-  - enemy spawn construction from authored encounter data
-  - round-to-miniboss handoff for encounters that include a `miniboss_phase`
-
+  - reused only for enemy construction helpers during manual debug spawning
 - `scripts/gameplay/enemy_controller.gd`
-  - per-frame enemy runtime updates
-  - Moth chase behavior
-  - Hollow blink / windup / disrupted transit state progression
-  - safe overlap direction fallback and contact damage application
-
-- `scripts/gameplay/beam_resolver.gd`
-  - beam cast validation
-  - wall-bounce continuation
-  - Prism Node redirect chaining
-  - shared total-range budgeting along beam segments
-  - Prism upgrade integration for redirect damage, redirect radius, redirect angle, and post-redirect bounce continuation
-  - segment-vs-circle hit checks and enemy damage application
-  - runtime summary hooks for beams, redirects, damage dealt, and kills
-
-- `scripts/gameplay/skill_controller.gd`
-  - active non-beam Prism skill execution
-  - current owner of Prism Surge burst logic, knockback, node consumption, and summary hooks
-
+  - reused for per-frame enemy runtime updates in the lab
 - `scripts/gameplay/boss_controller.gd`
-  - Hollow Matriarch spawn construction from authored data
-  - boss-specific runtime logic: dark regen, phase split, shadow-bolt firing, Veil Pounce windup/pounce flow, and darkness-projectile light corrosion
+  - reused for Hollow Matriarch runtime logic during manual debug spawn tests
 
-### Player / debug input
-- `scripts/player/debug_actions.gd`
-  - debug/help/dev input handling
-  - F1 help toggle
-  - F4 immortality toggle
-  - restart input handling
-  - dev refill
-  - dev spawn / dev reward shortcuts
+## Ownership rule going forward
 
-### UI
-- `scripts/ui/hud_text.gd`
-  - HUD text formatting helpers
-  - extracted text/bar formatting responsibility from `run_scene.gd`
+### Put new work here first if it belongs to:
+- material definitions -> `scripts/data/light_materials.gd`
+- beam/surface interaction -> `scripts/gameplay/light_surface_resolver.gd`
+- dead/alive blend state -> `scripts/gameplay/dead_alive_grid.gd`
+- lab content / debug probes / lab UI glue -> `scripts/light_lab_scene.gd`
 
-## Intentionally still in run_scene.gd
-
-These responsibilities still remain in the main runtime coordinator:
-
-- player movement + input-driven action intent handling
-- lit-zone builder
-- `_draw()` rendering path
-- top-level runtime glue between world state, combat state, and rendering state
-
-## Rule of thumb for future edits
-
-### Put new changes here first if they belong to:
-- reward behavior or reward UI -> `scripts/gameplay/reward_controller.gd`
-- help/debug/dev shortcuts -> `scripts/player/debug_actions.gd`
-- HUD formatting text -> `scripts/ui/hud_text.gd`
-- encounter data -> `scripts/data/encounter_defs.gd`
-- reward/upgrade data -> `scripts/data/upgrade_defs.gd`
-
-### Only touch `scripts/run_scene.gd` when the change belongs to:
-- player movement / action intent glue
-- draw/render core
-- top-level runtime orchestration that truly cannot live elsewhere yet
-
-## What not to do yet
-
-- do NOT split beam/combat math casually
-- do NOT introduce a large plugin framework yet
-- do NOT move rendering and gameplay apart in one giant pass
-- do NOT re-inline extracted data back into `run_scene.gd`
-
-## Recommended next structural step
-
-For the current MVP-1 patch, stop here unless a real regression appears.
-
-For the next MVP-1 expansion, consider:
-1. introducing a lightweight shared run-state container or clearer state grouping before adding another combat system
-2. keeping authored content additions in data files first instead of re-growing `run_scene.gd`
-3. avoiding duplicated combat ownership now that `beam_resolver.gd`, `enemy_controller.gd`, and `run_summary.gd` hold the core simulation/reporting rules
-
-## Validation expectation after structural edits
-
-After any structural refactor, always verify at minimum:
-- headless boot succeeds
-- Windows export succeeds
-- authored run progression still reaches clean run-complete summary state
-- Prism upgrades still affect real beam behavior, not just HUD text
+### Avoid
+- pushing new exploration/light systems back into `scripts/run_scene.gd`
+- treating the old wave prototype as the main runtime again
+- centralizing future material/light/debug logic into one giant controller

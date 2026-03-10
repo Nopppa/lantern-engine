@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 - 2026-03-10
+
+Direction-pivot Light Lab patch:
+
+- replaced the old wave-survival arena as the main runtime with a dedicated permanent `Light Lab` scene loaded from `scripts/main.gd -> scenes/light_lab_scene.tscn`
+- authored a real lab layout with outer walls, internal routing segments, separate brick / wood / wet / mirror / glass material bays, a prism routing station, dead/alive blend lanes, and an open validation deck for manual spawn testing
+- added first-pass modular light-surface data + runtime handling through `scripts/data/light_materials.gd`, `scripts/gameplay/light_surface_resolver.gd`, and `scripts/gameplay/dead_alive_grid.gd`
+- upgraded flashlight validation in the lab to use cone falloff with a brighter center, softer edge, and queryable local intensity that now feeds gameplay checks and the dead/alive blend prototype
+- implemented readable surface behavior differences: mirror clearly reflects, glass partially transmits (with a weak reflected branch), brick heavily absorbs, wood diffuses softly, wet stone reflects more strongly than brick/wood, and prism routing stays a gameplay-special redirect surface
+- removed automatic encounter flow from the primary map; the lab now persists until manually reset and only spawns Moth / Hollow / Hollow Matriarch through debug controls
+- added lab debug affordances for cursor material probe, local light intensity probe, beam-hit visualization, enemy HP labels, base alive toggle, and manual prism placement/spawn testing
+- kept the old authored wave prototype available in the repo as legacy scaffolding instead of deleting it outright
+- validated with headless boot and Windows export; packaged a fresh Windows release artifact for GitHub Releases
+
 ## 0.4.4 - 2026-03-10
 
 First Hollow Matriarch miniboss shipping pass:
