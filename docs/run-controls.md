@@ -5,6 +5,7 @@
 - `WASD` move
 - `LMB` cast Refraction Beam toward cursor
 - `RMB` place Prism Node
+- `Q` trigger Prism Surge from the active Prism Node (consumes the node, damages and shoves nearby enemies)
 - `R` restart run
 - reward panel: `1/2/3` direct select, `W/S` or `↑/↓` move highlight, `E`/`Enter` confirm
 - mouse click on a reward button also selects it
@@ -34,6 +35,13 @@
 4. confirm redirected segment appears and can hit enemies behind the original firing line
 5. if you have bounce upgrades or wall angle, confirm the redirected beam can still bounce from walls after the node redirect
 
+### Prism Surge check
+1. place Prism Node near a pack of enemies
+2. press `Q`
+3. confirm the node collapses into a cyan burst ring
+4. confirm nearby enemies take damage, get shoved away from the node, and the node is consumed
+5. if `Surge Capacitors` appears, take it and confirm the larger blast / shorter cooldown are noticeable
+
 ### Reward verification
 1. clear encounter 1
 2. verify reward panel shows keyboard hint text
@@ -50,12 +58,12 @@
 
 ## Current playtest focus
 
-For the current `v0.3.5` finish-pass build, testers should pay extra attention to:
+For the current `v0.4.1` patch-2 build, testers should pay extra attention to:
 
-- reward readability: does the reward pause make the currently highlighted choice and its practical stat gain obvious without extra explanation?
-- combat feedback: do beam hits/kills read more cleanly thanks to the compact impact flash?
-- lightweight audio polish: do the tiny beam/hit/reward cues help feedback without feeling distracting?
-- baseline safety: do `F2`, `F3`, `F1`, `F4`, and `R` still behave reliably after the polish pass?
+- Prism Surge value: does `Q` create a real tactical decision instead of feeling like a redundant button?
+- node tension: does consuming the Prism Node for an AOE burst create interesting timing choices versus keeping it for beam redirects?
+- reward readability: does `Surge Capacitors` read clearly when it appears in the reward pool?
+- baseline safety: do `F2`, `F3`, `F1`, `F4`, `Q`, and `R` all behave reliably in the shipped build?
 
 Use the relevant playtest notes under `docs/playtests/` when capturing observations.
 
@@ -79,4 +87,4 @@ Raw Godot export outputs land here:
 
 For the current version, the canonical packaged artifact to distribute is:
 
-- `build/windows/lantern_engine-windows-v0.3.5.zip`
+- `build/windows/lantern_engine-windows-v0.4.1.zip`

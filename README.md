@@ -1,6 +1,6 @@
-# Lantern Engine — MVP-1 Patch 1
+# Lantern Engine — MVP-1 Patch 2
 
-Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but complete authored run. `v0.4.0` ships the first MVP-1 patch with a simple run summary, a cleaner data-driven content layer, a full 5-encounter authored chain, and Prism Node upgrade depth — without adding the out-of-scope third Prism skill or miniboss.
+Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but complete authored run. `v0.4.1` ships the second MVP-1 patch with a real third Prism skill, a simple run summary, a cleaner data-driven content layer, a full 5-encounter authored chain, and Prism Node upgrade depth — still without stepping into miniboss scope.
 
 ## What is included
 
@@ -9,6 +9,7 @@ Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but com
 - Energy resource + regen
 - one Prism primary skill: **Refraction Beam**
 - one placeable setup skill: **Prism Node**
+- one Prism detonation skill: **Prism Surge**
 - beam wall-bounce support plus Prism redirect chaining
 - 2 enemy archetypes:
   - **Moth** chaser
@@ -29,7 +30,6 @@ This is a **small MVP-1 patch**, not a vertical slice and not a content explosio
 
 Explicitly *not* implemented yet:
 
-- third Prism skill
 - miniboss
 - procedural generation
 - save persistence
@@ -45,6 +45,7 @@ See `docs/milestones.md` for current milestone posture.
 - `WASD` move
 - `LMB` cast Refraction Beam
 - `RMB` place Prism Node
+- `Q` trigger Prism Surge from the active node
 - `R` restart run
 - reward panel: `1/2/3` direct select, `W/S` or `↑/↓` move, `E`/`Enter` confirm
 - mouse click on reward buttons also works
@@ -79,11 +80,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.4.0` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.4.1` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.4.0.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.4.1.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.1 - 2026-03-10
+
+MVP-1 patch 2 third-skill pass:
+
+- added Prism Surge as the third Prism skill on `Q`, consuming the active Prism Node to release a radial burst that damages and shoves nearby enemies
+- kept the new skill inside a cleaner data-driven/runtime split by introducing `scripts/data/skill_defs.gd` for authored skill stats and `scripts/gameplay/skill_controller.gd` for active skill execution instead of re-growing `scripts/run_scene.gd`
+- added `Surge Capacitors` to the existing reward pool so the current reward/content structure can deepen the new skill without a parallel bespoke path
+- updated HUD/help/control copy just enough to surface the new skill and its live stats cleanly
+- extended run summary tracking with Prism Surge casts so the new button shows up in the end report only where it matters
+- validated with headless boot and Windows export; packaged a Windows release artifact for GitHub Releases
+
 ## 0.4.0 - 2026-03-10
 
 MVP-1 patch 1 finish pass:

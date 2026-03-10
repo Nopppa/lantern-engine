@@ -3,10 +3,12 @@ class_name RunScene
 
 const EncounterDefs = preload("res://scripts/data/encounter_defs.gd")
 const DebugActions = preload("res://scripts/player/debug_actions.gd")
+const SkillDefs = preload("res://scripts/data/skill_defs.gd")
 const RewardController = preload("res://scripts/gameplay/reward_controller.gd")
 const EncounterController = preload("res://scripts/gameplay/encounter_controller.gd")
 const BeamResolver = preload("res://scripts/gameplay/beam_resolver.gd")
 const EnemyController = preload("res://scripts/gameplay/enemy_controller.gd")
+const SkillController = preload("res://scripts/gameplay/skill_controller.gd")
 const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 const HudText = preload("res://scripts/ui/hud_text.gd")
@@ -23,7 +25,7 @@ const BEAM_PULSE_DURATION := 0.15
 const BEAM_OFFSET := 4.0
 const PRISM_RADIUS := 18.0
 const PRISM_REDIRECT_ANGLE := 55.0
-const BUILD_LABEL := "MVP-1.0 patch 1"
+const BUILD_LABEL := "MVP-1.0 patch 2"
 
 var player_hp := 100.0
 var player_max_hp := 100.0
@@ -40,6 +42,13 @@ var prism_radius_bonus := 0.0
 var prism_redirect_angle_bonus := 0.0
 var prism_redirect_damage_bonus := 0.0
 var prism_redirect_bonus_bounces := 0
+var prism_surge_unlocked := true
+var prism_surge_cooldown := 6.0
+var prism_surge_timer := 0.0
+var prism_surge_damage := 20.0
+var prism_surge_radius := 118.0
+var prism_surge_push_distance := 96.0
+var prism_surge_energy_refund_on_hit := 8.0
 var prism_node: Node2D
 var player_velocity := Vector2.ZERO
 var player_speed := 285.0
@@ -90,6 +99,7 @@ var encounters := EncounterDefs.LIST.duplicate(true)
 
 func _ready() -> void:
 	randomize()
+	_apply_skill_defaults()
 	RunSummary.reset(self)
 	_setup_scene()
 	_start_encounter(0)
@@ -115,6 +125,16 @@ func _setup_scene() -> void:
 	_build_hud()
 	SfxController.setup(self)
 	queue_redraw()
+
+func _apply_skill_defaults() -> void:
+	var prism_surge: Dictionary = SkillDefs.get_skill("prism_surge")
+	prism_surge_unlocked = not prism_surge.is_empty()
+	prism_surge_cooldown = float(prism_surge.get("cooldown", 6.0))
+	prism_surge_timer = 0.0
+	prism_surge_damage = float(prism_surge.get("damage", 20.0))
+	prism_surge_radius = float(prism_surge.get("radius", 118.0))
+	prism_surge_push_distance = float(prism_surge.get("push_distance", 96.0))
+	prism_surge_energy_refund_on_hit = float(prism_surge.get("energy_refund_on_hit", 8.0))
 
 func _make_panel_style(bg: Color, border: Color, border_width: int = 2, radius: int = 8) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -195,6 +215,7 @@ func _process(delta: float) -> void:
 		return
 	beam_timer = max(beam_timer - delta, 0.0)
 	prism_timer = max(prism_timer - delta, 0.0)
+	prism_surge_timer = max(prism_surge_timer - delta, 0.0)
 	beam_flash = max(beam_flash - delta * 4.5, 0.0)
 	beam_pulse_timer = max(beam_pulse_timer - delta, 0.0)
 	_update_hit_flashes(delta)
@@ -235,6 +256,8 @@ func _handle_player(delta: float) -> void:
 		_cast_refraction_beam(mouse_world)
 	if Input.is_action_just_pressed("place_prism"):
 		_place_prism(mouse_world)
+	if Input.is_action_just_pressed("cast_prism_surge"):
+		_cast_prism_surge()
 	if prism_node:
 		prism_node.position = prism_node.position.clamp(ARENA_RECT.position + Vector2(24, 24), ARENA_RECT.end - Vector2(24, 24))
 
@@ -243,6 +266,9 @@ func _cast_refraction_beam(target: Vector2) -> void:
 
 func _redirected_prism_direction(direction: Vector2) -> Vector2:
 	return BeamResolver.redirected_prism_direction(self, direction)
+
+func _cast_prism_surge() -> void:
+	SkillController.cast_prism_surge(self)
 
 func current_prism_radius() -> float:
 	return PRISM_RADIUS + prism_radius_bonus
@@ -329,6 +355,7 @@ func _restart_run() -> void:
 	prism_redirect_angle_bonus = 0.0
 	prism_redirect_damage_bonus = 0.0
 	prism_redirect_bonus_bounces = 0
+	_apply_skill_defaults()
 	player_pos = Vector2(260, 360)
 	if prism_node:
 		prism_node.queue_free()
@@ -384,23 +411,24 @@ func _build_lit_zones() -> Array:
 func _update_ui() -> void:
 	var beam_ready := "[color=#8be9fd]READY[/color]" if beam_timer <= 0.0 else "[color=#ffb86c]%.2fs[/color]" % beam_timer
 	var prism_state := "[color=#8be9fd]ACTIVE %.1fs[/color]" % prism_timer if prism_node else "[color=#50fa7b]READY[/color]"
+	var surge_state := "[color=#8be9fd]READY[/color]" if prism_surge_timer <= 0.0 else "[color=#ffb86c]%.1fs[/color]" % prism_surge_timer
 	var current_encounter := _current_encounter()
 	var encounter_title := String(current_encounter.get("title", "Encounter"))
 	var objective := "Pick one upgrade" if reward_pending else (String(current_encounter.get("summary", "Survive encounter and route beam through walls/prism")) if not run_over else ("Run complete — restart from center panel or R" if player_hp > 0.0 else "Run failed — restart from center panel or R"))
 	var immortal_text := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
 	var flashlight_text := "[color=#f1fa8c]ON[/color] (%.0f/s)" % flashlight_drain if flashlight_on else "[color=#6272a4]OFF[/color]"
-	hud_label.text = "[b]Lantern Engine %s[/b]\n[color=#a4b1cd]Encounter:[/color] %s\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#f1fa8c]Prism[/color] +%.0f redirect dmg | +%.0f radius | +%.0f° bend | +%d post-prism bounce\n[color=#f1fa8c]Flashlight[/color] %s    [color=#a4b1cd]Beam:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d    [color=#a4b1cd]Enemies:[/color] %d\n[color=#a4b1cd]Immortal:[/color] %s" % [BUILD_LABEL, encounter_title, objective, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, prism_redirect_damage_bonus, prism_radius_bonus, prism_redirect_angle_bonus, prism_redirect_bonus_bounces, flashlight_text, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), _alive_enemy_count(), immortal_text]
+	hud_label.text = "[b]Lantern Engine %s[/b]\n[color=#a4b1cd]Encounter:[/color] %s\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#f1fa8c]Prism[/color] +%.0f redirect dmg | +%.0f radius | +%.0f° bend | +%d post-prism bounce\n[color=#f1fa8c]Surge[/color] %.0f dmg  |  %.0f radius  |  [color=#a4b1cd]Q[/color] %s\n[color=#f1fa8c]Flashlight[/color] %s    [color=#a4b1cd]Beam:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d    [color=#a4b1cd]Enemies:[/color] %d\n[color=#a4b1cd]Immortal:[/color] %s" % [BUILD_LABEL, encounter_title, objective, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, prism_redirect_damage_bonus, prism_radius_bonus, prism_redirect_angle_bonus, prism_redirect_bonus_bounces, prism_surge_damage, prism_surge_radius, surge_state, flashlight_text, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), _alive_enemy_count(), immortal_text]
 	var help_hint := "[color=#8be9fd]F1 show full help[/color]" if help_collapsed else "[color=#8be9fd]F1 hide full help[/color]"
 	var immortal_hint := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
 	if reward_pending:
 		if reward_title_label:
 			reward_title_label.text = "Choose one Prism upgrade — current beam: %.0f dmg | %.0f range | %d bounce" % [beam_damage, beam_range, beam_bounces]
 		RewardController.update_button_states(self)
-		status_label.text = "[b]Reward pause[/b]\nChoose one clear beam upgrade before the next encounter.\n\n[color=#8be9fd]1/2/3[/color] direct pick\n[color=#8be9fd]W/S or ↑/↓[/color] move highlight\n[color=#8be9fd]E / Enter[/color] confirm highlighted reward\n\n[b]Current beam[/b]\n%.0f dmg | %.0f range | %d bounce" % [beam_damage, beam_range, beam_bounces]
+		status_label.text = "[b]Reward pause[/b]\nChoose one Prism upgrade before the next encounter.\n\n[color=#8be9fd]1/2/3[/color] direct pick\n[color=#8be9fd]W/S or ↑/↓[/color] move highlight\n[color=#8be9fd]E / Enter[/color] confirm highlighted reward\n\n[b]Current kit[/b]\nBeam %.0f dmg | %.0f range | %d bounce\nSurge %.0f dmg | %.0f radius | Q" % [beam_damage, beam_range, beam_bounces, prism_surge_damage, prism_surge_radius]
 	elif help_collapsed and not run_over:
 		status_label.text = "[b]Event[/b]\n%s\n\n%s\n[color=#6272a4]Key actions: F1 help | F flashlight | R restart | F4 immortal %s[/color]" % [last_event, help_hint, immortal_hint]
 	else:
-		status_label.text = "[b]Readability legend[/b]\n[color=#f1fa8c]Warm core[/color] + [color=#8be9fd]cyan bloom[/color] = live beam path\n[color=#8be9fd]Cyan wall ring[/color] = bounce / redirect point\n[color=#8be9fd]Diamond aura[/color] = Prism Node\n[color=#ffb86c]Orange[/color] moth | [color=#bd93f9]Purple[/color] hollow\n\n[b]Controls[/b]\nWASD move | LMB beam | RMB prism | F flashlight | R restart\nReward: 1/2/3 or W/S + E/Enter\nF1 help | F2 refill | F3 reward | F4 immortal | 1/2 spawn\n\n[b]Event[/b]\n%s" % [last_event]
+		status_label.text = "[b]Readability legend[/b]\n[color=#f1fa8c]Warm core[/color] + [color=#8be9fd]cyan bloom[/color] = live beam path\n[color=#8be9fd]Cyan wall ring[/color] = bounce / redirect point\n[color=#8be9fd]Diamond aura[/color] = Prism Node\n[color=#ffb86c]Orange[/color] moth | [color=#bd93f9]Purple[/color] hollow\n\n[b]Controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight | R restart\nReward: 1/2/3 or W/S + E/Enter\nF1 help | F2 refill | F3 reward | F4 immortal | 1/2 spawn\n\n[b]Event[/b]\n%s" % [last_event]
 	status_label.visible = true
 	if run_over:
 		end_title_label.text = "Run complete" if player_hp > 0.0 else "Lantern extinguished"
@@ -448,6 +476,7 @@ func _draw() -> void:
 		draw_line(prism_node.position + Vector2(0, -24), prism_node.position + Vector2(0, 24), Color(1.0, 1.0, 1.0, 0.16), 2.0)
 		var prism_preview_dir := _redirected_prism_direction(facing)
 		draw_circle(prism_node.position, current_prism_radius(), Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.08))
+		draw_circle(prism_node.position, prism_surge_radius, Color(0.62, 0.94, 1.0, 0.035 if prism_surge_timer <= 0.0 else 0.02))
 		draw_line(prism_node.position, prism_node.position + prism_preview_dir * 46.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.4), 2.0)
 	# --- Flashlight cone ---
 	if flashlight_on:

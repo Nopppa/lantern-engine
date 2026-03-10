@@ -1,5 +1,32 @@
 # Devlog
 
+## 2026-03-10 — v0.4.1 MVP-1 Patch 2 Third-Skill Pass
+
+This pass added the next low-risk combat layer after the authored-run / summary / data cleanup work from `v0.4.0`.
+
+What changed:
+- added `Prism Surge` as the third Prism skill on `Q`: it consumes the active Prism Node and releases a radial burst that damages and shoves nearby enemies
+- kept the feature out of `run_scene.gd` by introducing `scripts/gameplay/skill_controller.gd` for active skill execution and `scripts/data/skill_defs.gd` for baseline skill authoring
+- extended `scripts/data/upgrade_defs.gd` with `Surge Capacitors`, letting the existing reward pipeline deepen the new skill without introducing a parallel one-off upgrade path
+- updated HUD/help/reward copy only enough to surface the new control and current surge stats
+- extended `scripts/gameplay/run_summary.gd` with a Prism Surge cast counter so the new skill shows up in the run report only where it matters
+
+Validation:
+```bash
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --quit
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
+```
+
+Validation result:
+- first headless pass exposed typed-inference compile blockers in the new skill controller
+- fixed only those compile issues
+- headless boot passed
+- Windows export passed
+- packaged Windows release artifact prepared for GitHub Release upload
+
+Recommended next step:
+- build the MVP-1 miniboss now that the core combat kit includes beam, node, and a third active Prism skill
+
 ## 2026-03-10 — v0.4.0 MVP-1 Patch 1 Finish Pass
 
 This pass finished the previously partial MVP-1 patch instead of restarting from scratch.

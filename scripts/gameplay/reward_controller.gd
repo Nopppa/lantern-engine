@@ -120,6 +120,10 @@ static func select_reward(run: RunScene, index: int) -> void:
 			run.prism_redirect_angle_bonus += 8.0
 		"echo_lens":
 			run.prism_redirect_bonus_bounces += 1
+		"surge_capacitors":
+			run.prism_surge_damage += 8.0
+			run.prism_surge_radius += 22.0
+			run.prism_surge_cooldown = max(run.prism_surge_cooldown - 1.0, 2.5)
 	RunSummary.note_upgrade(run, reward)
 	run.reward_pending = false
 	run.reward_panel.visible = false

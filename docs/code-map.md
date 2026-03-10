@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: post `v0.4.0` MVP-1 patch 1 finish pass
+Current internal state: post `v0.4.1` MVP-1 patch 2 skill pass
 
 ## Purpose
 
@@ -33,8 +33,12 @@ Use this before making structural changes so new work lands in the right file in
 
 - `scripts/data/upgrade_defs.gd`
   - reward / upgrade pool definitions
-  - source of current core + Prism upgrade authoring
+  - source of current core + Prism upgrade authoring, including Prism Surge support upgrades
   - drives reward filtering by encounter tags
+
+- `scripts/data/skill_defs.gd`
+  - authored baseline data for active Prism skills
+  - currently seeds Prism Surge stats into runtime instead of hardcoding them only in scene state
 
 ### Gameplay
 - `scripts/gameplay/run_summary.gd`
@@ -74,6 +78,10 @@ Use this before making structural changes so new work lands in the right file in
   - Prism upgrade integration for redirect damage, redirect radius, redirect angle, and post-redirect bounce continuation
   - segment-vs-circle hit checks and enemy damage application
   - runtime summary hooks for beams, redirects, damage dealt, and kills
+
+- `scripts/gameplay/skill_controller.gd`
+  - active non-beam Prism skill execution
+  - current owner of Prism Surge burst logic, knockback, node consumption, and summary hooks
 
 ### Player / debug input
 - `scripts/player/debug_actions.gd`
