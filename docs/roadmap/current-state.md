@@ -1,7 +1,7 @@
 # Current State
 
 Last updated: 2026-03-10
-Current shipped version target: `v0.5.2`
+Current shipped version target: `v0.5.3`
 
 ## Now shipped
 
@@ -29,12 +29,14 @@ That direction is no longer just a recommendation in docs; it is now reflected i
 The older wave-survival arena, encounter chain, reward flow, and run summary are still kept in-repo as temporary legacy scaffolding for reference and fallback testing.
 They are no longer the primary design center.
 
-## Now improved in v0.5.2
+## Now improved in v0.5.3
 
-- stronger authored signage now makes each comparison bay/lane/station/deck readable at a glance
-- secondary-light overlays now distinguish diffuse spread, reflected streaks, prism-emitted response, and glass continuation more clearly
-- beam-path instrumentation now exposes simple path layering (`L0/L1/L2...`) plus stronger bounce/redirect markers
-- reusable-vs-lab-only migration boundary is now documented explicitly in `docs/light_lab_runtime_boundary.md`
+- flashlight rendering now follows blocker/material truth much more closely with visible traced rays, visible blocking, visible reflection, and visible glass pass-through bend instead of relying on a misleading simple cone
+- glass / wood / wet / wood-floor interactions now read more honestly in the visible light language
+- flashlight cone widened slightly to support readability without turning into a floodlight
+- enemies now use lightweight obstacle routing around walls/tree trunks when a path exists
+- `F1` now genuinely hides help/legend/debug overlays for a clean validation view
+- reusable-vs-lab-only migration boundary now also documents the new flashlight-visual and navigation helpers honestly
 
 ## Immediate next recommendation
 

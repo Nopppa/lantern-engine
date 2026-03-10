@@ -1,5 +1,28 @@
 # Devlog
 
+## 2026-03-10 — v0.5.3 Surface Optics & Navigation Truth patch
+
+This patch stays narrow on the remaining trust gaps: the flashlight should show what it is actually doing, enemies should stop lying about reachable paths, and `F1` should mean what the UI says it means.
+
+What changed:
+- added `scripts/gameplay/flashlight_visuals.gd` so the flashlight now renders traced, blocker-aware, material-aware segments/zones instead of only a fake simple cone
+- widened the flashlight half-angle slightly to 34° and fed visible flashlight segments back into the local light readout / floor-response language
+- added slight glass bend + pass-through readability, broader wood scatter, subtle wood-floor glow/widening, and stronger wet-stone glossy disturbance
+- added `scripts/gameplay/light_lab_navigation.gd` and routed enemy chase movement through it so enemies can work around walls/tree trunks when a path exists
+- made overlay hiding truthful: `F1` now hides top panels, signage cards, path/debug markers, cursor probe text, and HP labels for an unobstructed test view
+
+Validation:
+```bash
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --quit
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
+```
+
+Validation result:
+- headless boot passed locally during implementation; Windows export result is tracked in the release/build step for `v0.5.3`
+
+Recommended next step:
+- if this patch tests well, do one small follow-up pass on deeper reusable light-trace extraction so future runtime consumers can use the same truthful flashlight/path outputs without the Light Lab scene adapter
+
 ## 2026-03-10 — v0.5.2 Light Lab Readability & Extraction patch
 
 This patch keeps the project pointed at the Light Lab, but makes the lab faster to read and easier to graduate from later.

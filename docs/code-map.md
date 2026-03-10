@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: `v0.5.2` Light Lab Readability & Extraction patch shipped
+Current internal state: `v0.5.3` Surface Optics & Navigation Truth patch shipped
 
 ## Purpose
 
@@ -60,6 +60,14 @@ This file tells future contributors where the new Light Lab responsibilities now
 - `scripts/gameplay/dead_alive_grid.gd`
   - rendering-side dead/alive blend state cache for the floor
   - tracks temporary exposure and base alive/restored zones
+
+- `scripts/gameplay/flashlight_visuals.gd`
+  - builds truthful visible flashlight trace segments/zones from the same blocker/material truth used by the lab
+  - keeps flashlight rendering alignment work out of `scripts/light_lab_scene.gd`
+
+- `scripts/gameplay/light_lab_navigation.gd`
+  - small Light Lab-only waypoint/A* helper for obstacle routing around walls/tree trunks
+  - gives enemies basic robust pathing without introducing a heavyweight navigation framework
 
 ### Existing reusable modules still used by the lab
 - `scripts/gameplay/encounter_controller.gd`

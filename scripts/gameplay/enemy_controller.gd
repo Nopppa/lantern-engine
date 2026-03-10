@@ -4,6 +4,7 @@ class_name EnemyController
 const BossController = preload("res://scripts/gameplay/boss_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
+const LightLabNavigation = preload("res://scripts/gameplay/light_lab_navigation.gd")
 
 static func update_enemies(run: RunScene, delta: float) -> void:
 	BossController.update_projectiles(run, delta)
@@ -68,25 +69,28 @@ static func _safe_direction_from_player(to_player: Vector2) -> Vector2:
 static func _resolve_motion(run: RunScene, enemy: Dictionary, motion: Vector2) -> void:
 	var radius := float(enemy.get("radius", 16.0)) + 4.0
 	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
-	var next_pos := LightLabCollision.resolve_circle_motion(enemy["node"].position, radius, motion, segments)
+	var circles: Array = run.get("tree_trunks") if run.get("tree_trunks") != null else []
+	var next_pos := LightLabCollision.resolve_circle_motion(enemy["node"].position, radius, motion, segments, circles)
 	next_pos = next_pos.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
 	enemy["node"].position = next_pos
 
 static func _find_clear_position(run: RunScene, desired: Vector2, radius: float) -> Vector2:
 	var clamped := desired.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
 	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
-	if segments.is_empty() or not LightLabCollision.is_circle_blocked(clamped, radius + 4.0, segments):
+	var circles: Array = run.get("tree_trunks") if run.get("tree_trunks") != null else []
+	if segments.is_empty() or not LightLabCollision.is_circle_blocked(clamped, radius + 4.0, segments, circles):
 		return clamped
 	for ring in range(1, 5):
 		for step in range(12):
 			var probe := clamped + Vector2.RIGHT.rotated(TAU * float(step) / 12.0) * 18.0 * float(ring)
 			probe = probe.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
-			if not LightLabCollision.is_circle_blocked(probe, radius + 4.0, segments):
+			if not LightLabCollision.is_circle_blocked(probe, radius + 4.0, segments, circles):
 				return probe
 	return clamped
 
 static func _update_moth(run: RunScene, enemy: Dictionary, dir: Vector2, delta: float) -> void:
-	_resolve_motion(run, enemy, dir * enemy["speed"] * delta)
+	var steer: Vector2 = _steer_toward_player(run, enemy, dir)
+	_resolve_motion(run, enemy, steer * enemy["speed"] * delta)
 
 static func _update_hollow(run: RunScene, enemy: Dictionary, dir: Vector2, delta: float) -> void:
 	var light_state := run._light_state_for_position(enemy["node"].position)
@@ -129,6 +133,15 @@ static func _update_hollow_windup(run: RunScene, enemy: Dictionary, dir: Vector2
 		var jitter := Vector2(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0))
 		enemy["node"].position += jitter
 
+static func _steer_toward_player(run: RunScene, enemy: Dictionary, fallback_dir: Vector2) -> Vector2:
+	var radius: float = float(enemy.get("radius", 16.0)) + 6.0
+	var waypoint: Vector2 = LightLabNavigation.next_waypoint(run, enemy["node"].position, run.player_pos, radius)
+	var steer: Vector2 = (waypoint - enemy["node"].position).normalized()
+	if steer == Vector2.ZERO:
+		steer = fallback_dir
+	enemy["nav_target"] = waypoint
+	return steer
+
 static func _update_hollow_active(run: RunScene, enemy: Dictionary, dir: Vector2, in_light: bool, delta: float) -> void:
 	enemy["attack_timer"] -= delta
 	var special_lock_timer: float = float(enemy.get("special_lock_timer", 0.0))
@@ -142,8 +155,9 @@ static func _update_hollow_active(run: RunScene, enemy: Dictionary, dir: Vector2
 			run.last_event = "Hollow struggling to blink..."
 		else:
 			enemy["attack_timer"] = 2.4
-			var flank := Vector2(randf_range(-80, 80), randf_range(-80, 80))
+			var flank: Vector2 = Vector2(randf_range(-80, 80), randf_range(-80, 80))
 			enemy["node"].position = _find_clear_position(run, run.player_pos + dir.rotated(PI) * 140.0 + flank, float(enemy.get("radius", 16.0)) + 6.0)
 			run.last_event = "Hollow ambush blink"
 	else:
-		_resolve_motion(run, enemy, dir * enemy["speed"] * 0.55 * delta)
+		var steer: Vector2 = _steer_toward_player(run, enemy, dir)
+		_resolve_motion(run, enemy, steer * enemy["speed"] * 0.55 * delta)

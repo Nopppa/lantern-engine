@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.3 - 2026-03-10
+
+Surface Optics & Navigation Truth patch:
+
+- replaced the old misleading flashlight fill-cone presentation with traced blocker-aware/material-aware flashlight visuals in `scripts/gameplay/flashlight_visuals.gd`, so visible flashlight behavior now shows real blocking, reflection/scatter, and glass pass-through much more honestly
+- widened flashlight half-angle from 30° to 34° and fed the traced flashlight segments/zones back into local light readability so dead/alive response and probes better match what players see
+- added slight glass refraction/bend plus visible transmitted continuation with mild intensity loss instead of a straight fake continuation
+- tuned wood response toward broader diffuse scatter with less perfectly clean reflection and added subtle wood-floor glow/widening when light travels across wood areas
+- tuned wet stone toward glossier partial reflection/disturbance so it no longer reads like a surface that does nothing
+- added lightweight obstacle routing in `scripts/gameplay/light_lab_navigation.gd`; enemies now choose waypoints around walls/tree trunks when a path exists instead of pushing into blockers forever
+- made `F1` a truthful full overlay toggle in the Light Lab: top panels, signage/help cards, debug/path markers, HP labels, and cursor probe text now all hide together for a clean test view and return on the next toggle
+- updated docs/runtime-boundary notes for the new truthful flashlight-visual and navigation modules
+
 ## 0.5.2 - 2026-03-10
 
 Light Lab Readability & Extraction patch:

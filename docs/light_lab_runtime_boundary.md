@@ -1,7 +1,7 @@
 # Light Lab Runtime Boundary
 
 Last updated: 2026-03-10  
-Target version: `v0.5.2`
+Target version: `v0.5.3`
 
 ## Purpose
 
@@ -109,6 +109,26 @@ This is intentionally the authored test-map layout:
 
 It exists to stop `light_lab_scene.gd` from owning all authored content directly.
 It should not be treated as exploration runtime content.
+
+### `scripts/gameplay/flashlight_visuals.gd`
+**Status:** partly reusable now
+
+Reusable pieces:
+
+- visible flashlight trace assembly from blocker/material truth
+- pass-through / reflect / scatter branch presentation inputs
+- extra local visual readability for wood/wet/glass interactions
+
+Lab-only parts right now:
+
+- direct dependence on the Light Lab scene contract/arrays
+- current tuning language for the validation deck and signage expectations
+
+### `scripts/gameplay/light_lab_navigation.gd`
+**Status:** Light Lab-only for now
+
+This is intentionally a small obstacle-routing helper for enemies in the authored validation space.
+It solves wall/tree truth without pretending a full future-runtime navigation architecture already exists.
 
 ### `scripts/light_lab_scene.gd`
 **Status:** lab coordinator only

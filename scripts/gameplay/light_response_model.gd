@@ -51,10 +51,17 @@ static func response(material_id: String, source_type: String, intensity: float,
 	diffusion /= total
 	transmission /= total
 	absorption /= total
-	var reflect_dir: Vector2 = incoming_dir.bounce(normal).normalized()
+	var incoming := incoming_dir.normalized()
+	var reflect_dir: Vector2 = incoming.bounce(normal).normalized()
 	if reflect_dir == Vector2.ZERO:
-		reflect_dir = incoming_dir.normalized()
-	var roughness: float = clampf(diffusion * float(profile.get("roughness_scale", 1.0)), 0.0, 1.0)
+		reflect_dir = incoming
+	var refraction_strength: float = clampf(float(material.get("refraction_strength", 0.0)), 0.0, 0.35)
+	var transmit_dir := incoming
+	if refraction_strength > 0.0:
+		transmit_dir = incoming.lerp(incoming.slide(normal).normalized(), refraction_strength).normalized()
+		if transmit_dir == Vector2.ZERO:
+			transmit_dir = incoming
+	var roughness: float = clampf(float(material.get("roughness", diffusion)) * float(profile.get("roughness_scale", 1.0)), 0.0, 1.0)
 	return {
 		"material_id": material_id,
 		"material": material,
@@ -65,7 +72,7 @@ static func response(material_id: String, source_type: String, intensity: float,
 		"transmission": transmission,
 		"absorption": absorption,
 		"reflect_dir": reflect_dir,
-		"transmit_dir": incoming_dir.normalized(),
+		"transmit_dir": transmit_dir,
 		"branch_min": float(profile.get("min_branch_intensity", 0.05)),
 		"branch_range_scale": float(profile.get("range_scale", 1.0)),
 		"diffuse_radius": float(profile.get("diffuse_radius", 56.0)) * (0.7 + diffusion * 0.7),

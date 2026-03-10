@@ -8,8 +8,9 @@ const BossController = preload("res://scripts/gameplay/boss_controller.gd")
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 const LightQuery = preload("res://scripts/gameplay/light_query.gd")
 const LightLabLayout = preload("res://scripts/data/light_lab_layout.gd")
+const FlashlightVisuals = preload("res://scripts/gameplay/flashlight_visuals.gd")
 
-const LAB_LABEL := "Light Lab v0.5.2"
+const LAB_LABEL := "Light Lab v0.5.3"
 const CELL_SIZE := 32.0
 const PROBE_RADIUS := 18.0
 
@@ -21,6 +22,9 @@ var diffuse_zones: Array = []
 var secondary_light_segments: Array = []
 var secondary_light_zones: Array = []
 var secondary_debug_points: Array = []
+var flashlight_visual_segments: Array = []
+var flashlight_visual_zones: Array = []
+var flashlight_visual_debug_points: Array = []
 var dead_alive_cells: Array = []
 var beam_debug_hits: Array = []
 var beam_debug_enabled := true
@@ -41,7 +45,7 @@ func _ready() -> void:
 	beam_damage = 22.0
 	flashlight_on = true
 	flashlight_range = 360.0
-	flashlight_half_angle = 30.0
+	flashlight_half_angle = 34.0
 	last_event = "Light Lab booted — readability + extraction pass active"
 	_build_light_lab()
 	_update_ui()
@@ -106,10 +110,17 @@ func _process(delta: float) -> void:
 	secondary_light_segments.clear()
 	secondary_light_zones.clear()
 	secondary_debug_points.clear()
+	flashlight_visual_segments.clear()
+	flashlight_visual_zones.clear()
+	flashlight_visual_debug_points.clear()
 	var secondary := LightSurfaceResolver.build_secondary_light(self)
 	secondary_light_segments = secondary.get("segments", [])
 	secondary_light_zones = secondary.get("zones", [])
 	secondary_debug_points = secondary.get("debug_points", [])
+	var flashlight_visuals := FlashlightVisuals.build_visual_trace(self)
+	flashlight_visual_segments = flashlight_visuals.get("segments", [])
+	flashlight_visual_zones = flashlight_visuals.get("zones", [])
+	flashlight_visual_debug_points = flashlight_visuals.get("debug_points", [])
 	energy = min(max_energy, energy + energy_regen * delta)
 	if prism_node and prism_timer <= 0.0:
 		prism_node.queue_free()
@@ -162,6 +173,9 @@ func _restart_lab() -> void:
 	beam_segments.clear()
 	beam_debug_hits.clear()
 	diffuse_zones.clear()
+	flashlight_visual_segments.clear()
+	flashlight_visual_zones.clear()
+	flashlight_visual_debug_points.clear()
 	player_hp = player_max_hp
 	energy = max_energy
 	player_pos = Vector2(228, 576)
@@ -268,6 +282,10 @@ func _visibility_between(a: Vector2, b: Vector2) -> float:
 
 func _light_intensity_at(pos: Vector2) -> float:
 	var intensity := _flashlight_intensity(player_pos, facing, pos, flashlight_range, flashlight_half_angle, 1.0 if flashlight_on else 0.0)
+	for segment: Dictionary in flashlight_visual_segments:
+		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 32.0 if String(segment.get("kind", "primary")) == "primary" else 26.0, float(segment["intensity"]) * (0.9 if String(segment.get("kind", "primary")) == "primary" else 0.7)))
+	for zone: Dictionary in flashlight_visual_zones:
+		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])))
 	for segment: Dictionary in beam_segments:
 		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 42.0, float(segment["intensity"])))
 	for diffuse: Dictionary in diffuse_zones:
@@ -312,7 +330,11 @@ func _light_state_for_position(pos: Vector2) -> Dictionary:
 func _build_lit_zones() -> Array:
 	var zones: Array = []
 	if flashlight_on:
-		zones.append({"pos": player_pos + facing * 116.0, "radius": 176.0, "color": Color(1.0, 0.95, 0.72, 0.09), "layer": 0})
+		zones.append({"pos": player_pos + facing * 116.0, "radius": 176.0, "color": Color(1.0, 0.95, 0.72, 0.06), "layer": 0})
+	for segment: Dictionary in flashlight_visual_segments:
+		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.18, 24.0), "color": Color(1.0, 0.92, 0.72, 0.028 + 0.035 * float(segment["intensity"])), "layer": 0})
+	for zone: Dictionary in flashlight_visual_zones:
+		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.90, 0.68, 0.022 + 0.032 * float(zone["strength"])), "layer": 0})
 	for segment: Dictionary in beam_segments:
 		var layer_alpha: float = max(0.03, 0.08 - float(segment.get("layer", 0)) * 0.008)
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.32, 64.0), "color": Color(0.55, 0.92, 1.0, layer_alpha * float(segment["intensity"])), "layer": int(segment.get("layer", 0))})
@@ -351,8 +373,8 @@ func _update_ui() -> void:
 	var beam_layers := 0
 	for segment: Dictionary in beam_segments:
 		beam_layers = max(beam_layers, int(segment.get("layer", 0)) + 1)
-	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] Permanent validation map (no auto encounters)\n[color=#a4b1cd]Goal:[/color] Readability + path instrumentation + extraction boundary\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s" % [LAB_LABEL, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text]
-	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle\nF1 hide/show overlays | F2 refill | F4 immortal\n\n[b]Readability legend[/b]\nBeam L0/L1/L2 = primary to later branches\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nGold line = flashlight secondary | Cyan line = prism secondary | Aqua dashed = glass continuation\nTrees = solid blockers for player, beam, and flashlight\n\n[b]Event[/b]\n%s" % last_event
+	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] Permanent validation map (no auto encounters)\n[color=#a4b1cd]Goal:[/color] Optics truth + obstacle truth\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | traced rays visible | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s" % [LAB_LABEL, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text]
+	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle\nF1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Readability legend[/b]\nBeam L0/L1/L2 = primary to later branches\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nWarm traced rays = flashlight truth | Aqua dashed = glass pass-through bend\nWood = broad scatter | Wet stone = glossy disturbance | Trees = hard blockers\n\n[b]Event[/b]\n%s" % last_event
 
 func _material_under_cursor(pos: Vector2) -> Dictionary:
 	for patch: Dictionary in surface_patches:
@@ -424,24 +446,13 @@ func _draw() -> void:
 	for prism_station: Dictionary in prism_stations:
 		draw_circle(prism_station["pos"], 26.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.18))
 		draw_arc(prism_station["pos"], 26.0, 0.0, TAU, 24, PRISM_COLOR, 3.0)
-	for patch: Dictionary in surface_patches:
-		_draw_sign_patch(patch)
-	if flashlight_on:
-		var cone_angle := deg_to_rad(flashlight_half_angle)
-		var base_angle := facing.angle()
-		var cone_segments := 28
-		var cone_points := PackedVector2Array([player_pos])
-		for ci in range(cone_segments + 1):
-			var t_angle := base_angle - cone_angle + (2.0 * cone_angle) * (float(ci) / float(cone_segments))
-			cone_points.append(player_pos + Vector2(cos(t_angle), sin(t_angle)) * flashlight_range)
-		var colors := PackedColorArray()
-		for point in cone_points:
-			var dist_ratio: float = player_pos.distance_to(point) / max(flashlight_range, 1.0)
-			colors.append(Color(1.0, 0.96, 0.74, 0.18 * (1.0 - dist_ratio * 0.6)))
-		draw_polygon(cone_points, colors)
+	if not help_collapsed:
+		for patch: Dictionary in surface_patches:
+			_draw_sign_patch(patch)
+	_draw_flashlight_trace()
 	_draw_primary_beam_segments()
 	_draw_secondary_overlays()
-	if beam_debug_enabled:
+	if beam_debug_enabled and not help_collapsed:
 		_draw_debug_markers()
 	for enemy: Dictionary in enemies:
 		if not is_instance_valid(enemy["node"]):
@@ -449,12 +460,12 @@ func _draw() -> void:
 		var color: Color = Color("ffb86c") if enemy["type"] == "moth" else (Color("ff4fd8") if enemy["type"] == "boss_hollow_matriarch" else Color("bd93f9"))
 		draw_circle(enemy["node"].position, enemy["radius"] + 7.0, Color(color.r, color.g, color.b, 0.15))
 		draw_circle(enemy["node"].position, enemy["radius"], color)
-		if hp_overhead_enabled:
+		if hp_overhead_enabled and not help_collapsed:
 			draw_string(ThemeDB.fallback_font, enemy["node"].position + Vector2(-28, -24), "%d/%d" % [int(ceil(float(enemy["hp"]))), int(ceil(float(enemy.get("max_hp", enemy["hp"]))))], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1,1,1,0.9))
 	draw_circle(player_pos, PLAYER_RADIUS + 10.0, Color(1.0, 0.95, 0.72, 0.12))
 	draw_circle(player_pos, PLAYER_RADIUS, Color("f1fa8c"))
 	draw_line(player_pos, player_pos + facing * 26.0, Color(0.14, 0.18, 0.24, 1.0), 2.0)
-	if cursor_probe_enabled and ARENA_RECT.has_point(get_global_mouse_position()):
+	if cursor_probe_enabled and not help_collapsed and ARENA_RECT.has_point(get_global_mouse_position()):
 		var probe := get_global_mouse_position()
 		var intensity := _light_intensity_at(probe)
 		var mat := _material_under_cursor(probe)
@@ -462,6 +473,62 @@ func _draw() -> void:
 		draw_arc(probe, PROBE_RADIUS + 7.0, -PI * 0.5, -PI * 0.5 + TAU * intensity, 24, Color(1.0, 0.95, 0.72, 0.85), 2.0)
 		var probe_text := "%s | I %.2f | R %.2f D %.2f T %.2f | %s" % [String(mat.get("label", "Floor")), intensity, float(mat.get("reflectivity", 0.0)), float(mat.get("diffusion", 0.0)), float(mat.get("transmission", 0.0)), String(mat.get("hint", ""))]
 		draw_string(ThemeDB.fallback_font, probe + Vector2(20, -12), probe_text, HORIZONTAL_ALIGNMENT_LEFT, 320.0, 12, Color(1, 1, 1, 0.88))
+
+func _draw_flashlight_trace() -> void:
+	if not flashlight_on:
+		return
+	for zone: Dictionary in flashlight_visual_zones:
+		var kind := String(zone.get("kind", "diffuse"))
+		var zone_color := Color(1.0, 0.90, 0.62, 0.08 * float(zone["strength"]))
+		if String(zone.get("material_id", "")) == "glass":
+			zone_color = Color(0.72, 0.96, 1.0, 0.07 * float(zone["strength"]))
+		elif String(zone.get("material_id", "")) == "wet":
+			zone_color = Color(0.76, 0.95, 1.0, 0.08 * float(zone["strength"]))
+		draw_circle(zone["pos"], zone["radius"], zone_color)
+		if kind != "block":
+			draw_arc(zone["pos"], float(zone["radius"]) * 0.56, 0.0, TAU, 20, Color(zone_color.r, zone_color.g, zone_color.b, 0.22 + 0.18 * float(zone["strength"])), 1.8)
+	for segment: Dictionary in flashlight_visual_segments:
+		var a: Vector2 = segment["a"]
+		var b: Vector2 = segment["b"]
+		var intensity: float = float(segment["intensity"])
+		var kind := String(segment.get("kind", "primary"))
+		var material_id := String(segment.get("material_id", "open"))
+		var tint := Color(1.0, 0.95, 0.78, 1.0)
+		var width := 4.0
+		if kind == "transmit":
+			tint = Color(0.70, 0.96, 1.0, 1.0)
+			width = 3.0
+		elif kind == "reflect":
+			tint = Color(1.0, 0.90, 0.70, 1.0)
+			width = 3.6
+		elif kind == "scatter":
+			tint = Color(1.0, 0.82, 0.56, 1.0)
+			width = 2.8
+		elif kind == "disturb":
+			tint = Color(0.78, 0.96, 1.0, 1.0)
+			width = 2.6
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.07 * intensity), 12.0)
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.18 * intensity), 7.0)
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.60 * intensity), width)
+		if kind == "transmit":
+			var distance: float = a.distance_to(b)
+			var steps: int = max(2, int(distance / 24.0))
+			for i in range(steps):
+				if i % 2 == 0:
+					continue
+				var da: Vector2 = a.lerp(b, float(i) / float(steps))
+				var db: Vector2 = a.lerp(b, min(1.0, float(i) / float(steps) + 0.08))
+				draw_line(da, db, Color(1.0, 1.0, 1.0, 0.34 * intensity), 1.4)
+		if material_id == "wood" and kind == "primary":
+			var wood_mid := a.lerp(b, 0.6)
+			draw_arc(wood_mid, 12.0, -0.45, 0.45, 10, Color(1.0, 0.88, 0.58, 0.25 * intensity), 1.4)
+			draw_arc(wood_mid + Vector2(6, -2), 18.0, -0.30, 0.55, 10, Color(1.0, 0.80, 0.50, 0.18 * intensity), 1.2)
+		if material_id == "wet":
+			var wet_mid := a.lerp(b, 0.48)
+			draw_arc(wet_mid, 10.0, 0.0, TAU, 16, Color(0.76, 0.96, 1.0, 0.30 * intensity), 1.2)
+		if not help_collapsed and kind != "primary":
+			var label := "FX" if kind == "reflect" else ("TX" if kind == "transmit" else "SC")
+			draw_string(ThemeDB.fallback_font, a.lerp(b, 0.5) + Vector2(-8, -8), label, HORIZONTAL_ALIGNMENT_LEFT, 28.0, 9, Color(1, 1, 1, 0.65))
 
 func _draw_sign_patch(patch: Dictionary) -> void:
 	var rect: Rect2 = patch["rect"]
@@ -488,9 +555,10 @@ func _draw_primary_beam_segments() -> void:
 			var mid: Vector2 = a.lerp(b, 0.5)
 			draw_arc(mid, 18.0, 0.0, TAU, 18, Color(0.72, 0.94, 1.0, 0.38 * alpha), 2.0)
 			draw_arc(mid + Vector2(8, -4), 10.0, 0.0, TAU, 16, Color(1.0, 1.0, 1.0, 0.24 * alpha), 1.5)
-		var mid2: Vector2 = a.lerp(b, 0.5)
-		draw_circle(mid2, 10.0, Color(0.02, 0.04, 0.08, 0.36))
-		draw_string(ThemeDB.fallback_font, mid2 + Vector2(-10, 4), "L%d" % layer, HORIZONTAL_ALIGNMENT_LEFT, 24.0, 11, Color(0.92, 0.98, 1.0, 0.9))
+		if not help_collapsed:
+			var mid2: Vector2 = a.lerp(b, 0.5)
+			draw_circle(mid2, 10.0, Color(0.02, 0.04, 0.08, 0.36))
+			draw_string(ThemeDB.fallback_font, mid2 + Vector2(-10, 4), "L%d" % layer, HORIZONTAL_ALIGNMENT_LEFT, 24.0, 11, Color(0.92, 0.98, 1.0, 0.9))
 
 func _draw_secondary_overlays() -> void:
 	for diffuse: Dictionary in diffuse_zones:

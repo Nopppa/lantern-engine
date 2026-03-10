@@ -1,5 +1,17 @@
 # Milestones
 
+## Done now: v0.5.3 Surface Optics & Navigation Truth patch shipped
+
+Delivered in this repo now:
+
+- flashlight visuals now draw traced, blocker-aware, surface-aware branches so visible flashlight behavior matches the lab's actual light truth much more closely than the old fake cone
+- glass now reads as pass-through with slight bend + slight loss instead of a straight misleading continuation
+- wood now shows broader scatter and less perfectly clean reflection, while wood flooring picks up subtle glow/widening when light travels across it
+- wet stone now shows glossy disturbance / partial reflection rather than feeling inert
+- flashlight cone widened slightly for clearer readable coverage without losing directionality
+- enemies now route around walls/tree trunks with a lightweight waypoint/A* helper instead of walking straight into blockers forever
+- `F1` now hides all overlay/debug/help elements needed for a clean unobstructed gameplay/test view
+
 ## Done now: v0.5.1 Unified Light Response patch shipped
 
 Delivered in this repo now:
