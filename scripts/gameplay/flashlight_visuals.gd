@@ -1,17 +1,22 @@
 extends RefCounted
 class_name FlashlightVisuals
 
+const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 const LightResponseModel = preload("res://scripts/gameplay/light_response_model.gd")
 const LightSurfaceResolver = preload("res://scripts/gameplay/light_surface_resolver.gd")
 
 static func build_visual_trace(lab) -> Dictionary:
 	if not lab.flashlight_on:
-		return {"segments": [], "zones": [], "debug_points": []}
+		return {"segments": [], "zones": [], "debug_points": [], "fills": [], "perf": {}}
+	var config := LightApproximation.config_for_source("flashlight")
+	var ray_count: int = int(config.get("guide_rays", 9))
+	var max_bounces: int = 1
 	var segments: Array = []
 	var zones: Array = []
+	var fills: Array = []
 	var debug_points: Array = []
-	var ray_count: int = 17
-	var max_bounces: int = 2
+	var primary_frontier: Array = []
+	var trace_count := 0
 	var base_angle: float = lab.facing.angle()
 	var cone_angle: float = deg_to_rad(lab.flashlight_half_angle)
 	for i in range(ray_count):
@@ -20,10 +25,12 @@ static func build_visual_trace(lab) -> Dictionary:
 		var edge_ratio: float = absf(t * 2.0 - 1.0)
 		var origin: Vector2 = lab.player_pos
 		var direction: Vector2 = Vector2.RIGHT.rotated(angle)
-		var intensity: float = lerpf(0.34, 0.92, pow(1.0 - edge_ratio, 1.45))
+		var intensity: float = lerpf(0.42, 0.96, pow(1.0 - edge_ratio, 1.18))
 		var remaining: float = lab.flashlight_range
 		var bounce_index: int = 0
-		while remaining > 12.0 and intensity > 0.045 and bounce_index <= max_bounces:
+		var frontier_point: Vector2 = origin + direction * min(remaining, 48.0)
+		while remaining > 14.0 and intensity > 0.055 and bounce_index <= max_bounces:
+			trace_count += 1
 			var hit := LightSurfaceResolver._closest_hit(lab, origin, direction, remaining)
 			if hit.is_empty():
 				var end_point: Vector2 = origin + direction * remaining
@@ -36,17 +43,19 @@ static func build_visual_trace(lab) -> Dictionary:
 					"bounce_index": bounce_index,
 					"sample": t
 				})
+				frontier_point = end_point
 				if _crosses_material_patch(lab, origin, end_point, "wood"):
 					var wood_mid: Vector2 = origin.lerp(end_point, 0.52)
 					zones.append({
 						"pos": wood_mid,
-						"radius": 28.0 + 24.0 * intensity,
-						"strength": 0.10 + intensity * 0.12,
+						"radius": 34.0 + 28.0 * intensity,
+						"strength": 0.08 + intensity * 0.10,
 						"material_id": "wood",
 						"kind": "wood_floor_glow"
 					})
 				break
 			var hit_point: Vector2 = hit["point"]
+			frontier_point = hit_point
 			var travel: float = origin.distance_to(hit_point)
 			segments.append({
 				"a": origin,
@@ -70,14 +79,14 @@ static func build_visual_trace(lab) -> Dictionary:
 			if material_id == "tree" or material_id == "brick":
 				zones.append({
 					"pos": hit_point,
-					"radius": 18.0 + 14.0 * intensity,
-					"strength": 0.05 + intensity * 0.08,
+					"radius": 18.0 + 16.0 * intensity,
+					"strength": 0.04 + intensity * 0.07,
 					"material_id": material_id,
 					"kind": "block"
 				})
 				break
 			var response: Dictionary = LightResponseModel.response(material_id, "flashlight", intensity, direction, Vector2(hit["normal"]))
-			if float(response["diffusion"]) * intensity > 0.035:
+			if float(response["diffusion"]) * intensity > 0.03:
 				zones.append({
 					"pos": hit_point,
 					"radius": float(response["diffuse_radius"]),
@@ -86,31 +95,32 @@ static func build_visual_trace(lab) -> Dictionary:
 					"kind": "diffuse"
 				})
 			if material_id == "wood":
-				var scatter_dir: Vector2 = Vector2(response["reflect_dir"]).lerp(direction, 0.55).normalized()
+				var scatter_dir: Vector2 = Vector2(response["reflect_dir"]).lerp(direction, 0.68).normalized()
 				segments.append({
 					"a": hit_point,
-					"b": hit_point + scatter_dir.rotated(0.13) * remaining * 0.22,
-					"intensity": intensity * 0.18,
+					"b": hit_point + scatter_dir * remaining * 0.18,
+					"intensity": intensity * 0.12,
 					"kind": "scatter",
 					"material_id": material_id,
 					"bounce_index": bounce_index + 1,
 					"sample": t
 				})
+			elif material_id == "wet":
 				segments.append({
 					"a": hit_point,
-					"b": hit_point + scatter_dir.rotated(-0.16) * remaining * 0.18,
-					"intensity": intensity * 0.14,
-					"kind": "scatter",
-					"material_id": material_id,
-					"bounce_index": bounce_index + 1,
-					"sample": t
-				})
-			if material_id == "wet":
-				segments.append({
-					"a": hit_point,
-					"b": hit_point + Vector2(response["reflect_dir"]).rotated(0.08 if int(i) % 2 == 0 else -0.08) * remaining * 0.24,
-					"intensity": intensity * 0.16,
+					"b": hit_point + Vector2(response["reflect_dir"]) * remaining * 0.20,
+					"intensity": intensity * 0.11,
 					"kind": "disturb",
+					"material_id": material_id,
+					"bounce_index": bounce_index + 1,
+					"sample": t
+				})
+			elif material_id == "mirror":
+				segments.append({
+					"a": hit_point,
+					"b": hit_point + Vector2(response["reflect_dir"]) * remaining * 0.26,
+					"intensity": intensity * 0.18,
+					"kind": "reflect",
 					"material_id": material_id,
 					"bounce_index": bounce_index + 1,
 					"sample": t
@@ -132,15 +142,6 @@ static func build_visual_trace(lab) -> Dictionary:
 				remaining *= float(response["branch_range_scale"])
 				continued = true
 			if not continued and float(response["reflectivity"]) * intensity > float(response["branch_min"]):
-				segments.append({
-					"a": hit_point,
-					"b": hit_point + Vector2(response["reflect_dir"]) * remaining * float(response["branch_range_scale"]),
-					"intensity": intensity * float(response["reflectivity"]),
-					"kind": "reflect",
-					"material_id": material_id,
-					"bounce_index": bounce_index + 1,
-					"sample": t
-				})
 				direction = Vector2(response["reflect_dir"]).normalized()
 				origin = hit_point + direction * lab.BEAM_OFFSET
 				intensity *= float(response["reflectivity"])
@@ -149,15 +150,48 @@ static func build_visual_trace(lab) -> Dictionary:
 				continued = true
 			if not continued:
 				break
-	return {"segments": segments, "zones": zones, "debug_points": debug_points}
+		primary_frontier.append(frontier_point)
+	fills = _build_beam_fills(lab.player_pos, primary_frontier, config)
+	return {
+		"segments": segments,
+		"zones": zones,
+		"debug_points": debug_points,
+		"fills": fills,
+		"perf": {
+			"guide_rays": ray_count,
+			"traces": trace_count,
+			"fills": fills.size()
+		}
+	}
+
+static func _build_beam_fills(origin: Vector2, frontier: Array, config: Dictionary) -> Array:
+	if frontier.size() < 2:
+		return []
+	var smoothing := float(config.get("envelope_smoothing", 0.35))
+	var points: PackedVector2Array = []
+	points.append(origin)
+	for i in range(frontier.size()):
+		var p: Vector2 = frontier[i]
+		if i > 0 and i < frontier.size() - 1 and smoothing > 0.0:
+			var prev: Vector2 = frontier[i - 1]
+			var nxt: Vector2 = frontier[i + 1]
+			p = p.lerp((prev + p + nxt) / 3.0, smoothing)
+		points.append(p)
+	var fills: Array = []
+	for i in range(1, points.size() - 1):
+		fills.append({
+			"points": PackedVector2Array([points[0], points[i], points[i + 1]]),
+			"strength": 1.0 - (float(i - 1) / max(1.0, float(points.size() - 3))) * 0.22
+		})
+	return fills
 
 static func _crosses_material_patch(lab, a: Vector2, b: Vector2, material_id: String) -> bool:
 	for patch: Dictionary in lab.surface_patches:
 		if String(patch.get("material_id", "")) != material_id:
 			continue
 		var rect: Rect2 = patch["rect"]
-		for step in range(8):
-			var t := float(step) / 7.0
+		for step in range(6):
+			var t := float(step) / 5.0
 			if rect.has_point(a.lerp(b, t)):
 				return true
 	return false

@@ -1,7 +1,7 @@
 # Current State
 
 Last updated: 2026-03-10
-Current shipped version target: `v0.5.3`
+Current shipped version target: `v0.5.4`
 
 ## Now shipped
 
@@ -29,14 +29,14 @@ That direction is no longer just a recommendation in docs; it is now reflected i
 The older wave-survival arena, encounter chain, reward flow, and run summary are still kept in-repo as temporary legacy scaffolding for reference and fallback testing.
 They are no longer the primary design center.
 
-## Now improved in v0.5.3
+## Now improved in v0.5.4
 
-- flashlight rendering now follows blocker/material truth much more closely with visible traced rays, visible blocking, visible reflection, and visible glass pass-through bend instead of relying on a misleading simple cone
-- glass / wood / wet / wood-floor interactions now read more honestly in the visible light language
-- flashlight cone widened slightly to support readability without turning into a floodlight
-- enemies now use lightweight obstacle routing around walls/tree trunks when a path exists
-- `F1` now genuinely hides help/legend/debug overlays for a clean validation view
-- reusable-vs-lab-only migration boundary now also documents the new flashlight-visual and navigation helpers honestly
+- flashlight presentation now uses a smoothed beam fill driven by fewer guide rays, so it reads as one coherent beam instead of a striped comb
+- flashlight/prism secondary response now samples only the strongest nearby material contacts on a budgeted cadence instead of rebuilding everything every frame
+- approximation tiers are now explicit: Tier A laser precision, Tier B flashlight guided approximation, Tier C cheap secondary response
+- prism scatter and flashlight scatter both now come from the same shared material response contract while remaining cheaper than the laser path
+- the lab HUD now shows lightweight approximation/perf counters for Tier B and Tier C work
+- reusable-vs-lab-only migration boundary now documents the new approximation module honestly
 
 ## Immediate next recommendation
 

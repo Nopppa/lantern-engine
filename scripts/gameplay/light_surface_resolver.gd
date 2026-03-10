@@ -2,6 +2,7 @@ extends RefCounted
 class_name LightSurfaceResolver
 
 const BeamResolver = preload("res://scripts/gameplay/beam_resolver.gd")
+const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 const LightResponseModel = preload("res://scripts/gameplay/light_response_model.gd")
 const LightQuery = preload("res://scripts/gameplay/light_query.gd")
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
@@ -46,41 +47,43 @@ static func build_secondary_light(lab) -> Dictionary:
 	var secondary_zones: Array = []
 	var debug_points: Array = []
 	var source_index := 0
+	var sampled_targets := 0
 	for source in _environment_sources(lab):
 		for sample in _surface_samples_for_source(lab, source):
+			sampled_targets += 1
 			var response := LightResponseModel.response(String(sample["material_id"]), String(source["source_type"]), float(sample["intensity"]), Vector2(source["direction"]), Vector2(sample["normal"]))
 			var hit_point: Vector2 = sample["point"]
 			var material_id := String(sample["material_id"])
-			if float(response["diffusion"]) * float(source["intensity"]) > float(response["branch_min"]):
+			if float(response["diffusion"]) * float(sample["intensity"]) > float(response["branch_min"]):
 				secondary_zones.append({
 					"pos": hit_point,
 					"radius": float(response["diffuse_radius"]),
-					"strength": float(source["intensity"]) * float(response["diffusion"]),
+					"strength": float(sample["intensity"]) * float(response["diffusion"]),
 					"material_id": material_id,
 					"source_type": source["source_type"],
 					"kind": "diffuse",
 					"source_index": source_index
 				})
-			if float(response["reflectivity"]) * float(source["intensity"]) > float(response["branch_min"]):
+			if float(response["reflectivity"]) * float(sample["intensity"]) > float(response["branch_min"]):
 				var reflect_dir: Vector2 = Vector2(response["reflect_dir"])
-				var reflect_len := float(source["range"]) * float(response["branch_range_scale"]) * (0.75 + float(response["reflectivity"]) * 0.35)
+				var reflect_len := float(source["range"]) * float(response["branch_range_scale"]) * (0.62 + float(response["reflectivity"]) * 0.28)
 				secondary_segments.append({
 					"a": hit_point,
 					"b": hit_point + reflect_dir * reflect_len,
-					"intensity": float(source["intensity"]) * float(response["reflectivity"]),
+					"intensity": float(sample["intensity"]) * float(response["reflectivity"]),
 					"material_id": material_id,
 					"source_type": source["source_type"],
 					"kind": "reflect",
 					"layer": 1,
 					"source_index": source_index
 				})
-			if float(response["transmission"]) * float(source["intensity"]) > float(response["branch_min"]):
+			if float(response["transmission"]) * float(sample["intensity"]) > float(response["branch_min"]):
 				var transmit_dir: Vector2 = Vector2(response["transmit_dir"])
 				var transmit_len := float(source["range"]) * float(response["branch_range_scale"])
 				secondary_segments.append({
 					"a": hit_point,
 					"b": hit_point + transmit_dir * transmit_len,
-					"intensity": float(source["intensity"]) * float(response["transmission"]),
+					"intensity": float(sample["intensity"]) * float(response["transmission"]),
 					"material_id": material_id,
 					"source_type": source["source_type"],
 					"kind": "transmit",
@@ -99,7 +102,13 @@ static func build_secondary_light(lab) -> Dictionary:
 	return {
 		"segments": secondary_segments,
 		"zones": secondary_zones,
-		"debug_points": debug_points
+		"debug_points": debug_points,
+		"perf": {
+			"sources": source_index,
+			"samples": sampled_targets,
+			"segments": secondary_segments.size(),
+			"zones": secondary_zones.size()
+		}
 	}
 
 static func _environment_sources(lab) -> Array:
@@ -109,41 +118,47 @@ static func _environment_sources(lab) -> Array:
 			"source_type": "flashlight",
 			"origin": lab.player_pos,
 			"direction": lab.facing,
-			"range": lab.flashlight_range * 0.52,
+			"range": lab.flashlight_range * 0.46,
 			"half_angle": lab.flashlight_half_angle,
-			"intensity": 0.72
+			"intensity": 0.62
 		})
 	for prism_station: Dictionary in lab.prism_stations:
 		sources.append({
 			"source_type": "prism",
 			"origin": prism_station["pos"],
 			"direction": Vector2.LEFT,
-			"range": 82.0,
+			"range": 74.0,
 			"half_angle": 180.0,
-			"intensity": 0.46
+			"intensity": 0.40
 		})
 	if lab.prism_node:
 		sources.append({
 			"source_type": "prism",
 			"origin": lab.prism_node.position,
 			"direction": lab.facing,
-			"range": 96.0,
+			"range": 88.0,
 			"half_angle": 180.0,
-			"intensity": 0.58
+			"intensity": 0.50
 		})
 	return sources
 
 static func _surface_samples_for_source(lab, source: Dictionary) -> Array:
-	var hits: Array = []
+	var candidates: Array = []
 	for surface: Dictionary in lab.surface_segments:
 		var sample := _sample_segment_from_source(lab, source, surface)
 		if not sample.is_empty():
-			hits.append(sample)
+			candidates.append(sample)
 	for patch: Dictionary in lab.surface_patches:
 		var patch_sample := _sample_patch_from_source(lab, source, patch)
 		if not patch_sample.is_empty():
-			hits.append(patch_sample)
-	return hits
+			candidates.append(patch_sample)
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("score", 0.0)) > float(b.get("score", 0.0))
+	)
+	var budget := int(LightApproximation.config_for_source(String(source.get("source_type", "prism"))).get("sample_budget", 6))
+	if budget <= 0 or candidates.size() <= budget:
+		return candidates
+	return candidates.slice(0, budget)
 
 static func _sample_segment_from_source(lab, source: Dictionary, surface: Dictionary) -> Dictionary:
 	var a: Vector2 = surface["a"]
@@ -157,24 +172,25 @@ static func _sample_segment_from_source(lab, source: Dictionary, surface: Dictio
 		return {}
 	var intensity: float = LightQuery.flashlight_intensity(Vector2(source["origin"]), Vector2(source["direction"]), point, float(source["range"]), float(source["half_angle"]), float(source["intensity"])) if String(source["source_type"]) == "flashlight" else LightQuery.radial_intensity(Vector2(source["origin"]), point, float(source["range"]), float(source["intensity"]))
 	intensity *= visibility
-	if intensity <= 0.05:
+	if intensity <= 0.06:
 		return {}
 	return {
 		"point": point,
 		"normal": Vector2(surface["normal"]),
 		"material_id": surface["material_id"],
-		"intensity": intensity
+		"intensity": intensity,
+		"score": intensity / max(8.0, Vector2(source["origin"]).distance_to(point))
 	}
 
 static func _sample_patch_from_source(lab, source: Dictionary, patch: Dictionary) -> Dictionary:
 	var rect: Rect2 = patch["rect"]
-	var point: Vector2 = rect.get_center().clamp(rect.position + Vector2(10, 10), rect.end - Vector2(10, 10))
+	var point: Vector2 = rect.get_center().clamp(rect.position + Vector2(12, 12), rect.end - Vector2(12, 12))
 	var visibility: float = lab._visibility_between(Vector2(source["origin"]), point)
 	if visibility <= 0.0:
 		return {}
 	var intensity: float = LightQuery.flashlight_intensity(Vector2(source["origin"]), Vector2(source["direction"]), point, float(source["range"]), float(source["half_angle"]), float(source["intensity"])) if String(source["source_type"]) == "flashlight" else LightQuery.radial_intensity(Vector2(source["origin"]), point, float(source["range"]), float(source["intensity"]))
 	intensity *= visibility
-	if intensity <= 0.05:
+	if intensity <= 0.06:
 		return {}
 	var normal := (point - Vector2(source["origin"])).normalized()
 	if normal == Vector2.ZERO:
@@ -183,7 +199,8 @@ static func _sample_patch_from_source(lab, source: Dictionary, patch: Dictionary
 		"point": point,
 		"normal": normal,
 		"material_id": patch["material_id"],
-		"intensity": intensity
+		"intensity": intensity,
+		"score": intensity / max(8.0, Vector2(source["origin"]).distance_to(point))
 	}
 
 static func _trace_ray(lab, ray: Dictionary, queue: Array) -> void:

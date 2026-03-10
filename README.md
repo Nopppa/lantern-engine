@@ -1,6 +1,6 @@
 # Lantern Engine — Light Lab Pivot
 
-Godot 4 prototype now centered on a permanent **Light Lab** instead of treating the old wave-survival arena as the main game direction. `v0.5.3` keeps the lab as default runtime and tightens truth between actual light behavior, visible flashlight response, obstacle routing, and overlay/debug honesty.
+Godot 4 prototype now centered on a permanent **Light Lab** instead of treating the old wave-survival arena as the main game direction. `v0.5.4` keeps the lab as default runtime and shifts the light presentation toward cheaper approximation tiers while preserving material/obstacle truth.
 
 ## Current primary runtime
 
@@ -16,7 +16,7 @@ The project now boots straight into the **Light Lab**:
 
 The older wave-survival run still exists in the repo as temporary legacy scaffolding (`scenes/run_scene.tscn`, `scripts/run_scene.gd`, encounter data, reward flow), but it is no longer the primary target or default scene flow.
 
-## Light Lab content shipped in v0.5.3
+## Light Lab content shipped in v0.5.4
 
 - surrounding outer walls
 - several internal wall segments for routing / occlusion tests
@@ -62,7 +62,8 @@ The flashlight now behaves as a proper gameplay light query in the lab and its r
 
 - cone-based with a slightly wider 34° half-angle
 - distance falloff with brighter center / softer edge
-- visible traced rays instead of only a fake simple cone
+- player-facing flashlight now renders as a unified smoothed beam fill driven by a smaller set of guide rays
+- guide rays still preserve blocker/material truth, but no longer dominate the image as comb-like stripes
 - hard visible blocking on brick walls and tree trunks
 - visible reflected / scattered / transmitted flashlight branches on nearby surfaces
 - glass pass-through now shows slight bend + intensity loss
@@ -70,6 +71,7 @@ The flashlight now behaves as a proper gameplay light query in the lab and its r
 - wet stone now shows glossy disturbance / partial reflection
 - wood floor lanes now pick up subtle widened glow when light travels across them
 - queryable local intensity still drives gameplay checks and blend response
+- approximation work now refreshes on a short budgeted cadence instead of rebuilding every surface response every frame
 
 ### Dead/alive blend prototype
 
@@ -128,11 +130,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.5.3` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.5.4` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.5.3.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.5.4.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 

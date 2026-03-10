@@ -1,7 +1,7 @@
 # Light Lab Runtime Boundary
 
 Last updated: 2026-03-10  
-Target version: `v0.5.3`
+Target version: `v0.5.4`
 
 ## Purpose
 
@@ -115,7 +115,8 @@ It should not be treated as exploration runtime content.
 
 Reusable pieces:
 
-- visible flashlight trace assembly from blocker/material truth
+- guided flashlight trace assembly from blocker/material truth
+- smoothed beam-envelope / beam-fill generation from guide-ray frontier points
 - pass-through / reflect / scatter branch presentation inputs
 - extra local visual readability for wood/wet/glass interactions
 
@@ -123,6 +124,19 @@ Lab-only parts right now:
 
 - direct dependence on the Light Lab scene contract/arrays
 - current tuning language for the validation deck and signage expectations
+
+### `scripts/gameplay/light_approximation.gd`
+**Status:** reusable now
+
+New in `v0.5.4`.
+
+This file defines the practical fidelity split used by the patch:
+
+- Tier A = precise beam logic
+- Tier B = guided flashlight approximation
+- Tier C = cheap secondary response
+
+It also owns the cadence/sample-budget knobs that keep the approximation work cheaper without changing material truth itself.
 
 ### `scripts/gameplay/light_lab_navigation.gd`
 **Status:** Light Lab-only for now

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.4 - 2026-03-10
+
+Unified Light Approximation & Performance patch:
+
+- introduced explicit approximation tiers in `scripts/gameplay/light_approximation.gd`: Tier A laser precision, Tier B guided flashlight approximation, Tier C cheap secondary response
+- changed flashlight presentation from dense visible ray stripes to a smoothed beam-fill envelope generated from fewer guide rays in `scripts/gameplay/flashlight_visuals.gd`
+- reduced hitch/stutter sources by refreshing flashlight/prism approximation work on a short cadence instead of every frame and by capping secondary-light surface sampling to the strongest nearby candidates per source
+- kept laser, flashlight main beam, flashlight scatter, prism main light, and prism scatter unified against the same `LightResponseModel` material truth while allowing lower-cost range/branch tuning per source tier
+- made prism/flashlight scatter more materially honest at lower cost: brick/tree stop hard, wood diffuses softly, wet surfaces push glossy disturbance, mirror emphasizes reflection, glass transmits with softened continuation
+- added lightweight Tier B / Tier C perf counters to the Light Lab HUD for before/after comparison during testing
+- updated docs/runtime-boundary notes for the new approximation/performance architecture
+
 ## 0.5.3 - 2026-03-10
 
 Surface Optics & Navigation Truth patch:

@@ -9,8 +9,9 @@ const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd
 const LightQuery = preload("res://scripts/gameplay/light_query.gd")
 const LightLabLayout = preload("res://scripts/data/light_lab_layout.gd")
 const FlashlightVisuals = preload("res://scripts/gameplay/flashlight_visuals.gd")
+const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 
-const LAB_LABEL := "Light Lab v0.5.3"
+const LAB_LABEL := "Light Lab v0.5.4"
 const CELL_SIZE := 32.0
 const PROBE_RADIUS := 18.0
 
@@ -25,7 +26,16 @@ var secondary_debug_points: Array = []
 var flashlight_visual_segments: Array = []
 var flashlight_visual_zones: Array = []
 var flashlight_visual_debug_points: Array = []
+var flashlight_visual_fills: Array = []
 var dead_alive_cells: Array = []
+var approx_refresh_timer := 999.0
+var approx_state := {}
+var perf_snapshot := {
+	"secondary": {},
+	"flashlight": {},
+	"tier_b_ms": 0.0,
+	"tier_c_ms": 0.0
+}
 var beam_debug_hits: Array = []
 var beam_debug_enabled := true
 var hp_overhead_enabled := true
@@ -113,14 +123,9 @@ func _process(delta: float) -> void:
 	flashlight_visual_segments.clear()
 	flashlight_visual_zones.clear()
 	flashlight_visual_debug_points.clear()
-	var secondary := LightSurfaceResolver.build_secondary_light(self)
-	secondary_light_segments = secondary.get("segments", [])
-	secondary_light_zones = secondary.get("zones", [])
-	secondary_debug_points = secondary.get("debug_points", [])
-	var flashlight_visuals := FlashlightVisuals.build_visual_trace(self)
-	flashlight_visual_segments = flashlight_visuals.get("segments", [])
-	flashlight_visual_zones = flashlight_visuals.get("zones", [])
-	flashlight_visual_debug_points = flashlight_visuals.get("debug_points", [])
+	flashlight_visual_fills.clear()
+	approx_refresh_timer += delta
+	_refresh_light_approximations_if_needed()
 	energy = min(max_energy, energy + energy_regen * delta)
 	if prism_node and prism_timer <= 0.0:
 		prism_node.queue_free()
@@ -131,6 +136,38 @@ func _process(delta: float) -> void:
 	lit_zones = _build_lit_zones()
 	_update_ui()
 	queue_redraw()
+
+func _refresh_light_approximations_if_needed(force: bool = false) -> void:
+	var prism_pos: Vector2 = prism_node.position if prism_node else Vector2.INF
+	var state := {
+		"flashlight_on": flashlight_on,
+		"player_pos": player_pos.round(),
+		"facing": Vector2(snapped(facing.x, 0.02), snapped(facing.y, 0.02)),
+		"prism": prism_pos.round(),
+		"beam_count": beam_segments.size()
+	}
+	var tier_b_due := force or approx_state != state or LightApproximation.should_refresh(approx_refresh_timer, "flashlight")
+	var tier_c_due := force or approx_state != state or LightApproximation.should_refresh(approx_refresh_timer, "prism")
+	if tier_c_due:
+		var t0 := Time.get_ticks_usec()
+		var secondary := LightSurfaceResolver.build_secondary_light(self)
+		secondary_light_segments = secondary.get("segments", [])
+		secondary_light_zones = secondary.get("zones", [])
+		secondary_debug_points = secondary.get("debug_points", [])
+		perf_snapshot["secondary"] = secondary.get("perf", {})
+		perf_snapshot["tier_c_ms"] = (Time.get_ticks_usec() - t0) / 1000.0
+	if tier_b_due:
+		var t1 := Time.get_ticks_usec()
+		var flashlight_visuals := FlashlightVisuals.build_visual_trace(self)
+		flashlight_visual_segments = flashlight_visuals.get("segments", [])
+		flashlight_visual_zones = flashlight_visuals.get("zones", [])
+		flashlight_visual_debug_points = flashlight_visuals.get("debug_points", [])
+		flashlight_visual_fills = flashlight_visuals.get("fills", [])
+		perf_snapshot["flashlight"] = flashlight_visuals.get("perf", {})
+		perf_snapshot["tier_b_ms"] = (Time.get_ticks_usec() - t1) / 1000.0
+	if tier_b_due or tier_c_due:
+		approx_state = state
+		approx_refresh_timer = 0.0
 
 func _handle_player(delta: float) -> void:
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -176,6 +213,7 @@ func _restart_lab() -> void:
 	flashlight_visual_segments.clear()
 	flashlight_visual_zones.clear()
 	flashlight_visual_debug_points.clear()
+	flashlight_visual_fills.clear()
 	player_hp = player_max_hp
 	energy = max_energy
 	player_pos = Vector2(228, 576)
@@ -188,6 +226,8 @@ func _restart_lab() -> void:
 	prism_surge_timer = 0.0
 	flashlight_on = true
 	_build_light_lab()
+	approx_state = {}
+	approx_refresh_timer = 999.0
 	last_event = "Light Lab reset"
 
 func _spawn_debug_enemy(type: String) -> void:
@@ -373,8 +413,12 @@ func _update_ui() -> void:
 	var beam_layers := 0
 	for segment: Dictionary in beam_segments:
 		beam_layers = max(beam_layers, int(segment.get("layer", 0)) + 1)
-	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] Permanent validation map (no auto encounters)\n[color=#a4b1cd]Goal:[/color] Optics truth + obstacle truth\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | traced rays visible | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s" % [LAB_LABEL, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text]
-	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle\nF1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Readability legend[/b]\nBeam L0/L1/L2 = primary to later branches\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nWarm traced rays = flashlight truth | Aqua dashed = glass pass-through bend\nWood = broad scatter | Wet stone = glossy disturbance | Trees = hard blockers\n\n[b]Event[/b]\n%s" % last_event
+	var tier_b_ms := float(perf_snapshot.get("tier_b_ms", 0.0))
+	var tier_c_ms := float(perf_snapshot.get("tier_c_ms", 0.0))
+	var secondary_perf: Dictionary = perf_snapshot.get("secondary", {})
+	var flash_perf: Dictionary = perf_snapshot.get("flashlight", {})
+	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] Permanent validation map (no auto encounters)\n[color=#a4b1cd]Goal:[/color] Behavioral light truth + cheaper approximation\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | unified beam fill | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s\n[color=#a4b1cd]Approx:[/color] T-B %.2fms / %d rays / %d fills | T-C %.2fms / %d samples / %d zones" % [LAB_LABEL, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text, tier_b_ms, int(flash_perf.get("guide_rays", 0)), int(flash_perf.get("fills", 0)), tier_c_ms, int(secondary_perf.get("samples", 0)), int(secondary_perf.get("zones", 0))]
+	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle\nF1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Approximation tiers[/b]\nTier A laser = precise beam logic\nTier B flashlight = guided beam fill from guide rays\nTier C prism/scatter = cheap material-aware secondary response\n\n[b]Readability legend[/b]\nWarm beam fill = main flashlight volume | faint lines = guide truth only\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nAqua dashed = glass continuation | Wood = soft scatter | Wet = glossy disturbance\n\n[b]Event[/b]\n%s" % last_event
 
 func _material_under_cursor(pos: Vector2) -> Dictionary:
 	for patch: Dictionary in surface_patches:
@@ -477,6 +521,11 @@ func _draw() -> void:
 func _draw_flashlight_trace() -> void:
 	if not flashlight_on:
 		return
+	for fill: Dictionary in flashlight_visual_fills:
+		var points: PackedVector2Array = fill["points"]
+		var strength: float = float(fill.get("strength", 1.0))
+		draw_colored_polygon(points, Color(1.0, 0.94, 0.72, 0.060 * strength))
+		draw_polyline(points, Color(1.0, 0.98, 0.84, 0.11 * strength), 1.2, true)
 	for zone: Dictionary in flashlight_visual_zones:
 		var kind := String(zone.get("kind", "diffuse"))
 		var zone_color := Color(1.0, 0.90, 0.62, 0.08 * float(zone["strength"]))
@@ -507,9 +556,10 @@ func _draw_flashlight_trace() -> void:
 		elif kind == "disturb":
 			tint = Color(0.78, 0.96, 1.0, 1.0)
 			width = 2.6
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.07 * intensity), 12.0)
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.18 * intensity), 7.0)
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.60 * intensity), width)
+		var is_primary := kind == "primary"
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.035 if is_primary else 0.07) * intensity), 10.0 if is_primary else 12.0)
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.08 if is_primary else 0.18) * intensity), 5.5 if is_primary else 7.0)
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.22 if is_primary else 0.55) * intensity), 2.2 if is_primary else width)
 		if kind == "transmit":
 			var distance: float = a.distance_to(b)
 			var steps: int = max(2, int(distance / 24.0))

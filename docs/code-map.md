@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: `v0.5.3` Surface Optics & Navigation Truth patch shipped
+Current internal state: `v0.5.4` Unified Light Approximation & Performance patch shipped
 
 ## Purpose
 
@@ -62,8 +62,12 @@ This file tells future contributors where the new Light Lab responsibilities now
   - tracks temporary exposure and base alive/restored zones
 
 - `scripts/gameplay/flashlight_visuals.gd`
-  - builds truthful visible flashlight trace segments/zones from the same blocker/material truth used by the lab
-  - keeps flashlight rendering alignment work out of `scripts/light_lab_scene.gd`
+  - builds guided flashlight approximation outputs from the same blocker/material truth used by the lab
+  - emits both low-count guide segments and unified beam-fill polygons so the player-facing beam reads as one volume
+
+- `scripts/gameplay/light_approximation.gd`
+  - small shared approximation-tier contract (`A/B/C`) for precise beam logic, guided beam presentation, and cheap secondary response
+  - centralizes cadence/sample-budget knobs so performance tuning does not sprawl across the scene coordinator
 
 - `scripts/gameplay/light_lab_navigation.gd`
   - small Light Lab-only waypoint/A* helper for obstacle routing around walls/tree trunks
