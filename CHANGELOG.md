@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.2 - 2026-03-10
+
+Focused follow-up patch for the first Prism Surge playtest notes:
+
+- fixed Prism Node readiness UI so it now shows `ACTIVE`, a live recharge timer, or `READY` from the same timer/state truth used by placement logic; consuming a node with Surge no longer leaves the HUD lying about readiness
+- gave Prism Surge a cleaner identity as a special-jam burst: enemies hit by the blast have their special abilities disabled briefly, and Hollow blinks are interrupted/locked out during that jam window
+- kept Surge otherwise compact: the shipped behavior is still burst damage + shove + node consumption, with the new debuff identity replacing the earlier vague feel instead of piling on extra slows / DoTs
+- updated skill/help text only where needed to describe the shipped Surge debuff behavior
+- validated with headless boot and Windows export; packaged a fresh Windows release artifact for GitHub Releases
+
 ## 0.4.1 - 2026-03-10
 
 MVP-1 patch 2 third-skill pass:

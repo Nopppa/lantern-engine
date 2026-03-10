@@ -1,5 +1,30 @@
 # Devlog
 
+## 2026-03-10 — v0.4.2 MVP-1 Patch 3 Prism Truth + Surge Identity Pass
+
+This pass stayed intentionally narrow: fix the tester-visible Prism readiness lie first, then give Prism Surge one clearer combat identity without widening into a rebalance pass.
+
+What changed:
+- fixed Prism Node HUD state so it now reports `ACTIVE`, a live recharge timer, or `READY` from the same underlying `prism_timer` logic used by placement/runtime gating
+- resolved the tester-visible bug where consuming a node with Surge left `prism_timer` on cooldown while the HUD still showed `READY` simply because no node existed
+- gave Prism Surge a coherent debuff identity by jamming enemy special abilities for a short duration on hit; Hollow blink windups/transits are interrupted and blink stays locked out during the jam window
+- kept the implementation inside the existing extracted gameplay/data files instead of pushing more logic back into `run_scene.gd`
+- updated shipped control/readme/changelog copy only where needed for the new truth/state and debuff behavior
+
+Validation:
+```bash
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --quit
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
+```
+
+Validation result:
+- headless boot passed
+- Windows export passed
+- packaged Windows release artifact prepared for GitHub Release upload
+
+Recommended next step:
+- use the now-cleaner three-skill baseline to build the next scoped encounter-pressure layer, most likely the MVP-1 miniboss
+
 ## 2026-03-10 — v0.4.1 MVP-1 Patch 2 Third-Skill Pass
 
 This pass added the next low-risk combat layer after the authored-run / summary / data cleanup work from `v0.4.0`.

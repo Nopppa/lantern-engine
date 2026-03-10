@@ -25,7 +25,7 @@ const BEAM_PULSE_DURATION := 0.15
 const BEAM_OFFSET := 4.0
 const PRISM_RADIUS := 18.0
 const PRISM_REDIRECT_ANGLE := 55.0
-const BUILD_LABEL := "MVP-1.0 patch 2"
+const BUILD_LABEL := "MVP-1.0 patch 3"
 
 var player_hp := 100.0
 var player_max_hp := 100.0
@@ -49,6 +49,7 @@ var prism_surge_damage := 20.0
 var prism_surge_radius := 118.0
 var prism_surge_push_distance := 96.0
 var prism_surge_energy_refund_on_hit := 8.0
+var prism_surge_special_lock_duration := 2.2
 var prism_node: Node2D
 var player_velocity := Vector2.ZERO
 var player_speed := 285.0
@@ -135,6 +136,7 @@ func _apply_skill_defaults() -> void:
 	prism_surge_radius = float(prism_surge.get("radius", 118.0))
 	prism_surge_push_distance = float(prism_surge.get("push_distance", 96.0))
 	prism_surge_energy_refund_on_hit = float(prism_surge.get("energy_refund_on_hit", 8.0))
+	prism_surge_special_lock_duration = float(prism_surge.get("special_lock_duration", 2.2))
 
 func _make_panel_style(bg: Color, border: Color, border_width: int = 2, radius: int = 8) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -410,7 +412,7 @@ func _build_lit_zones() -> Array:
 
 func _update_ui() -> void:
 	var beam_ready := "[color=#8be9fd]READY[/color]" if beam_timer <= 0.0 else "[color=#ffb86c]%.2fs[/color]" % beam_timer
-	var prism_state := "[color=#8be9fd]ACTIVE %.1fs[/color]" % prism_timer if prism_node else "[color=#50fa7b]READY[/color]"
+	var prism_state := "[color=#8be9fd]ACTIVE %.1fs[/color]" % prism_timer if prism_node else ("[color=#ffb86c]%.1fs[/color]" % prism_timer if prism_timer > 0.0 else "[color=#50fa7b]READY[/color]")
 	var surge_state := "[color=#8be9fd]READY[/color]" if prism_surge_timer <= 0.0 else "[color=#ffb86c]%.1fs[/color]" % prism_surge_timer
 	var current_encounter := _current_encounter()
 	var encounter_title := String(current_encounter.get("title", "Encounter"))
@@ -529,6 +531,9 @@ func _draw() -> void:
 			draw_circle(enemy["node"].position, enemy["radius"] + 20.0, Color(1.0, 0.5, 0.3, 0.22 * flicker))
 			draw_arc(enemy["node"].position, enemy["radius"] + 16.0 * flicker2, 0.0, TAU, 16, Color(1.0, 0.85, 0.4, 0.65 * flicker), 3.0)
 			draw_arc(enemy["node"].position, enemy["radius"] + 8.0, 0.0, TAU, 12, Color(1.0, 0.3, 0.2, 0.4 * flicker2), 2.0)
+		if float(enemy.get("special_lock_timer", 0.0)) > 0.0:
+			draw_arc(enemy["node"].position, enemy["radius"] + 14.0, 0.0, TAU, 24, Color(0.62, 0.94, 1.0, 0.65), 2.5)
+			draw_circle(enemy["node"].position, enemy["radius"] + 10.0, Color(0.62, 0.94, 1.0, 0.08))
 		# Flashlight reveal shimmer for hollows
 		var is_revealed: bool = bool(enemy.get("revealed_by_light", false)) or float(enemy.get("shimmer_timer", 0.0)) > 0.0
 		if enemy["type"] == "hollow" and is_revealed:

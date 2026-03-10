@@ -7,6 +7,7 @@ static func update_enemies(run: RunScene, delta: float) -> void:
 			_tick_dead_enemy(enemy, delta)
 			continue
 		enemy["flash"] = max(enemy["flash"] - delta, 0.0)
+		enemy["special_lock_timer"] = max(float(enemy.get("special_lock_timer", 0.0)) - delta, 0.0)
 		var to_player: Vector2 = run.player_pos - enemy["node"].position
 		var dir := _safe_direction_from_player(to_player)
 		if enemy["type"] == "moth":
@@ -74,8 +75,12 @@ static func _update_hollow_windup(run: RunScene, enemy: Dictionary, dir: Vector2
 
 static func _update_hollow_active(run: RunScene, enemy: Dictionary, dir: Vector2, in_light: bool, delta: float) -> void:
 	enemy["attack_timer"] -= delta
+	var special_lock_timer: float = float(enemy.get("special_lock_timer", 0.0))
 	if enemy["attack_timer"] <= 0.0:
-		if in_light:
+		if special_lock_timer > 0.0:
+			enemy["attack_timer"] = min(0.2, special_lock_timer)
+			run.last_event = "Hollow blink jammed by Prism Surge"
+		elif in_light:
 			enemy["blink_winding_up"] = true
 			enemy["blink_windup"] = 0.4
 			run.last_event = "Hollow struggling to blink..."

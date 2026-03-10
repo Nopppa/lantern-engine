@@ -26,6 +26,7 @@ static func cast_prism_surge(run: RunScene) -> void:
 			continue
 		hit_count += 1
 		enemy["hp"] -= run.prism_surge_damage
+		enemy["special_lock_timer"] = max(float(enemy.get("special_lock_timer", 0.0)), run.prism_surge_special_lock_duration)
 		RunSummary.note_damage_dealt(run, run.prism_surge_damage)
 		enemy["flash"] = 0.35
 		var push_dir: Vector2 = (enemy["node"].position - origin).normalized()
@@ -33,7 +34,7 @@ static func cast_prism_surge(run: RunScene) -> void:
 			push_dir = Vector2.RIGHT.rotated(randf() * TAU)
 		enemy["node"].position = (enemy["node"].position + push_dir * run.prism_surge_push_distance).clamp(run.ARENA_RECT.position + Vector2(enemy["radius"], enemy["radius"]), run.ARENA_RECT.end - Vector2(enemy["radius"], enemy["radius"]))
 		if enemy["type"] == "hollow":
-			enemy["attack_timer"] = max(float(enemy.get("attack_timer", 0.0)), 1.4)
+			enemy["attack_timer"] = max(float(enemy.get("attack_timer", 0.0)), run.prism_surge_special_lock_duration)
 			enemy["blink_winding_up"] = false
 			enemy["blink_transiting"] = false
 			enemy["shimmer_timer"] = max(float(enemy.get("shimmer_timer", 0.0)), 0.45)
@@ -55,6 +56,6 @@ static func cast_prism_surge(run: RunScene) -> void:
 	RunSummary.note_skill_cast(run, "prism_surge")
 	SfxController.play(run, "beam")
 	if hit_count > 0:
-		run.last_event = "Prism Surge burst for %.0f across %d target%s" % [run.prism_surge_damage, hit_count, "" if hit_count == 1 else "s"]
+		run.last_event = "Prism Surge burst for %.0f across %d target%s and jammed specials" % [run.prism_surge_damage, hit_count, "" if hit_count == 1 else "s"]
 	else:
 		run.last_event = "Prism Surge discharged with no target in the blast"
