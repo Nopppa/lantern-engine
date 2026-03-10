@@ -18,7 +18,9 @@ Godot 4 prototype for the **first testable Lantern Engine phase**. This repo del
 - basic hit / death feedback
 - one reward/upgrade choice step between encounters with clear mouse + keyboard selection
 - restart / retry loop
-- dev shortcuts for rapid iteration
+- dev shortcuts for rapid iteration, including immortality toggle
+- short pulse-style Refraction Beam presentation instead of a long-held laser trace
+- lightweight functional lit-zone readability pass around player, prism, targets, and fresh beam path
 
 ## Scope discipline
 
@@ -45,13 +47,14 @@ See `docs/mvp0-scope.md` for exact scope boundaries.
 - `R` restart run
 - reward panel: `1/2/3` direct select, `W/S` or `↑/↓` move, `E`/`Enter` confirm
 - mouse click on reward buttons also works
-- `F1` toggle debug text
+- `F1` show/hide the full help legend (shown by default on first launch; compact event/status panel stays visible after collapsing)
 - `F2` refill HP + Energy
 - `F3` force reward selection
+- `F4` toggle immortality for testing
 - `1` spawn Moth
 - `2` spawn Hollow
 
-See `docs/run-controls.md` for full testing flows.
+See `docs/run-controls.md` for full control notes and `docs/playtests/PLAYTEST-02-CHECKLIST.md` for the focused tester checklist that triggered the v0.2.1 cleanup pass.
 
 ## Run locally
 
@@ -75,10 +78,15 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Releases are expected to contain the canonical versioned archives:
+Current project version is `v0.3.1` (see `VERSION`). Local export outputs and release archives are:
 
-- `lantern_engine-windows-vX.Y.Z.zip`
-- `lantern_engine-linux-vX.Y.Z.tar.gz`
+- Windows export output: `build/windows/lantern_engine.exe`
+- Windows data pack: `build/windows/lantern_engine.pck`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.3.1.zip`
+
+Windows builds are the default tester artifacts. Linux builds are optional and only produced when explicitly requested.
+
+Godot export presets currently point to the unarchived executables under `build/windows/` and `build/linux/`; the versioned `.zip` / `.tar.gz` files are the canonical release artifacts to hand to testers.
 
 If export templates are missing on the machine, see `docs/devlog.md` for current blocker notes and exact export commands.
 
@@ -87,6 +95,8 @@ If export templates are missing on the machine, see `docs/devlog.md` for current
 - `docs/vision.md`
 - `docs/architecture.md`
 - `docs/architecture-mvp0.md`
+- `docs/architecture-v0.3-internal-refactor-plan.md`
+- `docs/code-map.md`
 - `docs/milestones.md`
 - `docs/devlog.md`
 - `docs/mvp0-scope.md`

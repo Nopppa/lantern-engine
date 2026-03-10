@@ -11,7 +11,17 @@ This first implementation favors **playability and speed** over premature framew
 - `scenes/run_scene.tscn`
   - owns the full playable MVP-0 sandbox
 - `scripts/run_scene.gd`
-  - currently contains the prototype loop, arena rules, player state, encounter flow, reward handling, and simple enemy logic
+  - still acts as the playable runtime coordinator and keeps beam/combat/rendering-heavy logic local for now
+- `scripts/data/encounter_defs.gd`
+  - authored encounter definitions extracted from the main runtime script
+- `scripts/data/upgrade_defs.gd`
+  - authored reward/upgrade definitions extracted from the main runtime script
+- `scripts/player/debug_actions.gd`
+  - help/debug/dev-input handling (`F1`, `F4`, refill/restart/dev spawn hooks)
+- `scripts/gameplay/reward_controller.gd`
+  - reward panel setup plus reward input, selection, and application flow
+- `scripts/ui/hud_text.gd`
+  - lightweight HUD text formatting helpers
 
 ## Why this is acceptable right now
 
