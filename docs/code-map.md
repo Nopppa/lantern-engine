@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: post `v0.3.3` combat/runtime decomposition pass
+Current internal state: post `v0.3.4` stabilization + enemy runtime extraction pass
 
 ## Purpose
 
@@ -47,6 +47,12 @@ Use this before making structural changes so new work lands in the right file in
   - encounter start/reset flow
   - enemy spawn construction from authored encounter data
 
+- `scripts/gameplay/enemy_controller.gd`
+  - per-frame enemy runtime updates
+  - Moth chase behavior
+  - Hollow blink / windup / disrupted transit state progression
+  - safe overlap direction fallback and contact damage application
+
 - `scripts/gameplay/beam_resolver.gd`
   - beam cast validation
   - wall-bounce continuation
@@ -72,7 +78,6 @@ Use this before making structural changes so new work lands in the right file in
 
 These responsibilities still remain in the main runtime coordinator:
 
-- enemy runtime update / blink / contact-damage loop
 - player movement + input-driven action intent handling
 - lit-zone builder
 - `_draw()` rendering path
@@ -88,9 +93,7 @@ These responsibilities still remain in the main runtime coordinator:
 - reward/upgrade data -> `scripts/data/upgrade_defs.gd`
 
 ### Only touch `scripts/run_scene.gd` when the change belongs to:
-- beam path logic
-- bounce / redirect / range budget
-- enemy runtime behavior
+- player movement / action intent glue
 - draw/render core
 - top-level runtime orchestration that truly cannot live elsewhere yet
 
@@ -104,9 +107,9 @@ These responsibilities still remain in the main runtime coordinator:
 ## Recommended next structural step
 
 If/when the next internal refactor pass happens, consider:
-1. extracting enemy runtime update/state handling out of `run_scene.gd`
-2. introducing a lightweight shared run-state container or clearer state grouping
-3. only after that, splitting lighting/rendering helpers further if the runtime still feels too coupled
+1. introducing a lightweight shared run-state container or clearer state grouping
+2. only after that, splitting lighting/rendering helpers further if the runtime still feels too coupled
+3. avoid duplicating combat ownership now that `beam_resolver.gd` and `enemy_controller.gd` hold the core simulation rules
 
 ## Validation expectation after structural edits
 

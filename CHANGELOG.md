@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.4 - 2026-03-10
+
+Regression fix + enemy runtime extraction pass:
+
+- fixed tester-visible dev shortcut regressions where `F2` refill and `F3` reward trigger could appear to do nothing because they were only polled in `_process` and could be swallowed by UI focus
+- handled `F2` and `F3` directly from raw key input, matching the earlier reliability fix approach used for `F1` / `F4`
+- made dev refill revive out of the run-over/end-panel state so testers can resume immediately instead of seeing a refilled but still locked run
+- made forced reward open from run-over state and reordered `_process()` so reward modal handling wins before the run-over early return
+- extracted enemy runtime update / state handling out of `scripts/run_scene.gd` into new `scripts/gameplay/enemy_controller.gd`
+- kept `scripts/gameplay/beam_resolver.gd` as the single beam/combat path authority; `run_scene.gd` now coordinates beam, encounter, reward, and enemy modules instead of re-owning those details
+- validated with headless boot and Windows export
+
 ## 0.3.3 - 2026-03-10
 
 Combat/runtime decomposition pass:
@@ -24,11 +36,12 @@ Enemy freeze fix (Playtest 07 follow-up):
 Disrupted blink transit fix (Playtest 06 follow-up):
 
 - replaced instant teleport during light-disrupted blink with a visible 0.28s linear transit phase
-- hollow now moves visibly from start to end position during disrupted blink, flickering/shimmering
+- hollow now moves visibly from start to end position during transit, flickering/shimmering
 - windup phase (0.4s jitter) retained before transit for readability
 - transit shows rapid flicker between orange disruption glow and purple ghost afterimage
 - faint trail line drawn between start and end positions during transit
 - blink distance in light still reduced (40% of normal)
+- blink cooldown after disrupted blink slightly longer (2.6s vs 2.4s)
 - result: player can read both origin and destination, movement is fast but not instant
 
 ## 0.3.0 - 2026-03-10
@@ -40,7 +53,7 @@ Blink readability fix (Playtest 05 follow-up):
 - post-blink shimmer extended to 0.7s (was 0.6s)
 - blink cooldown after disrupted blink slightly longer (2.6s vs 2.4s)
 - HUD event text shows "Hollow struggling to blink..." during windup
-- no new systems, no hard-counter — blink still works, just visibly worse in light
+- no new systems, no hard-counter — blink still works, just visibly worse
 
 ## 0.2.3 - 2026-03-10
 

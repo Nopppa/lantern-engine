@@ -50,11 +50,11 @@
 
 ## Current playtest focus
 
-For the current `v0.3.1` flashlight proof build, testers should pay extra attention to:
+For the current `v0.3.4` stabilization build, testers should pay extra attention to:
 
-- flashlight usability: does `F` feel natural and does the energy tradeoff read clearly?
-- reveal behavior: does Hollow visibly struggle in flashlight influence instead of behaving like an instant teleport?
-- blink readability: can you read the blink start, disrupted travel, and arrival point clearly?
+- debug shortcut reliability: do `F2` refill and `F3` reward trigger work even when UI focus/end panels are present?
+- enemy pacing after extraction: do Moths and Hollows still pressure at the same cadence as before the controller split?
+- beam readability: does the pulse/bounce/redirect path still read clearly after the safety pass?
 - baseline controls: do `F1`, `F4`, and `R` remain easy to discover and use?
 
 Use the relevant playtest notes under `docs/playtests/` when capturing observations.
@@ -79,4 +79,4 @@ Raw Godot export outputs land here:
 
 For the current version, the canonical packaged artifact to distribute is:
 
-- `build/windows/lantern_engine-windows-v0.3.1.zip`
+- `build/windows/lantern_engine-windows-v0.3.4.zip`

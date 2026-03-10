@@ -1,5 +1,29 @@
 # Devlog
 
+## 2026-03-10 — v0.3.4 Regression Fix + Enemy Runtime Extraction
+
+This pass handled the first tester-visible regressions from the post-`v0.3.3` build before continuing the next planned structural extraction.
+
+What changed:
+- fixed `F2` refill and `F3` reward trigger reliability by handling them from raw key input, not only from `_process()` action polling
+- made debug refill clear the run-over/end-panel gate so testers can immediately resume after death instead of seeing a refilled but still locked run
+- reordered `run_scene.gd::_process()` so reward modal handling runs before the `run_over` early return
+- extracted enemy runtime/state handling into new `scripts/gameplay/enemy_controller.gd`
+- kept `scripts/gameplay/beam_resolver.gd` as the single beam/combat path authority instead of duplicating combat ownership elsewhere
+
+Why this pass now:
+- testers reported two concrete regressions first, so those had to be fixed before any more structural work
+- `run_scene.gd` still owned the highest-churn enemy runtime logic after the earlier beam/encounter extraction pass
+- this split keeps MVP-0.x stabilization moving without broadening into MVP-1 features
+
+Validation target:
+- headless boot
+- Windows export
+- quick safety retest focus on enemy pacing, beam readability, and debug shortcut recovery paths
+
+Recommended next step after this pass:
+- introduce a lightweight grouped run-state container only if further maintenance pressure appears; otherwise keep iterating via focused playtests
+
 ## 2026-03-10 — v0.3.3 Combat/Runtime Decomposition Pass
 
 This pass took the next planned structural step after the earlier low-risk extraction work. The main goal was not new gameplay but safer ownership around the runtime core.

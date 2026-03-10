@@ -6,6 +6,7 @@ const DebugActions = preload("res://scripts/player/debug_actions.gd")
 const RewardController = preload("res://scripts/gameplay/reward_controller.gd")
 const EncounterController = preload("res://scripts/gameplay/encounter_controller.gd")
 const BeamResolver = preload("res://scripts/gameplay/beam_resolver.gd")
+const EnemyController = preload("res://scripts/gameplay/enemy_controller.gd")
 const HudText = preload("res://scripts/ui/hud_text.gd")
 
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
@@ -170,6 +171,11 @@ func _input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if DebugActions.handle_process_actions(self):
 		return
+	if reward_pending:
+		RewardController.handle_input(self)
+		_update_ui()
+		queue_redraw()
+		return
 	if run_over:
 		_update_ui()
 		queue_redraw()
@@ -185,11 +191,6 @@ func _process(delta: float) -> void:
 	if prism_node and prism_timer <= 0.0:
 		prism_node.queue_free()
 		prism_node = null
-	if reward_pending:
-		RewardController.handle_input(self)
-		_update_ui()
-		queue_redraw()
-		return
 	_handle_player(delta)
 	_update_enemies(delta)
 	_check_encounter_complete()
@@ -274,79 +275,7 @@ func _apply_contact_damage(amount: float) -> void:
 		last_event = "Lantern extinguished"
 
 func _update_enemies(delta: float) -> void:
-	for enemy: Dictionary in enemies:
-		if not enemy["alive"]:
-			enemy["death_timer"] -= delta
-			enemy["flash"] = max(enemy["flash"] - delta, 0.0)
-			enemy["node"].scale = Vector2.ONE * max(enemy["death_timer"] * 2.0, 0.1)
-			if enemy["death_timer"] <= 0.0 and is_instance_valid(enemy["node"]):
-				enemy["node"].queue_free()
-			continue
-		enemy["flash"] = max(enemy["flash"] - delta, 0.0)
-		var to_player: Vector2 = player_pos - enemy["node"].position
-		var dir: Vector2
-		if to_player.length_squared() < 4.0:
-			# Prevent freeze when overlapping player — push outward with random offset
-			dir = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)).normalized()
-			if dir == Vector2.ZERO:
-				dir = Vector2.RIGHT
-		else:
-			dir = to_player.normalized()
-		if enemy["type"] == "moth":
-			enemy["node"].position += dir * enemy["speed"] * delta
-		elif enemy["type"] == "hollow":
-			var in_light := _is_in_flashlight_cone(enemy["node"].position)
-			enemy["revealed_by_light"] = in_light
-			# --- Disrupted transit phase: visible linear movement with flicker ---
-			if enemy["blink_transiting"]:
-				enemy["blink_transit_timer"] -= delta
-				var t_progress: float = 1.0 - clampf(float(enemy["blink_transit_timer"]) / float(enemy["blink_transit_duration"]), 0.0, 1.0)
-				enemy["node"].position = Vector2(enemy["blink_transit_start"]).lerp(Vector2(enemy["blink_transit_end"]), t_progress)
-				if enemy["blink_transit_timer"] <= 0.0:
-					enemy["blink_transiting"] = false
-					enemy["node"].position = Vector2(enemy["blink_transit_end"])
-					enemy["attack_timer"] = 2.6
-					enemy["shimmer_timer"] = 0.5
-					last_event = "Hollow blink DISRUPTED by flashlight"
-			# --- Windup phase: enemy hesitates visibly before disrupted blink ---
-			elif enemy["blink_winding_up"]:
-				enemy["blink_windup"] -= delta
-				if enemy["blink_windup"] <= 0.0:
-					# Start disrupted transit instead of teleport
-					enemy["blink_winding_up"] = false
-					var blink_dist := 140.0 * 0.4
-					var flank := Vector2(randf_range(-50, 50), randf_range(-50, 50))
-					var target_pos := (player_pos + dir.rotated(PI) * blink_dist + flank).clamp(ARENA_RECT.position + Vector2(32, 32), ARENA_RECT.end - Vector2(32, 32))
-					enemy["blink_transiting"] = true
-					enemy["blink_transit_start"] = enemy["node"].position
-					enemy["blink_transit_end"] = target_pos
-					enemy["blink_transit_duration"] = 0.28
-					enemy["blink_transit_timer"] = 0.28
-					last_event = "Hollow disrupted transit..."
-				else:
-					# During windup: jitter position to show struggle
-					var jitter := Vector2(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0))
-					enemy["node"].position += jitter
-			else:
-				enemy["attack_timer"] -= delta
-				if enemy["attack_timer"] <= 0.0:
-					if in_light:
-						# Start visible windup instead of instant blink
-						enemy["blink_winding_up"] = true
-						enemy["blink_windup"] = 0.4
-						last_event = "Hollow struggling to blink..."
-					else:
-						enemy["attack_timer"] = 2.4
-						var flank := Vector2(randf_range(-80, 80), randf_range(-80, 80))
-						enemy["node"].position = (player_pos + dir.rotated(PI) * 140.0 + flank).clamp(ARENA_RECT.position + Vector2(32, 32), ARENA_RECT.end - Vector2(32, 32))
-						last_event = "Hollow ambush blink"
-				else:
-					enemy["node"].position += dir * enemy["speed"] * 0.55 * delta
-			# Tick shimmer timer
-			if enemy.get("shimmer_timer", 0.0) > 0.0:
-				enemy["shimmer_timer"] -= delta
-		if enemy["node"].position.distance_to(player_pos) < ENEMY_CONTACT_RADIUS + enemy["radius"]:
-			_apply_contact_damage(enemy["contact_damage"] * delta)
+	EnemyController.update_enemies(self, delta)
 
 func _check_encounter_complete() -> void:
 	EncounterController.check_complete(self)

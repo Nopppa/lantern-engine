@@ -7,15 +7,19 @@ static func handle_key_input(run: RunScene, event: InputEvent) -> void:
 			KEY_F1:
 				toggle_help(run)
 				run.get_viewport().set_input_as_handled()
+			KEY_F2:
+				quick_refill(run)
+				run.get_viewport().set_input_as_handled()
+			KEY_F3:
+				force_reward(run)
+				run.get_viewport().set_input_as_handled()
 			KEY_F4:
 				toggle_immortal(run)
 				run.get_viewport().set_input_as_handled()
 
 static func handle_process_actions(run: RunScene) -> bool:
 	if Input.is_action_just_pressed("quick_refill"):
-		run.player_hp = run.player_max_hp
-		run.energy = run.max_energy
-		run.last_event = "Dev refill"
+		quick_refill(run)
 	if Input.is_action_just_pressed("restart_run"):
 		run._restart_run()
 		return true
@@ -23,9 +27,27 @@ static func handle_process_actions(run: RunScene) -> bool:
 		run._spawn_enemy("moth", run._random_spawn())
 	if Input.is_action_just_pressed("spawn_hollow") and not run.reward_pending:
 		run._spawn_enemy("hollow", run._random_spawn())
-	if Input.is_action_just_pressed("grant_upgrade") and not run.reward_pending:
-		run._show_rewards()
+	if Input.is_action_just_pressed("grant_upgrade"):
+		force_reward(run)
 	return false
+
+static func quick_refill(run: RunScene) -> void:
+	run.player_hp = run.player_max_hp
+	run.energy = run.max_energy
+	if run.run_over and run.player_hp > 0.0:
+		run.run_over = false
+		run.end_panel.visible = false
+		run.last_event = "Dev refill + revive"
+	else:
+		run.last_event = "Dev refill"
+
+static func force_reward(run: RunScene) -> void:
+	if run.reward_pending or run.reward_resolution_in_progress:
+		return
+	if run.run_over:
+		run.run_over = false
+		run.end_panel.visible = false
+	run._show_rewards()
 
 static func toggle_help(run: RunScene) -> void:
 	run.help_collapsed = !run.help_collapsed
