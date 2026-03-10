@@ -130,3 +130,17 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "
 ### Validation result
 - headless boot passed after fixing one missing preload in `reward_controller.gd`
 - export validation pending / to be run after documentation update
+
+---
+
+## 2026-03-10 — v0.3.2 Enemy Freeze Bugfix
+
+**Context:** Playtest 07 reported both Moth and Hollow freezing completely in place before being killed.
+
+**Root cause:** `(player_pos - enemy_pos).normalized()` returns `Vector2(0,0)` when enemy overlaps the player. This zeroed out all movement (Moth chase, Hollow slow-walk) and blink targeting (`dir.rotated(PI) * distance` = zero), trapping the enemy at player position indefinitely.
+
+**Fix:** Added a 2px distance threshold check before normalizing. When enemy is within threshold, a random direction is used instead, pushing the enemy outward so normal movement resumes next frame.
+
+**Files touched:** `scripts/run_scene.gd` (4 lines added in `_update_enemies`), `VERSION`, `CHANGELOG.md`, `docs/devlog.md`
+
+**Not a side-effect of:** reward state, run state, input handling, flashlight/blink design, or debug actions. All those paths are gated separately and don't affect the `dir` calculation.

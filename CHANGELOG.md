@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2 - 2026-03-10
+
+Enemy freeze fix (Playtest 07 follow-up):
+
+- fixed bug where both Moth and Hollow could freeze completely when overlapping the player position
+- root cause: `(player_pos - enemy_pos).normalized()` returns `Vector2(0,0)` at zero distance, killing all direction-based movement and blink targeting
+- added safe direction fallback (random outward push) when enemy is within 2px of player
+- no gameplay/design changes — pure stability fix
+
 ## 0.3.1 - 2026-03-10
 
 Disrupted blink transit fix (Playtest 06 follow-up):

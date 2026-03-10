@@ -387,7 +387,15 @@ func _update_enemies(delta: float) -> void:
 				enemy["node"].queue_free()
 			continue
 		enemy["flash"] = max(enemy["flash"] - delta, 0.0)
-		var dir: Vector2 = (player_pos - enemy["node"].position).normalized()
+		var to_player: Vector2 = player_pos - enemy["node"].position
+		var dir: Vector2
+		if to_player.length_squared() < 4.0:
+			# Prevent freeze when overlapping player — push outward with random offset
+			dir = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)).normalized()
+			if dir == Vector2.ZERO:
+				dir = Vector2.RIGHT
+		else:
+			dir = to_player.normalized()
 		if enemy["type"] == "moth":
 			enemy["node"].position += dir * enemy["speed"] * delta
 		elif enemy["type"] == "hollow":
