@@ -3,6 +3,7 @@ class_name BossController
 
 const BossDefs = preload("res://scripts/data/boss_defs.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
+const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 
 static func spawn_boss(run: RunScene, boss_id: String, pos: Vector2) -> void:
 	if boss_id != "hollow_matriarch":
@@ -69,7 +70,11 @@ static func update_boss(run: RunScene, enemy: Dictionary, dir: Vector2, delta: f
 	elif String(enemy.get("special_state", "idle")) == "pouncing":
 		_update_pounce(run, enemy, delta)
 	else:
-		enemy["node"].position += dir * float(enemy["speed"]) * (0.62 if in_honest_light else 1.0) * delta
+		var radius := float(enemy.get("radius", 28.0)) + 5.0
+		var motion := dir * float(enemy["speed"]) * (0.62 if in_honest_light else 1.0) * delta
+		var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
+		var next_pos := LightLabCollision.resolve_circle_motion(enemy["node"].position, radius, motion, segments)
+		enemy["node"].position = next_pos.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
 		var projectile_cooldown: float = float(enemy.get("projectile_cooldown", 0.0)) - delta
 		var special_cooldown: float = float(enemy.get("special_cooldown", 0.0)) - delta
 		if special_lock_timer <= 0.0 and special_cooldown <= 0.0:
@@ -173,6 +178,9 @@ static func _start_pounce(run: RunScene, enemy: Dictionary) -> void:
 	if bool(light_state.get("honest", false)):
 		target = enemy["node"].position + (run.player_pos - enemy["node"].position).normalized() * float(profile.get("range", 220.0)) * 0.42
 		target = target.clamp(run.ARENA_RECT.position + Vector2(32, 32), run.ARENA_RECT.end - Vector2(32, 32))
+	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
+	if not segments.is_empty():
+		target = LightLabCollision.resolve_circle_motion(target, float(enemy.get("radius", 28.0)) + 6.0, Vector2.ZERO, segments)
 	enemy["special_target"] = target
 	run.last_event = "Hollow Matriarch compresses for Veil Pounce"
 
@@ -200,7 +208,11 @@ static func _update_pounce(run: RunScene, enemy: Dictionary, delta: float) -> vo
 	var total_time: float = max(float(enemy.get("special_duration", 0.2)), 0.001)
 	var remaining: float = max(float(enemy.get("special_timer", 0.0)) - delta, 0.0)
 	var progress := 1.0 - remaining / total_time
-	enemy["node"].position = Vector2(enemy.get("special_start", enemy["node"].position)).lerp(Vector2(enemy.get("special_target", enemy["node"].position)), progress)
+	var desired := Vector2(enemy.get("special_start", enemy["node"].position)).lerp(Vector2(enemy.get("special_target", enemy["node"].position)), progress)
+	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
+	if not segments.is_empty():
+		desired = LightLabCollision.resolve_circle_motion(desired, float(enemy.get("radius", 28.0)) + 6.0, Vector2.ZERO, segments)
+	enemy["node"].position = desired
 	enemy["special_timer"] = remaining
 	if remaining > 0.0:
 		return

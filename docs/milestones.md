@@ -1,5 +1,16 @@
 # Milestones
 
+## Done now: v0.5.1 Unified Light Response patch shipped
+
+Delivered in this repo now:
+
+- shared response model now drives laser, flashlight, and prism light against the same material coefficients
+- flashlight and prism light now create readable secondary response on lab surfaces instead of staying mostly detached visuals
+- player, enemies, and the Hollow Matriarch now respect Light Lab wall collision instead of relying only on arena bounds
+- shallow/deep wet test lanes now modulate movement speed for water-depth readability checks
+- spawn/prism placement now avoid obviously blocked wall positions where practical
+- material/intensity probe, section labels, and secondary beam/bounce instrumentation are clearer for validation
+
 ## Done now: v0.5.0 Light Lab pivot shipped
 
 Delivered in this repo now:

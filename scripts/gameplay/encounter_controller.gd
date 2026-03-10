@@ -51,6 +51,10 @@ static func start_encounter(run: RunScene, index: int) -> void:
 	run.last_event = "%s started" % String(encounter.get("title", "Encounter %d" % [index + 1]))
 
 static func spawn_enemy(run: RunScene, type: String, pos: Vector2) -> void:
+	if run.has_method("_find_valid_spawn"):
+		var resolved: Vector2 = run._find_valid_spawn(pos, 18.0)
+		if resolved != Vector2.INF:
+			pos = resolved
 	var node := Node2D.new()
 	node.name = "Enemy_%s_%d" % [type, randi() % 9999]
 	node.position = pos

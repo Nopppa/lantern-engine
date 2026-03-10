@@ -3,6 +3,7 @@ class_name EnemyController
 
 const BossController = preload("res://scripts/gameplay/boss_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
+const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 
 static func update_enemies(run: RunScene, delta: float) -> void:
 	BossController.update_projectiles(run, delta)
@@ -18,7 +19,7 @@ static func update_enemies(run: RunScene, delta: float) -> void:
 		var to_player: Vector2 = run.player_pos - enemy["node"].position
 		var dir := _safe_direction_from_player(to_player)
 		if enemy["type"] == "moth":
-			_update_moth(enemy, dir, delta)
+			_update_moth(run, enemy, dir, delta)
 		elif enemy["type"] == "hollow":
 			_update_hollow(run, enemy, dir, delta)
 		elif enemy["type"] == "boss_hollow_matriarch":
@@ -64,8 +65,28 @@ static func _safe_direction_from_player(to_player: Vector2) -> Vector2:
 		return dir if dir != Vector2.ZERO else Vector2.RIGHT
 	return to_player.normalized()
 
-static func _update_moth(enemy: Dictionary, dir: Vector2, delta: float) -> void:
-	enemy["node"].position += dir * enemy["speed"] * delta
+static func _resolve_motion(run: RunScene, enemy: Dictionary, motion: Vector2) -> void:
+	var radius := float(enemy.get("radius", 16.0)) + 4.0
+	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
+	var next_pos := LightLabCollision.resolve_circle_motion(enemy["node"].position, radius, motion, segments)
+	next_pos = next_pos.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
+	enemy["node"].position = next_pos
+
+static func _find_clear_position(run: RunScene, desired: Vector2, radius: float) -> Vector2:
+	var clamped := desired.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
+	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
+	if segments.is_empty() or not LightLabCollision.is_circle_blocked(clamped, radius + 4.0, segments):
+		return clamped
+	for ring in range(1, 5):
+		for step in range(12):
+			var probe := clamped + Vector2.RIGHT.rotated(TAU * float(step) / 12.0) * 18.0 * float(ring)
+			probe = probe.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
+			if not LightLabCollision.is_circle_blocked(probe, radius + 4.0, segments):
+				return probe
+	return clamped
+
+static func _update_moth(run: RunScene, enemy: Dictionary, dir: Vector2, delta: float) -> void:
+	_resolve_motion(run, enemy, dir * enemy["speed"] * delta)
 
 static func _update_hollow(run: RunScene, enemy: Dictionary, dir: Vector2, delta: float) -> void:
 	var light_state := run._light_state_for_position(enemy["node"].position)
@@ -97,7 +118,7 @@ static func _update_hollow_windup(run: RunScene, enemy: Dictionary, dir: Vector2
 		enemy["blink_winding_up"] = false
 		var blink_dist := 140.0 * 0.4
 		var flank := Vector2(randf_range(-50, 50), randf_range(-50, 50))
-		var target_pos := (run.player_pos + dir.rotated(PI) * blink_dist + flank).clamp(run.ARENA_RECT.position + Vector2(32, 32), run.ARENA_RECT.end - Vector2(32, 32))
+		var target_pos := _find_clear_position(run, run.player_pos + dir.rotated(PI) * blink_dist + flank, float(enemy.get("radius", 16.0)) + 6.0)
 		enemy["blink_transiting"] = true
 		enemy["blink_transit_start"] = enemy["node"].position
 		enemy["blink_transit_end"] = target_pos
@@ -122,7 +143,7 @@ static func _update_hollow_active(run: RunScene, enemy: Dictionary, dir: Vector2
 		else:
 			enemy["attack_timer"] = 2.4
 			var flank := Vector2(randf_range(-80, 80), randf_range(-80, 80))
-			enemy["node"].position = (run.player_pos + dir.rotated(PI) * 140.0 + flank).clamp(run.ARENA_RECT.position + Vector2(32, 32), run.ARENA_RECT.end - Vector2(32, 32))
+			enemy["node"].position = _find_clear_position(run, run.player_pos + dir.rotated(PI) * 140.0 + flank, float(enemy.get("radius", 16.0)) + 6.0)
 			run.last_event = "Hollow ambush blink"
 	else:
-		enemy["node"].position += dir * enemy["speed"] * 0.55 * delta
+		_resolve_motion(run, enemy, dir * enemy["speed"] * 0.55 * delta)

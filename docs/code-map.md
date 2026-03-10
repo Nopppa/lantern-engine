@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: `v0.5.0` Light Lab pivot shipped
+Current internal state: `v0.5.1` Unified Light Response patch shipped
 
 ## Purpose
 
@@ -37,7 +37,16 @@ This file tells future contributors where the new Light Lab responsibilities now
 ### Gameplay / simulation
 - `scripts/gameplay/light_surface_resolver.gd`
   - lab beam routing against authored surfaces
+  - shared secondary response generation for flashlight + prism + laser
   - mirror reflection, glass transmission, wet reflection, wood diffusion, brick absorption, prism redirect handling
+
+- `scripts/gameplay/light_response_model.gd`
+  - shared source/material response truth for laser / flashlight / prism light
+  - normalizes reflectivity / diffusion / transmission / absorption into readable gameplay branches
+
+- `scripts/gameplay/light_lab_collision.gd`
+  - circle-vs-segment collision helper for Light Lab movement / placement
+  - keeps player, enemy, boss, and spawn placement out of walls
 
 - `scripts/gameplay/dead_alive_grid.gd`
   - rendering-side dead/alive blend state cache for the floor

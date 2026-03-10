@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.1 - 2026-03-10
+
+Unified Light Response patch:
+
+- unified laser, flashlight, and prism light around a shared response model in `scripts/gameplay/light_response_model.gd`, so all three now resolve against the same reflectivity / diffusion / transmission / absorption material truth instead of flashlight/prism behaving as detached visual-only light
+- upgraded `scripts/gameplay/light_surface_resolver.gd` so flashlight and prism light now generate secondary reflected / transmitted / diffused response on authored lab surfaces; mirror, glass, brick, wood, and wet surfaces now show readable differences even without firing only the laser
+- added collision-aware movement through `scripts/gameplay/light_lab_collision.gd` and wired it into the Light Lab player, enemies, and Hollow Matriarch movement/pounce targeting so walls behave as real blockers instead of mere arena clamps
+- added light-touch water-depth slowdown lanes in the lab using wet-surface metadata plus shallow/deep labels; shallow water only trims movement slightly while deeper water slows more noticeably but still stays readable
+- hardened manual spawn/prism placement with blocked-position checks and nearest valid placement fallback so debug objects do not casually appear inside walls
+- improved Light Lab debug readability with material coefficient probe text under the cursor, local intensity readout, secondary light/bounce instrumentation, persistent section labels, and live step-speed feedback for water testing
+- updated docs and release metadata for the new `v0.5.1` Light Lab baseline
+
 ## 0.5.0 - 2026-03-10
 
 Direction-pivot Light Lab patch:

@@ -1,15 +1,17 @@
 # Current State
 
 Last updated: 2026-03-10
-Current shipped version target: `v0.5.0`
+Current shipped version target: `v0.5.1`
 
 ## Now shipped
 
 - the project now boots directly into a permanent authored **Light Lab** instead of the old auto-wave run
-- the lab contains outer walls, internal routing segments, authored brick/wood/wet/mirror/glass/prism test spaces, dead/alive blend lanes, and an open validation deck
-- flashlight checks now expose a queryable local light intensity with cone falloff, a stronger center, and softer edge behavior
-- first-pass light material definitions now drive readable beam behavior differences across mirror, glass, brick, wood, wet stone, and prism routing
+- the lab contains outer walls, internal routing segments, authored brick/wood/wet/mirror/glass/prism test spaces, dead/alive blend lanes, shallow/deep water lanes, and an open validation deck
+- flashlight checks now expose a queryable local light intensity with cone falloff, a stronger center, softer edge behavior, and secondary surface response on authored materials
+- prism light now also participates in the shared material-response model and excites nearby surfaces instead of remaining only an isolated aura concept
+- first-pass light material definitions now drive readable response differences across mirror, glass, brick, wood, wet surface, and prism routing from laser / flashlight / prism light together
 - dead/alive floor response now blends on the rendering side toward ALIVE while illuminated and fades back toward DEAD when light leaves unless the zone has a restored base state
+- player, enemy, and miniboss motion in the lab now respects wall collision rather than only room clamping
 - enemy testing in the lab is manual/debug spawned only; there is no auto encounter flow, no forced completion, and no run ending state in the primary map
 
 ## Canon direction status
