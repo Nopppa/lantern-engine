@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: post `v0.3.5` MVP-0 finish pass
+Current internal state: post `v0.4.0` MVP-1 patch 1 finish pass
 
 ## Purpose
 
@@ -28,19 +28,27 @@ Use this before making structural changes so new work lands in the right file in
 ### Data
 - `scripts/data/encounter_defs.gd`
   - authored encounter definitions / spawn data
-  - source of encounter content that used to live inline in `run_scene.gd`
+  - source of the current 5-encounter MVP-1 run chain
+  - includes encounter titles, summaries, spawn lists, and reward-tag hints
 
 - `scripts/data/upgrade_defs.gd`
   - reward / upgrade pool definitions
-  - source of upgrade data that used to live inline in `run_scene.gd`
+  - source of current core + Prism upgrade authoring
+  - drives reward filtering by encounter tags
 
 ### Gameplay
+- `scripts/gameplay/run_summary.gd`
+  - owns the run-summary tracker schema
+  - records encounter, upgrade, combat, and damage metrics
+  - builds the end-of-run report shown in the center panel
+
 - `scripts/gameplay/reward_controller.gd`
   - reward panel creation
   - reward modal input
   - reward highlight / focus / button state
   - reward selection and upgrade application
-  - reward flow progression to next encounter or run-complete state
+  - reward flow progression to the next authored encounter
+  - encounter-tag-aware reward filtering with fallback when the pool gets thin
   - small readability polish for selected-state styling and stat-delta copy
 
 - `scripts/gameplay/sfx_controller.gd`
@@ -63,7 +71,9 @@ Use this before making structural changes so new work lands in the right file in
   - wall-bounce continuation
   - Prism Node redirect chaining
   - shared total-range budgeting along beam segments
+  - Prism upgrade integration for redirect damage, redirect radius, redirect angle, and post-redirect bounce continuation
   - segment-vs-circle hit checks and enemy damage application
+  - runtime summary hooks for beams, redirects, damage dealt, and kills
 
 ### Player / debug input
 - `scripts/player/debug_actions.gd`
@@ -111,17 +121,17 @@ These responsibilities still remain in the main runtime coordinator:
 
 ## Recommended next structural step
 
-For MVP-0, stop here unless a real regression appears.
+For the current MVP-1 patch, stop here unless a real regression appears.
 
-When MVP-1 starts, consider:
-1. introducing a lightweight shared run-state container or clearer state grouping
-2. only after that, splitting lighting/rendering helpers further if the runtime still feels too coupled
-3. avoid duplicating combat ownership now that `beam_resolver.gd` and `enemy_controller.gd` hold the core simulation rules
+For the next MVP-1 expansion, consider:
+1. introducing a lightweight shared run-state container or clearer state grouping before adding another combat system
+2. keeping authored content additions in data files first instead of re-growing `run_scene.gd`
+3. avoiding duplicated combat ownership now that `beam_resolver.gd`, `enemy_controller.gd`, and `run_summary.gd` hold the core simulation/reporting rules
 
 ## Validation expectation after structural edits
 
 After any structural refactor, always verify at minimum:
 - headless boot succeeds
 - Windows export succeeds
-- Linux export succeeds
-- core playtest behaviors still work
+- authored run progression still reaches clean run-complete summary state
+- Prism upgrades still affect real beam behavior, not just HUD text

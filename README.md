@@ -1,6 +1,6 @@
-# Lantern Engine — MVP-0 Prism Mechanic Proof
+# Lantern Engine — MVP-1 Patch 1
 
-Godot 4 prototype for the **first testable Lantern Engine phase**. `v0.3.5` is treated as the completed MVP-0 handoff build unless a new blocker regression appears. This repo deliberately ships a tight, playable MVP-0 instead of a broad systems skeleton.
+Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but complete authored run. `v0.4.0` ships the first MVP-1 patch with a simple run summary, a cleaner data-driven content layer, a full 5-encounter authored chain, and Prism Node upgrade depth — without adding the out-of-scope third Prism skill or miniboss.
 
 ## What is included
 
@@ -9,14 +9,15 @@ Godot 4 prototype for the **first testable Lantern Engine phase**. `v0.3.5` is t
 - Energy resource + regen
 - one Prism primary skill: **Refraction Beam**
 - one placeable setup skill: **Prism Node**
-- at least one real bounce/refraction moment:
-  - beam can bounce off arena walls
-  - beam can refract through Prism Node into a redirected segment
+- beam wall-bounce support plus Prism redirect chaining
 - 2 enemy archetypes:
   - **Moth** chaser
   - **Hollow** ambusher/blinker
-- basic hit / death feedback
-- one reward/upgrade choice step between encounters with clear mouse + keyboard selection
+- authored 5-encounter run chain
+- reward/upgrade choice step between encounters with clear mouse + keyboard selection
+- Prism upgrade depth that now affects redirect damage, redirect catch radius, redirect bend angle, and post-redirect bounce continuation
+- simple end-of-run summary populated from runtime events
+- cleaner data-driven encounter + upgrade authoring split out of the main scene script
 - restart / retry loop
 - dev shortcuts for rapid iteration, including immortality toggle
 - short pulse-style Refraction Beam presentation instead of a long-held laser trace
@@ -24,20 +25,20 @@ Godot 4 prototype for the **first testable Lantern Engine phase**. `v0.3.5` is t
 
 ## Scope discipline
 
-This is **MVP-0 / mechanic proof**, not MVP-1 and not a vertical slice.
+This is a **small MVP-1 patch**, not a vertical slice and not a content explosion.
 
 Explicitly *not* implemented yet:
 
+- third Prism skill
+- miniboss
 - procedural generation
 - save persistence
 - multiple schools
-- broad content pipeline
-- art/audio content pass beyond the tiny synthesized MVP feedback cues
+- broad content validator pipeline
 - meta progression
-- boss/miniboss
-- full data-driven combat authoring
+- full production art/audio pass
 
-See `docs/mvp0-scope.md` for exact scope boundaries.
+See `docs/milestones.md` for current milestone posture.
 
 ## Controls
 
@@ -78,15 +79,15 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.3.5` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.4.0` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.3.5.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.4.0.zip`
 
-Windows builds are the default tester artifacts. Linux builds are optional and only produced when explicitly requested.
+Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 
-Godot export presets currently point to the unarchived executables under `build/windows/` and `build/linux/`; the versioned `.zip` / `.tar.gz` files are the canonical release artifacts to hand to testers.
+Godot export presets point to the unarchived executable under `build/windows/`; the versioned `.zip` file is the canonical release artifact to hand to testers.
 
 If export templates are missing on the machine, see `docs/devlog.md` for current blocker notes and exact export commands.
 

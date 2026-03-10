@@ -1,5 +1,32 @@
 # Devlog
 
+## 2026-03-10 — v0.4.0 MVP-1 Patch 1 Finish Pass
+
+This pass finished the previously partial MVP-1 patch instead of restarting from scratch.
+
+What changed:
+- completed the authored 5-encounter chain and ensured runtime actually uses that content from `scripts/data/encounter_defs.gd`
+- completed the reward/upgrade authoring layer around `scripts/data/upgrade_defs.gd` and `scripts/gameplay/reward_controller.gd`, including safer fallback behavior when encounter-tagged pools get thin
+- completed Prism upgrade depth integration in `scripts/gameplay/beam_resolver.gd` so Prism bonuses now affect redirect damage, redirect catch radius, redirect bend angle, and post-redirect bounce continuation
+- completed `scripts/gameplay/run_summary.gd` runtime wiring so the end panel reports real counters for encounters, upgrades, beams, prism placements, prism redirects, damage dealt/taken, and kill breakdown
+- fixed final encounter completion so the run ends directly into summary/restart state instead of trying to open another reward after the authored chain is over
+
+Validation:
+```bash
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --quit
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
+```
+
+Validation result:
+- first export attempt exposed compile blockers because Godot treated typed-inference warnings as errors in a few newly edited scripts
+- fixed only those concrete compile issues
+- headless boot passed
+- Windows export passed
+- packaged Windows release artifact prepared for GitHub Release upload
+
+Recommended next step:
+- playtest the new 5-encounter authored run and choose the next single MVP-1 expansion item deliberately (third Prism skill or miniboss)
+
 ## 2026-03-10 — v0.3.5 Final MVP-0 Polish / Finish Pass
 
 This was the intended last MVP-0 pass unless fresh tester evidence finds a real blocker.

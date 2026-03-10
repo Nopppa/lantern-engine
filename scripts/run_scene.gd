@@ -8,6 +8,7 @@ const EncounterController = preload("res://scripts/gameplay/encounter_controller
 const BeamResolver = preload("res://scripts/gameplay/beam_resolver.gd")
 const EnemyController = preload("res://scripts/gameplay/enemy_controller.gd")
 const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
+const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 const HudText = preload("res://scripts/ui/hud_text.gd")
 
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
@@ -22,6 +23,7 @@ const BEAM_PULSE_DURATION := 0.15
 const BEAM_OFFSET := 4.0
 const PRISM_RADIUS := 18.0
 const PRISM_REDIRECT_ANGLE := 55.0
+const BUILD_LABEL := "MVP-1.0 patch 1"
 
 var player_hp := 100.0
 var player_max_hp := 100.0
@@ -34,6 +36,10 @@ var beam_timer := 0.0
 var prism_timer := 0.0
 var prism_cooldown := 1.2
 var prism_duration := 12.0
+var prism_radius_bonus := 0.0
+var prism_redirect_angle_bonus := 0.0
+var prism_redirect_damage_bonus := 0.0
+var prism_redirect_bonus_bounces := 0
 var prism_node: Node2D
 var player_velocity := Vector2.ZERO
 var player_speed := 285.0
@@ -75,6 +81,7 @@ var end_panel: PanelContainer
 var end_title_label: Label
 var end_body_label: RichTextLabel
 var help_collapsed := false
+var run_summary := RunSummary.make_tracker()
 var world_layer: Node2D
 var fx_layer: Node2D
 var player_node: Node2D
@@ -83,6 +90,7 @@ var encounters := EncounterDefs.LIST.duplicate(true)
 
 func _ready() -> void:
 	randomize()
+	RunSummary.reset(self)
 	_setup_scene()
 	_start_encounter(0)
 
@@ -236,6 +244,15 @@ func _cast_refraction_beam(target: Vector2) -> void:
 func _redirected_prism_direction(direction: Vector2) -> Vector2:
 	return BeamResolver.redirected_prism_direction(self, direction)
 
+func current_prism_radius() -> float:
+	return PRISM_RADIUS + prism_radius_bonus
+
+func current_prism_redirect_angle() -> float:
+	return PRISM_REDIRECT_ANGLE + prism_redirect_angle_bonus
+
+func _current_encounter() -> Dictionary:
+	return EncounterDefs.get_encounter(encounter_index)
+
 func _place_prism(target: Vector2) -> void:
 	if prism_timer > 0.0:
 		last_event = "Prism Node recharging"
@@ -251,6 +268,7 @@ func _place_prism(target: Vector2) -> void:
 	marker.color = PRISM_COLOR
 	prism_node.add_child(marker)
 	prism_timer = prism_duration
+	RunSummary.note_prism_placed(self)
 	last_event = "Prism Node deployed"
 
 func _toggle_flashlight() -> void:
@@ -275,9 +293,11 @@ func _apply_contact_damage(amount: float) -> void:
 		last_event = "Immortal mode absorbed damage"
 		return
 	player_hp -= amount
+	RunSummary.note_damage_taken(self, amount)
 	if player_hp <= 0.0:
 		player_hp = 0.0
 		run_over = true
+		RunSummary.finish(self)
 		last_event = "Lantern extinguished"
 
 func _update_enemies(delta: float) -> void:
@@ -303,6 +323,12 @@ func _restart_run() -> void:
 	beam_range = 330.0
 	beam_damage = 18.0
 	beam_bounces = 1
+	prism_duration = 12.0
+	encounters = EncounterDefs.LIST.duplicate(true)
+	prism_radius_bonus = 0.0
+	prism_redirect_angle_bonus = 0.0
+	prism_redirect_damage_bonus = 0.0
+	prism_redirect_bonus_bounces = 0
 	player_pos = Vector2(260, 360)
 	if prism_node:
 		prism_node.queue_free()
@@ -316,6 +342,7 @@ func _restart_run() -> void:
 	beam_segments.clear()
 	hit_flashes.clear()
 	beam_pulse_timer = 0.0
+	RunSummary.reset(self)
 	_start_encounter(0)
 	last_event = "Run restarted"
 
@@ -357,10 +384,12 @@ func _build_lit_zones() -> Array:
 func _update_ui() -> void:
 	var beam_ready := "[color=#8be9fd]READY[/color]" if beam_timer <= 0.0 else "[color=#ffb86c]%.2fs[/color]" % beam_timer
 	var prism_state := "[color=#8be9fd]ACTIVE %.1fs[/color]" % prism_timer if prism_node else "[color=#50fa7b]READY[/color]"
-	var objective := "Pick one upgrade" if reward_pending else ("Survive encounter and route beam through walls/prism" if not run_over else ("Run complete — restart from center panel or R" if player_hp > 0.0 else "Run failed — restart from center panel or R"))
+	var current_encounter := _current_encounter()
+	var encounter_title := String(current_encounter.get("title", "Encounter"))
+	var objective := "Pick one upgrade" if reward_pending else (String(current_encounter.get("summary", "Survive encounter and route beam through walls/prism")) if not run_over else ("Run complete — restart from center panel or R" if player_hp > 0.0 else "Run failed — restart from center panel or R"))
 	var immortal_text := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
 	var flashlight_text := "[color=#f1fa8c]ON[/color] (%.0f/s)" % flashlight_drain if flashlight_on else "[color=#6272a4]OFF[/color]"
-	hud_label.text = "[b]Lantern Engine MVP-0.3[/b]\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#f1fa8c]Flashlight[/color] %s    [color=#a4b1cd]Beam:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d    [color=#a4b1cd]Enemies:[/color] %d\n[color=#a4b1cd]Immortal:[/color] %s" % [objective, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, flashlight_text, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), _alive_enemy_count(), immortal_text]
+	hud_label.text = "[b]Lantern Engine %s[/b]\n[color=#a4b1cd]Encounter:[/color] %s\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#f1fa8c]Prism[/color] +%.0f redirect dmg | +%.0f radius | +%.0f° bend | +%d post-prism bounce\n[color=#f1fa8c]Flashlight[/color] %s    [color=#a4b1cd]Beam:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d    [color=#a4b1cd]Enemies:[/color] %d\n[color=#a4b1cd]Immortal:[/color] %s" % [BUILD_LABEL, encounter_title, objective, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, prism_redirect_damage_bonus, prism_radius_bonus, prism_redirect_angle_bonus, prism_redirect_bonus_bounces, flashlight_text, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), _alive_enemy_count(), immortal_text]
 	var help_hint := "[color=#8be9fd]F1 show full help[/color]" if help_collapsed else "[color=#8be9fd]F1 hide full help[/color]"
 	var immortal_hint := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
 	if reward_pending:
@@ -375,7 +404,7 @@ func _update_ui() -> void:
 	status_label.visible = true
 	if run_over:
 		end_title_label.text = "Run complete" if player_hp > 0.0 else "Lantern extinguished"
-		end_body_label.text = "[b]Encounter %d / %d cleared.[/b]\nRestart is available immediately.\n\nPress [b]R[/b] or click [b]Restart run[/b] below.\nPress [b]F1[/b] to view the full control legend." % [encounter_index + 1, encounters.size()] if player_hp > 0.0 else "[b]The run ended in combat.[/b]\n\nPress [b]R[/b] or click [b]Restart run[/b] below.\nPress [b]F1[/b] to view the full control legend."
+		end_body_label.text = RunSummary.build_report(self, player_hp > 0.0) + "\n\nPress [b]R[/b] or click [b]Restart run[/b] below."
 		end_panel.visible = true
 	else:
 		end_panel.visible = false
@@ -418,6 +447,7 @@ func _draw() -> void:
 		draw_line(prism_node.position + Vector2(-24, 0), prism_node.position + Vector2(24, 0), Color(1.0, 1.0, 1.0, 0.16), 2.0)
 		draw_line(prism_node.position + Vector2(0, -24), prism_node.position + Vector2(0, 24), Color(1.0, 1.0, 1.0, 0.16), 2.0)
 		var prism_preview_dir := _redirected_prism_direction(facing)
+		draw_circle(prism_node.position, current_prism_radius(), Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.08))
 		draw_line(prism_node.position, prism_node.position + prism_preview_dir * 46.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.4), 2.0)
 	# --- Flashlight cone ---
 	if flashlight_on:

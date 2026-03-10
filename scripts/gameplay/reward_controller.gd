@@ -3,6 +3,7 @@ class_name RewardController
 
 const UpgradeDefs = preload("res://scripts/data/upgrade_defs.gd")
 const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
+const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 
 static func build_panel(run: RunScene) -> void:
 	run.reward_panel = PanelContainer.new()
@@ -40,7 +41,16 @@ static func show_rewards(run: RunScene) -> void:
 	run.reward_resolution_in_progress = false
 	run.reward_panel.visible = true
 	run.reward_selection_index = 0
-	var options: Array = UpgradeDefs.POOL.duplicate(true)
+	var encounter: Dictionary = run._current_encounter()
+	var requested_tags: Array = encounter.get("reward_tags", ["core", "prism"])
+	var taken_ids: Array = run.run_summary.get("upgrade_ids", [])
+	for btn in run.reward_buttons:
+		btn.set_meta("reward", {})
+	var options: Array = UpgradeDefs.get_pool(requested_tags, taken_ids)
+	if options.size() < run.reward_buttons.size():
+		options = UpgradeDefs.get_pool([], taken_ids)
+	if options.size() < run.reward_buttons.size():
+		options = UpgradeDefs.POOL.duplicate(true)
 	options.shuffle()
 	for i in run.reward_buttons.size():
 		var reward: Dictionary = options[i]
@@ -95,13 +105,22 @@ static func select_reward(run: RunScene, index: int) -> void:
 	if reward.is_empty():
 		run.reward_resolution_in_progress = false
 		return
-	match reward.get("apply", ""):
-		"bounce":
-			run.beam_bounces += 1
-		"range":
-			run.beam_range = min(run.beam_range + 180.0, 960.0)
-		"damage":
-			run.beam_damage += 8.0
+	match String(reward.get("apply", "")):
+		"beam_bounces":
+			run.beam_bounces += int(reward.get("value", 1))
+		"beam_range":
+			run.beam_range = min(run.beam_range + float(reward.get("value", 160.0)), 960.0)
+		"beam_damage":
+			run.beam_damage += float(reward.get("value", 7.0))
+		"prism_overclock":
+			run.prism_redirect_damage_bonus += 6.0
+			run.prism_duration += 3.0
+		"wide_refraction":
+			run.prism_radius_bonus += 10.0
+			run.prism_redirect_angle_bonus += 8.0
+		"echo_lens":
+			run.prism_redirect_bonus_bounces += 1
+	RunSummary.note_upgrade(run, reward)
 	run.reward_pending = false
 	run.reward_panel.visible = false
 	SfxController.play(run, "reward_pick")
@@ -112,4 +131,5 @@ static func select_reward(run: RunScene, index: int) -> void:
 		run.run_over = true
 		run.help_collapsed = false
 		run.reward_resolution_in_progress = false
-		run.last_event = "Prototype cleared — restart is ready"
+		RunSummary.finish(run)
+		run.last_event = "Prism Trial cleared — review run summary"

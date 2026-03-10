@@ -1,6 +1,9 @@
 extends RefCounted
 class_name EncounterController
 
+const EncounterDefs = preload("res://scripts/data/encounter_defs.gd")
+const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
+
 static func check_complete(run: RunScene) -> void:
 	if not run.encounter_active:
 		return
@@ -8,9 +11,21 @@ static func check_complete(run: RunScene) -> void:
 		if enemy["alive"]:
 			return
 	run.encounter_active = false
+	var encounter := EncounterDefs.get_encounter(run.encounter_index)
+	RunSummary.note_encounter_cleared(run, encounter)
+	if run.encounter_index + 1 >= run.encounters.size():
+		run.run_over = true
+		run.help_collapsed = false
+		run.reward_pending = false
+		run.reward_resolution_in_progress = false
+		run.reward_panel.visible = false
+		RunSummary.finish(run)
+		run.last_event = "%s cleared — review run summary" % String(encounter.get("title", "Final encounter"))
+		return
 	run._show_rewards()
 
 static func start_encounter(run: RunScene, index: int) -> void:
+	var encounter := EncounterDefs.get_encounter(index)
 	run.encounter_index = index
 	run.enemies.clear()
 	for child in run.world_layer.get_children():
@@ -21,9 +36,10 @@ static func start_encounter(run: RunScene, index: int) -> void:
 	run.reward_resolution_in_progress = false
 	run.reward_panel.visible = false
 	run.end_panel.visible = false
-	for spec: Dictionary in run.encounters[min(index, run.encounters.size() - 1)]:
+	for spec: Dictionary in encounter.get("spawns", []):
 		spawn_enemy(run, spec["type"], spec["pos"])
-	run.last_event = "Encounter %d started" % [index + 1]
+	RunSummary.note_encounter_started(run, encounter)
+	run.last_event = "%s started" % String(encounter.get("title", "Encounter %d" % [index + 1]))
 
 static func spawn_enemy(run: RunScene, type: String, pos: Vector2) -> void:
 	var node := Node2D.new()

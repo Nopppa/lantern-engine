@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 - 2026-03-10
+
+MVP-1 patch 1 finish pass:
+
+- completed the first authored MVP-1 run as a 5-encounter chain using encounter data from `scripts/data/encounter_defs.gd` instead of inline scene-script content
+- completed the cleaner data-driven content layer by keeping encounter definitions and upgrade definitions in dedicated data files and tightening reward-pool filtering/fallback around encounter tags and already-taken upgrades
+- completed Prism Node upgrade depth at runtime: Prism upgrades now affect redirect damage, redirect catch radius, redirect bend angle, and post-redirect bounce continuation instead of existing only as partial scaffolding
+- completed the simple run summary as a real runtime-fed report, with encounter progression, chosen upgrades, beam casts, prism placements, prism redirects, damage dealt/taken, and per-enemy kill counts populated from gameplay events
+- fixed final-encounter flow so the run ends cleanly into the summary instead of incorrectly trying to open another reward step after the last authored encounter
+- validated with headless boot and Windows export; packaged a Windows release artifact for GitHub Releases
+
 ## 0.3.5 - 2026-03-10
 
 Final MVP-0 polish / finish pass:

@@ -2,6 +2,7 @@ extends RefCounted
 class_name BeamResolver
 
 const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
+const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 
 static func cast_beam(run: RunScene, target: Vector2) -> void:
 	if run.beam_timer > 0.0:
@@ -16,6 +17,7 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 	run.beam_pulse_timer = run.BEAM_PULSE_DURATION
 	run.beam_segments.clear()
 	run.hit_flashes.clear()
+	RunSummary.note_beam_cast(run)
 	SfxController.play(run, "beam")
 	var direction := (target - run.player_pos).normalized()
 	if direction == Vector2.ZERO:
@@ -24,6 +26,7 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 	var current_direction := direction
 	var bounces_left := run.beam_bounces
 	var prism_redirect_used := false
+	var prism_redirect_bounces_granted := false
 	var remaining_range := run.beam_range
 	var any_hit := false
 	while remaining_range > 0.0:
@@ -31,9 +34,11 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 		var segment_start: Vector2 = segment[0]
 		var segment_end: Vector2 = segment[1]
 		var segment_damage := run.beam_damage + float(max(run.beam_bounces - bounces_left, 0)) * 4.0
+		if prism_redirect_used:
+			segment_damage += run.prism_redirect_damage_bonus
 		var prism_hit := {}
 		if run.prism_node and not prism_redirect_used:
-			prism_hit = segment_circle_hit(segment_start, segment_end, run.prism_node.position, run.PRISM_RADIUS)
+			prism_hit = segment_circle_hit(segment_start, segment_end, run.prism_node.position, run.current_prism_radius())
 		if prism_hit.size() > 0:
 			var hit_pos: Vector2 = prism_hit["point"]
 			run.beam_segments.append([segment_start, hit_pos])
@@ -44,6 +49,10 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 			current_direction = redirected_prism_direction(run, current_direction)
 			current_origin = hit_pos + current_direction * run.BEAM_OFFSET
 			prism_redirect_used = true
+			if not prism_redirect_bounces_granted:
+				bounces_left += run.prism_redirect_bonus_bounces
+				prism_redirect_bounces_granted = true
+			RunSummary.note_prism_redirect(run)
 			any_hit = true
 			run.last_event = "Refraction Beam redirected through Prism Node"
 			continue
@@ -65,7 +74,8 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 	run.lit_zones = run._build_lit_zones()
 
 static func redirected_prism_direction(run: RunScene, direction: Vector2) -> Vector2:
-	return direction.rotated(deg_to_rad(run.PRISM_REDIRECT_ANGLE if direction.y >= 0.0 else -run.PRISM_REDIRECT_ANGLE)).normalized()
+	var redirect_angle: float = run.current_prism_redirect_angle()
+	return direction.rotated(deg_to_rad(redirect_angle if direction.y >= 0.0 else -redirect_angle)).normalized()
 
 static func beam_to_bounds(run: RunScene, origin: Vector2, direction: Vector2, length: float) -> Array:
 	var end := origin + direction * length
@@ -109,6 +119,7 @@ static func damage_enemies_along_segment(run: RunScene, a: Vector2, b: Vector2, 
 		var hit: Dictionary = segment_circle_hit(a, b, enemy["node"].position, enemy["radius"])
 		if hit.size() > 0:
 			enemy["hp"] -= damage
+			RunSummary.note_damage_dealt(run, damage)
 			enemy["flash"] = 0.25
 			var hit_pos: Vector2 = hit["point"]
 			var hit_color := Color(1.0, 0.82, 0.45, 0.95) if enemy["type"] == "moth" else Color(0.88, 0.72, 1.0, 0.95)
@@ -117,6 +128,7 @@ static func damage_enemies_along_segment(run: RunScene, a: Vector2, b: Vector2, 
 			if enemy["hp"] <= 0.0:
 				enemy["alive"] = false
 				enemy["death_timer"] = 0.35
+				RunSummary.note_kill(run, String(enemy["type"]))
 				run._add_hit_flash(enemy["node"].position, enemy["radius"] + 22.0, Color(1.0, 0.96, 0.76, 1.0), 0.22)
 				SfxController.play(run, "kill")
 				run.last_event = "%s eliminated" % String(enemy["type"]).capitalize()
