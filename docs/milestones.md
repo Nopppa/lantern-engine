@@ -18,16 +18,26 @@ Delivered in this repo:
 - restart/retry
 - documentation pass
 
-## Next sensible milestone: MVP-0 polish / validation
+## Current state: MVP-0.3 combat/runtime decomposition in progress
+
+Recently completed:
+
+- flashlight reveal mechanic added for Hollow pressure/readability
+- disrupted blink readability improved with visible windup + transit
+- shared enemy freeze bug fixed in v0.3.2
+- first low-risk internal refactor pass completed around data, reward flow, debug input, and HUD helpers
+- second structural pass completed in v0.3.3 around beam resolution and encounter orchestration
+
+## Next sensible milestone: MVP-0 enemy/runtime state extraction
 
 Recommended next steps:
 
-1. tune beam readability and enemy pacing
-2. separate combat code from rendering code
-3. add proper combat resolver object
-4. improve reward UI readability
-5. add lightweight audio + hit flash polish
-6. document playtest findings from multiple testers
+1. extract enemy runtime update/state handling from `run_scene.gd`
+2. group shared mutable run state more cleanly to reduce flag sprawl
+3. retest enemy pacing and beam readability after the structural pass
+4. tighten reward/UI readability only if new playtests still expose friction
+5. add lightweight hit-flash/audio polish after runtime structure is safer
+6. keep documenting playtest findings in persistent files
 
 ## After validation: MVP-1
 

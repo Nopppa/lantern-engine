@@ -1,0 +1,113 @@
+extends RefCounted
+class_name BeamResolver
+
+static func cast_beam(run: RunScene, target: Vector2) -> void:
+	if run.beam_timer > 0.0:
+		run.last_event = "Beam on cooldown"
+		return
+	if run.energy < run.beam_cost:
+		run.last_event = "Low energy"
+		return
+	run.energy -= run.beam_cost
+	run.beam_timer = run.beam_cooldown
+	run.beam_flash = 1.0
+	run.beam_pulse_timer = run.BEAM_PULSE_DURATION
+	run.beam_segments.clear()
+	var direction := (target - run.player_pos).normalized()
+	if direction == Vector2.ZERO:
+		direction = run.facing
+	var current_origin := run.player_pos
+	var current_direction := direction
+	var bounces_left := run.beam_bounces
+	var prism_redirect_used := false
+	var remaining_range := run.beam_range
+	var any_hit := false
+	while remaining_range > 0.0:
+		var segment := beam_to_bounds(run, current_origin, current_direction, remaining_range)
+		var segment_start: Vector2 = segment[0]
+		var segment_end: Vector2 = segment[1]
+		var segment_damage := run.beam_damage + float(max(run.beam_bounces - bounces_left, 0)) * 4.0
+		var prism_hit := {}
+		if run.prism_node and not prism_redirect_used:
+			prism_hit = segment_circle_hit(segment_start, segment_end, run.prism_node.position, run.PRISM_RADIUS)
+		if prism_hit.size() > 0:
+			var hit_pos: Vector2 = prism_hit["point"]
+			run.beam_segments.append([segment_start, hit_pos])
+			damage_enemies_along_segment(run, segment_start, hit_pos, segment_damage)
+			remaining_range -= segment_start.distance_to(hit_pos)
+			if remaining_range <= 0.0:
+				break
+			current_direction = redirected_prism_direction(run, current_direction)
+			current_origin = hit_pos + current_direction * run.BEAM_OFFSET
+			prism_redirect_used = true
+			any_hit = true
+			run.last_event = "Refraction Beam redirected through Prism Node"
+			continue
+		run.beam_segments.append([segment_start, segment_end])
+		damage_enemies_along_segment(run, segment_start, segment_end, segment_damage)
+		remaining_range -= segment_start.distance_to(segment_end)
+		any_hit = true
+		if remaining_range <= 0.0 or bounces_left <= 0:
+			break
+		var bounce_result := reflect_if_wall(run, segment_end, current_direction)
+		if bounce_result.is_empty():
+			break
+		current_direction = bounce_result["direction"]
+		current_origin = bounce_result["point"] + current_direction * run.BEAM_OFFSET
+		bounces_left -= 1
+		run.last_event = "Beam bounced off arena wall"
+	if not any_hit:
+		run.last_event = "Beam fizzled"
+	run.lit_zones = run._build_lit_zones()
+
+static func redirected_prism_direction(run: RunScene, direction: Vector2) -> Vector2:
+	return direction.rotated(deg_to_rad(run.PRISM_REDIRECT_ANGLE if direction.y >= 0.0 else -run.PRISM_REDIRECT_ANGLE)).normalized()
+
+static func beam_to_bounds(run: RunScene, origin: Vector2, direction: Vector2, length: float) -> Array:
+	var end := origin + direction * length
+	var t := 1.0
+	if direction.x > 0.0:
+		t = min(t, (run.ARENA_RECT.end.x - origin.x) / max(direction.x * length, 0.001))
+	elif direction.x < 0.0:
+		t = min(t, (run.ARENA_RECT.position.x - origin.x) / min(direction.x * length, -0.001))
+	if direction.y > 0.0:
+		t = min(t, (run.ARENA_RECT.end.y - origin.y) / max(direction.y * length, 0.001))
+	elif direction.y < 0.0:
+		t = min(t, (run.ARENA_RECT.position.y - origin.y) / min(direction.y * length, -0.001))
+	end = origin + direction * length * clamp(t, 0.0, 1.0)
+	return [origin, end]
+
+static func reflect_if_wall(run: RunScene, end: Vector2, direction: Vector2) -> Dictionary:
+	var reflected := direction
+	var hit_wall := false
+	if is_equal_approx(end.x, run.ARENA_RECT.position.x) or is_equal_approx(end.x, run.ARENA_RECT.end.x):
+		reflected.x *= -1.0
+		hit_wall = true
+	if is_equal_approx(end.y, run.ARENA_RECT.position.y) or is_equal_approx(end.y, run.ARENA_RECT.end.y):
+		reflected.y *= -1.0
+		hit_wall = true
+	if not hit_wall:
+		return {}
+	return {"point": end, "direction": reflected.normalized()}
+
+static func segment_circle_hit(a: Vector2, b: Vector2, center: Vector2, radius: float) -> Dictionary:
+	var ab: Vector2 = b - a
+	var t: float = clamp((center - a).dot(ab) / max(ab.length_squared(), 0.001), 0.0, 1.0)
+	var p: Vector2 = a + ab * t
+	if p.distance_to(center) <= radius:
+		return {"point": p, "t": t}
+	return {}
+
+static func damage_enemies_along_segment(run: RunScene, a: Vector2, b: Vector2, damage: float) -> void:
+	for enemy: Dictionary in run.enemies:
+		if not enemy["alive"]:
+			continue
+		var hit: Dictionary = segment_circle_hit(a, b, enemy["node"].position, enemy["radius"])
+		if hit.size() > 0:
+			enemy["hp"] -= damage
+			enemy["flash"] = 0.25
+			run.last_event = "Hit %s for %.0f" % [enemy["type"], damage]
+			if enemy["hp"] <= 0.0:
+				enemy["alive"] = false
+				enemy["death_timer"] = 0.35
+				run.last_event = "%s eliminated" % String(enemy["type"]).capitalize()

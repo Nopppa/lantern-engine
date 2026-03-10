@@ -4,6 +4,8 @@ class_name RunScene
 const EncounterDefs = preload("res://scripts/data/encounter_defs.gd")
 const DebugActions = preload("res://scripts/player/debug_actions.gd")
 const RewardController = preload("res://scripts/gameplay/reward_controller.gd")
+const EncounterController = preload("res://scripts/gameplay/encounter_controller.gd")
+const BeamResolver = preload("res://scripts/gameplay/beam_resolver.gd")
 const HudText = preload("res://scripts/ui/hud_text.gd")
 
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
@@ -222,116 +224,10 @@ func _handle_player(delta: float) -> void:
 		prism_node.position = prism_node.position.clamp(ARENA_RECT.position + Vector2(24, 24), ARENA_RECT.end - Vector2(24, 24))
 
 func _cast_refraction_beam(target: Vector2) -> void:
-	if beam_timer > 0.0:
-		last_event = "Beam on cooldown"
-		return
-	if energy < beam_cost:
-		last_event = "Low energy"
-		return
-	energy -= beam_cost
-	beam_timer = beam_cooldown
-	beam_flash = 1.0
-	beam_pulse_timer = BEAM_PULSE_DURATION
-	beam_segments.clear()
-	var direction := (target - player_pos).normalized()
-	if direction == Vector2.ZERO:
-		direction = facing
-	var current_origin := player_pos
-	var current_direction := direction
-	var bounces_left := beam_bounces
-	var prism_redirect_used := false
-	var remaining_range := beam_range
-	var any_hit := false
-	while remaining_range > 0.0:
-		var segment := _beam_to_bounds(current_origin, current_direction, remaining_range)
-		var segment_start: Vector2 = segment[0]
-		var segment_end: Vector2 = segment[1]
-		var segment_damage := beam_damage + float(max(beam_bounces - bounces_left, 0)) * 4.0
-		var prism_hit := {}
-		if prism_node and not prism_redirect_used:
-			prism_hit = _segment_circle_hit(segment_start, segment_end, prism_node.position, PRISM_RADIUS)
-		if prism_hit.size() > 0:
-			var hit_pos: Vector2 = prism_hit["point"]
-			beam_segments.append([segment_start, hit_pos])
-			_damage_enemies_along_segment(segment_start, hit_pos, segment_damage)
-			remaining_range -= segment_start.distance_to(hit_pos)
-			if remaining_range <= 0.0:
-				break
-			current_direction = _redirected_prism_direction(current_direction)
-			current_origin = hit_pos + current_direction * BEAM_OFFSET
-			prism_redirect_used = true
-			any_hit = true
-			last_event = "Refraction Beam redirected through Prism Node"
-			continue
-		beam_segments.append([segment_start, segment_end])
-		_damage_enemies_along_segment(segment_start, segment_end, segment_damage)
-		remaining_range -= segment_start.distance_to(segment_end)
-		any_hit = true
-		if remaining_range <= 0.0 or bounces_left <= 0:
-			break
-		var bounce_result := _reflect_if_wall(segment_start, segment_end, current_direction)
-		if bounce_result.is_empty():
-			break
-		current_direction = bounce_result["direction"]
-		current_origin = bounce_result["point"] + current_direction * BEAM_OFFSET
-		bounces_left -= 1
-		last_event = "Beam bounced off arena wall"
-	if not any_hit:
-		last_event = "Beam fizzled"
-	lit_zones = _build_lit_zones()
+	BeamResolver.cast_beam(self, target)
 
 func _redirected_prism_direction(direction: Vector2) -> Vector2:
-	return direction.rotated(deg_to_rad(PRISM_REDIRECT_ANGLE if direction.y >= 0.0 else -PRISM_REDIRECT_ANGLE)).normalized()
-
-func _beam_to_bounds(origin: Vector2, direction: Vector2, length: float) -> Array:
-	var end := origin + direction * length
-	var t := 1.0
-	if direction.x > 0.0:
-		t = min(t, (ARENA_RECT.end.x - origin.x) / max(direction.x * length, 0.001))
-	elif direction.x < 0.0:
-		t = min(t, (ARENA_RECT.position.x - origin.x) / min(direction.x * length, -0.001))
-	if direction.y > 0.0:
-		t = min(t, (ARENA_RECT.end.y - origin.y) / max(direction.y * length, 0.001))
-	elif direction.y < 0.0:
-		t = min(t, (ARENA_RECT.position.y - origin.y) / min(direction.y * length, -0.001))
-	end = origin + direction * length * clamp(t, 0.0, 1.0)
-	return [origin, end]
-
-func _reflect_if_wall(start: Vector2, end: Vector2, direction: Vector2) -> Dictionary:
-	var reflected := direction
-	var hit := end
-	var hit_wall := false
-	if is_equal_approx(end.x, ARENA_RECT.position.x) or is_equal_approx(end.x, ARENA_RECT.end.x):
-		reflected.x *= -1.0
-		hit_wall = true
-	if is_equal_approx(end.y, ARENA_RECT.position.y) or is_equal_approx(end.y, ARENA_RECT.end.y):
-		reflected.y *= -1.0
-		hit_wall = true
-	if not hit_wall:
-		return {}
-	return {"point": hit, "direction": reflected.normalized()}
-
-func _segment_circle_hit(a: Vector2, b: Vector2, center: Vector2, radius: float) -> Dictionary:
-	var ab: Vector2 = b - a
-	var t: float = clamp((center - a).dot(ab) / max(ab.length_squared(), 0.001), 0.0, 1.0)
-	var p: Vector2 = a + ab * t
-	if p.distance_to(center) <= radius:
-		return {"point": p, "t": t}
-	return {}
-
-func _damage_enemies_along_segment(a: Vector2, b: Vector2, damage: float) -> void:
-	for enemy: Dictionary in enemies:
-		if not enemy["alive"]:
-			continue
-		var hit: Dictionary = _segment_circle_hit(a, b, enemy["node"].position, enemy["radius"])
-		if hit.size() > 0:
-			enemy["hp"] -= damage
-			enemy["flash"] = 0.25
-			last_event = "Hit %s for %.0f" % [enemy["type"], damage]
-			if enemy["hp"] <= 0.0:
-				enemy["alive"] = false
-				enemy["death_timer"] = 0.35
-				last_event = "%s eliminated" % String(enemy["type"]).capitalize()
+	return BeamResolver.redirected_prism_direction(self, direction)
 
 func _place_prism(target: Vector2) -> void:
 	if prism_timer > 0.0:
@@ -453,44 +349,13 @@ func _update_enemies(delta: float) -> void:
 			_apply_contact_damage(enemy["contact_damage"] * delta)
 
 func _check_encounter_complete() -> void:
-	if not encounter_active:
-		return
-	for enemy: Dictionary in enemies:
-		if enemy["alive"]:
-			return
-	encounter_active = false
-	_show_rewards()
+	EncounterController.check_complete(self)
 
 func _start_encounter(index: int) -> void:
-	encounter_index = index
-	enemies.clear()
-	for child in world_layer.get_children():
-		if child.name.begins_with("Enemy_"):
-			child.queue_free()
-	encounter_active = true
-	reward_pending = false
-	reward_resolution_in_progress = false
-	reward_panel.visible = false
-	end_panel.visible = false
-	for spec: Dictionary in encounters[min(index, encounters.size() - 1)]:
-		_spawn_enemy(spec["type"], spec["pos"])
-	last_event = "Encounter %d started" % [index + 1]
+	EncounterController.start_encounter(self, index)
 
 func _spawn_enemy(type: String, pos: Vector2) -> void:
-	var node := Node2D.new()
-	node.name = "Enemy_%s_%d" % [type, randi() % 9999]
-	node.position = pos
-	world_layer.add_child(node)
-	var sprite := Polygon2D.new()
-	if type == "moth":
-		sprite.polygon = PackedVector2Array([Vector2(-14, 0), Vector2(0, -10), Vector2(14, 0), Vector2(0, 10)])
-		sprite.color = Color("ffb86c")
-		enemies.append({"node": node, "type": type, "hp": 24.0, "speed": 116.0, "radius": 16.0, "contact_damage": 14.0, "alive": true, "flash": 0.0, "death_timer": 0.0, "attack_timer": 0.0})
-	else:
-		sprite.polygon = PackedVector2Array([Vector2(-12, -12), Vector2(12, -12), Vector2(12, 12), Vector2(-12, 12)])
-		sprite.color = Color("bd93f9")
-		enemies.append({"node": node, "type": type, "hp": 34.0, "speed": 92.0, "radius": 16.0, "contact_damage": 19.0, "alive": true, "flash": 0.0, "death_timer": 0.0, "attack_timer": 1.3, "revealed_by_light": false, "shimmer_timer": 0.0, "blink_windup": 0.0, "blink_winding_up": false, "blink_transiting": false, "blink_transit_timer": 0.0, "blink_transit_duration": 0.0, "blink_transit_start": Vector2.ZERO, "blink_transit_end": Vector2.ZERO})
-	node.add_child(sprite)
+	EncounterController.spawn_enemy(self, type, pos)
 
 func _show_rewards() -> void:
 	RewardController.show_rewards(self)

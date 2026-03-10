@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.3 - 2026-03-10
+
+Combat/runtime decomposition pass:
+
+- extracted beam path / bounce / prism redirect / beam-hit logic into `scripts/gameplay/beam_resolver.gd`
+- extracted encounter start / completion / enemy spawn orchestration into `scripts/gameplay/encounter_controller.gd`
+- reduced `scripts/run_scene.gd` to a thinner runtime coordinator for these systems
+- updated roadmap + code map docs to reflect the new internal structure and next recommended step
+- no intended gameplay/design changes; structure-first maintenance pass
+
 ## 0.3.2 - 2026-03-10
 
 Enemy freeze fix (Playtest 07 follow-up):

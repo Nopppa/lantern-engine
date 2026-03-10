@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: post `v0.3-internal pass 1`
+Current internal state: post `v0.3.3` combat/runtime decomposition pass
 
 ## Purpose
 
@@ -23,7 +23,7 @@ Use this before making structural changes so new work lands in the right file in
   - still the main runtime coordinator
   - still owns the risky gameplay core that has NOT been extracted yet
 
-## Extracted modules from refactor pass 1
+## Extracted modules
 
 ### Data
 - `scripts/data/encounter_defs.gd`
@@ -42,6 +42,18 @@ Use this before making structural changes so new work lands in the right file in
   - reward selection and upgrade application
   - reward flow progression to next encounter or run-complete state
 
+- `scripts/gameplay/encounter_controller.gd`
+  - encounter completion checks
+  - encounter start/reset flow
+  - enemy spawn construction from authored encounter data
+
+- `scripts/gameplay/beam_resolver.gd`
+  - beam cast validation
+  - wall-bounce continuation
+  - Prism Node redirect chaining
+  - shared total-range budgeting along beam segments
+  - segment-vs-circle hit checks and enemy damage application
+
 ### Player / debug input
 - `scripts/player/debug_actions.gd`
   - debug/help/dev input handling
@@ -58,16 +70,13 @@ Use this before making structural changes so new work lands in the right file in
 
 ## Intentionally still in run_scene.gd
 
-These were deliberately NOT extracted in pass 1 because they are the highest-risk systems:
+These responsibilities still remain in the main runtime coordinator:
 
-- beam/combat/bounce/prism-range math
-- prism redirect logic
-- shared beam total-range budgeting
-- enemy spawn / update / contact-damage logic
-- encounter start/completion orchestration
+- enemy runtime update / blink / contact-damage loop
+- player movement + input-driven action intent handling
 - lit-zone builder
 - `_draw()` rendering path
-- runtime glue between world state, combat state, and rendering state
+- top-level runtime glue between world state, combat state, and rendering state
 
 ## Rule of thumb for future edits
 
@@ -95,9 +104,9 @@ These were deliberately NOT extracted in pass 1 because they are the highest-ris
 ## Recommended next structural step
 
 If/when the next internal refactor pass happens, consider:
-1. a lightweight module registry / load list
-2. clearer run-state orchestration split
-3. only after that, deeper beam/combat extraction
+1. extracting enemy runtime update/state handling out of `run_scene.gd`
+2. introducing a lightweight shared run-state container or clearer state grouping
+3. only after that, splitting lighting/rendering helpers further if the runtime still feels too coupled
 
 ## Validation expectation after structural edits
 

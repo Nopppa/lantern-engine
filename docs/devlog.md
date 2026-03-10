@@ -1,5 +1,27 @@
 # Devlog
 
+## 2026-03-10 — v0.3.3 Combat/Runtime Decomposition Pass
+
+This pass took the next planned structural step after the earlier low-risk extraction work. The main goal was not new gameplay but safer ownership around the runtime core.
+
+What changed:
+- moved beam path, wall bounce, prism redirect, segment hit, and enemy damage resolution into `scripts/gameplay/beam_resolver.gd`
+- moved encounter completion checks, encounter start/reset flow, and enemy spawn construction into `scripts/gameplay/encounter_controller.gd`
+- kept `run_scene.gd` as orchestration root, but reduced it to calling these modules instead of directly owning as much combat/encounter code
+
+Why this pass now:
+- the project had already proven the flashlight/readability direction and fixed the immediate freeze bug in `v0.3.2`
+- the biggest remaining maintenance risk was concentrated ownership inside `run_scene.gd`
+- this extraction is a structure-first pass that should make the next combat/runtime cleanup safer without broadening scope into MVP-1
+
+Validation target:
+- headless boot
+- Windows export
+- no intended gameplay changes
+
+Recommended next step after this pass:
+- extract enemy runtime update/state handling next, or introduce a lightweight shared run-state container before deeper rendering splits
+
 ## 2026-03-10 — v0.3.1 Disrupted Blink Transit
 
 Playtest 06 feedback: windup + teleport still didn't sell the fantasy. Player knows something is happening but the blink destination appears instantly. Fix: replaced the teleport with a short visible linear transit (0.28s). Hollow now moves visibly between start and end, flickering rapidly as light disrupts the blink. Still much faster than walking (~5x speed), but readable. Windup retained. Trail line shows path during transit.

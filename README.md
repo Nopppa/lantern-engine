@@ -78,11 +78,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.3.1` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.3.3` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.3.1.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.3.3.zip`
 
 Windows builds are the default tester artifacts. Linux builds are optional and only produced when explicitly requested.
 
