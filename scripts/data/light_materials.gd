@@ -35,7 +35,7 @@ const DEFINITIONS := {
 		"color": Color(0.22, 0.32, 0.38, 1.0),
 		"alive_color": Color(0.36, 0.58, 0.62, 1.0),
 		"water_depth": 0.65,
-		"move_speed_multiplier": 0.84
+		"move_speed_multiplier": 0.70
 	},
 	"mirror": {
 		"label": "Mirror",
@@ -69,6 +69,17 @@ const DEFINITIONS := {
 		"restoration_affinity": 1.0,
 		"color": Color(0.56, 0.92, 1.0, 1.0),
 		"alive_color": Color(0.88, 1.0, 1.0, 1.0)
+	},
+	"tree": {
+		"label": "Tree Trunk",
+		"reflectivity": 0.02,
+		"diffusion": 0.18,
+		"transmission": 0.0,
+		"absorption": 0.80,
+		"roughness": 0.88,
+		"restoration_affinity": 0.48,
+		"color": Color(0.34, 0.22, 0.14, 1.0),
+		"alive_color": Color(0.42, 0.30, 0.18, 1.0)
 	}
 }
 

@@ -1,7 +1,7 @@
 extends RefCounted
 class_name LightLabCollision
 
-static func resolve_circle_motion(position: Vector2, radius: float, motion: Vector2, segments: Array, iterations: int = 4) -> Vector2:
+static func resolve_circle_motion(position: Vector2, radius: float, motion: Vector2, segments: Array, circles: Array = [], iterations: int = 4) -> Vector2:
 	var new_pos := position
 	new_pos += motion
 	for _i in range(iterations):
@@ -15,16 +15,37 @@ static func resolve_circle_motion(position: Vector2, radius: float, motion: Vect
 			var push_dir := delta / dist
 			new_pos = closest + push_dir * radius
 			pushed = true
+		for circle: Dictionary in circles:
+			var center: Vector2 = circle["pos"]
+			var circle_radius: float = float(circle["radius"])
+			var cdelta := new_pos - center
+			var cdist := cdelta.length()
+			if cdist >= radius + circle_radius or cdist <= 0.0001:
+				continue
+			var cpush_dir := cdelta / cdist
+			new_pos = center + cpush_dir * (radius + circle_radius)
+			pushed = true
 		if not pushed:
 			break
 	return new_pos
 
-static func is_circle_blocked(position: Vector2, radius: float, segments: Array) -> bool:
+static func is_circle_blocked(position: Vector2, radius: float, segments: Array, circles: Array = []) -> bool:
 	for segment: Dictionary in segments:
 		var closest := _closest_point_on_segment(position, Vector2(segment["a"]), Vector2(segment["b"]))
 		if closest.distance_to(position) < radius:
 			return true
+	for circle: Dictionary in circles:
+		if Vector2(circle["pos"]).distance_to(position) < radius + float(circle["radius"]):
+			return true
 	return false
+
+static func segment_intersects_circle(a: Vector2, b: Vector2, center: Vector2, radius: float) -> Dictionary:
+	var closest := _closest_point_on_segment(center, a, b)
+	if closest.distance_to(center) > radius:
+		return {}
+	var ab := b - a
+	var t := clampf((closest - a).dot(ab) / max(ab.length_squared(), 0.001), 0.0, 1.0)
+	return {"point": closest, "t": t}
 
 static func _closest_point_on_segment(point: Vector2, a: Vector2, b: Vector2) -> Vector2:
 	var ab := b - a

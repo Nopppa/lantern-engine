@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-03-10 — v0.5.2 Light Lab Readability & Extraction patch
+
+This patch keeps the project pointed at the Light Lab, but makes the lab faster to read and easier to graduate from later.
+
+What changed:
+- extracted authored Light Lab bay/lane/station content into `scripts/data/light_lab_layout.gd`
+- extracted reusable light intensity math into `scripts/gameplay/light_query.gd`
+- upgraded each comparison space with stronger authored signage and short behavior hints
+- differentiated secondary-light overlays so reflection / transmission / diffusion / prism-emitted response are easier to tell apart
+- added path-layer labels and stronger bounce/redirect markers so beam logic reads as a layered trace instead of a loose glow sketch
+- tightened truth/readability from testing feedback: brick walls now occlude flashlight properly, solid tree trunks now block movement/beam/flashlight, water slowdown is much more noticeable, wet-light response is less visually dead/straight, and `F1` now hides both top debug panels for a clean view
+- slightly widened restoration influence so the alive floor response reads more naturally around the active light sources
+- documented the migration boundary in `docs/light_lab_runtime_boundary.md`
+
+Validation:
+```bash
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --quit
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
+```
+
+Validation result:
+- headless boot passed locally during implementation; Windows export result is tracked in the release/build step for `v0.5.2`
+
+Recommended next step:
+- split scene-agnostic trace/query inputs farther out of `light_surface_resolver.gd` only when the first exploration runtime consumer actually exists
+
 ## 2026-03-10 — v0.5.1 Unified Light Response patch
 
 This patch hardens the Light Lab into a more credible systems testbed instead of leaving flashlight/prism light half-detached from the world.

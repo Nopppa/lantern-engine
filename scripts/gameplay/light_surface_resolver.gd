@@ -3,6 +3,8 @@ class_name LightSurfaceResolver
 
 const BeamResolver = preload("res://scripts/gameplay/beam_resolver.gd")
 const LightResponseModel = preload("res://scripts/gameplay/light_response_model.gd")
+const LightQuery = preload("res://scripts/gameplay/light_query.gd")
+const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 
 static func cast_beam(lab, target: Vector2) -> void:
 	if lab.beam_timer > 0.0:
@@ -28,7 +30,9 @@ static func cast_beam(lab, target: Vector2) -> void:
 		"remaining": lab.beam_range,
 		"bounces": 0,
 		"source_type": "laser",
-		"special": false
+		"special": false,
+		"layer": 0,
+		"parent_layer": -1
 	}]
 	var processed := 0
 	while not queue.is_empty() and processed < 16:
@@ -41,6 +45,7 @@ static func build_secondary_light(lab) -> Dictionary:
 	var secondary_segments: Array = []
 	var secondary_zones: Array = []
 	var debug_points: Array = []
+	var source_index := 0
 	for source in _environment_sources(lab):
 		for sample in _surface_samples_for_source(lab, source):
 			var response := LightResponseModel.response(String(sample["material_id"]), String(source["source_type"]), float(sample["intensity"]), Vector2(source["direction"]), Vector2(sample["normal"]))
@@ -52,7 +57,9 @@ static func build_secondary_light(lab) -> Dictionary:
 					"radius": float(response["diffuse_radius"]),
 					"strength": float(source["intensity"]) * float(response["diffusion"]),
 					"material_id": material_id,
-					"source_type": source["source_type"]
+					"source_type": source["source_type"],
+					"kind": "diffuse",
+					"source_index": source_index
 				})
 			if float(response["reflectivity"]) * float(source["intensity"]) > float(response["branch_min"]):
 				var reflect_dir: Vector2 = Vector2(response["reflect_dir"])
@@ -63,7 +70,9 @@ static func build_secondary_light(lab) -> Dictionary:
 					"intensity": float(source["intensity"]) * float(response["reflectivity"]),
 					"material_id": material_id,
 					"source_type": source["source_type"],
-					"kind": "reflect"
+					"kind": "reflect",
+					"layer": 1,
+					"source_index": source_index
 				})
 			if float(response["transmission"]) * float(source["intensity"]) > float(response["branch_min"]):
 				var transmit_dir: Vector2 = Vector2(response["transmit_dir"])
@@ -74,15 +83,19 @@ static func build_secondary_light(lab) -> Dictionary:
 					"intensity": float(source["intensity"]) * float(response["transmission"]),
 					"material_id": material_id,
 					"source_type": source["source_type"],
-					"kind": "transmit"
+					"kind": "transmit",
+					"layer": 2,
+					"source_index": source_index
 				})
 			debug_points.append({
 				"point": hit_point,
 				"material_id": material_id,
 				"source_type": source["source_type"],
 				"intensity": sample["intensity"],
-				"response": response
+				"response": response,
+				"source_index": source_index
 			})
+		source_index += 1
 	return {
 		"segments": secondary_segments,
 		"zones": secondary_zones,
@@ -139,7 +152,11 @@ static func _sample_segment_from_source(lab, source: Dictionary, surface: Dictio
 	if closest.is_empty():
 		return {}
 	var point: Vector2 = closest["point"]
-	var intensity: float = lab._flashlight_intensity(Vector2(source["origin"]), Vector2(source["direction"]), point, float(source["range"]), float(source["half_angle"]), float(source["intensity"])) if String(source["source_type"]) == "flashlight" else lab._radial_intensity(Vector2(source["origin"]), point, float(source["range"]), float(source["intensity"]))
+	var visibility: float = lab._visibility_between(Vector2(source["origin"]), point)
+	if visibility <= 0.0:
+		return {}
+	var intensity: float = LightQuery.flashlight_intensity(Vector2(source["origin"]), Vector2(source["direction"]), point, float(source["range"]), float(source["half_angle"]), float(source["intensity"])) if String(source["source_type"]) == "flashlight" else LightQuery.radial_intensity(Vector2(source["origin"]), point, float(source["range"]), float(source["intensity"]))
+	intensity *= visibility
 	if intensity <= 0.05:
 		return {}
 	return {
@@ -152,7 +169,11 @@ static func _sample_segment_from_source(lab, source: Dictionary, surface: Dictio
 static func _sample_patch_from_source(lab, source: Dictionary, patch: Dictionary) -> Dictionary:
 	var rect: Rect2 = patch["rect"]
 	var point: Vector2 = rect.get_center().clamp(rect.position + Vector2(10, 10), rect.end - Vector2(10, 10))
-	var intensity: float = lab._flashlight_intensity(Vector2(source["origin"]), Vector2(source["direction"]), point, float(source["range"]), float(source["half_angle"]), float(source["intensity"])) if String(source["source_type"]) == "flashlight" else lab._radial_intensity(Vector2(source["origin"]), point, float(source["range"]), float(source["intensity"]))
+	var visibility: float = lab._visibility_between(Vector2(source["origin"]), point)
+	if visibility <= 0.0:
+		return {}
+	var intensity: float = LightQuery.flashlight_intensity(Vector2(source["origin"]), Vector2(source["direction"]), point, float(source["range"]), float(source["half_angle"]), float(source["intensity"])) if String(source["source_type"]) == "flashlight" else LightQuery.radial_intensity(Vector2(source["origin"]), point, float(source["range"]), float(source["intensity"]))
+	intensity *= visibility
 	if intensity <= 0.05:
 		return {}
 	var normal := (point - Vector2(source["origin"])).normalized()
@@ -171,38 +192,45 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array) -> void:
 	var intensity: float = float(ray["intensity"])
 	var remaining: float = float(ray["remaining"])
 	var bounces: int = int(ray["bounces"])
+	var layer: int = int(ray.get("layer", 0))
 	if intensity < 0.08 or remaining <= 8.0:
 		return
 	var best: Dictionary = _closest_hit(lab, origin, direction, remaining)
 	if best.is_empty():
-		_append_segment(lab, origin, origin + direction * remaining, intensity, "open", false)
+		_append_segment(lab, origin, origin + direction * remaining, intensity, "open", false, layer, bounces, "primary")
 		return
 	var hit_point: Vector2 = best["point"]
 	var travel: float = origin.distance_to(hit_point)
-	_append_segment(lab, origin, hit_point, intensity, String(best.get("material_id", "open")), bool(best.get("special", false)))
+	_append_segment(lab, origin, hit_point, intensity, String(best.get("material_id", "open")), bool(best.get("special", false)), layer, bounces, String(best.get("hit_kind", "primary")))
 	var material_id := String(best.get("material_id", "brick"))
 	lab.beam_debug_hits.append({
 		"point": hit_point,
 		"material_id": material_id,
 		"label": String(best.get("material_label", material_id)),
 		"intensity": intensity,
-		"source_type": "laser"
+		"source_type": "laser",
+		"layer": layer,
+		"kind": String(best.get("hit_kind", "primary")),
+		"bounce_index": bounces
 	})
 	if bool(best.get("special", false)):
 		var redirected: Vector2 = direction.rotated(deg_to_rad(60.0 if direction.y >= 0.0 else -60.0)).normalized()
-		queue.append({"origin": hit_point + redirected * lab.BEAM_OFFSET, "direction": redirected, "intensity": intensity * 0.95, "remaining": remaining - travel, "bounces": bounces + 1, "source_type": "laser", "special": true})
+		queue.append({"origin": hit_point + redirected * lab.BEAM_OFFSET, "direction": redirected, "intensity": intensity * 0.95, "remaining": remaining - travel, "bounces": bounces + 1, "source_type": "laser", "special": true, "layer": layer + 1, "parent_layer": layer})
 		lab.last_event = "Beam redirected through prism station"
 		return
 	var response := LightResponseModel.response(material_id, "laser", intensity, direction, Vector2(best["normal"]))
 	var remaining_after := remaining - travel
 	if float(response["diffusion"]) > 0.0:
-		lab.diffuse_zones.append({"pos": hit_point, "radius": response["diffuse_radius"], "strength": intensity * float(response["diffusion"]), "material_id": material_id, "source_type": "laser"})
+		lab.diffuse_zones.append({"pos": hit_point, "radius": response["diffuse_radius"], "strength": intensity * float(response["diffusion"]), "material_id": material_id, "source_type": "laser", "layer": layer + 1, "kind": "diffuse"})
 	if remaining_after <= 8.0:
 		return
+	if material_id == "tree":
+		lab.last_event = "Tree trunk blocked the beam"
+		return
 	if float(response["reflectivity"]) * intensity > float(response["branch_min"]):
-		queue.append({"origin": hit_point + Vector2(response["reflect_dir"]) * lab.BEAM_OFFSET, "direction": response["reflect_dir"], "intensity": intensity * float(response["reflectivity"]), "remaining": remaining_after, "bounces": bounces + 1, "source_type": "laser", "special": false})
+		queue.append({"origin": hit_point + Vector2(response["reflect_dir"]) * lab.BEAM_OFFSET, "direction": response["reflect_dir"], "intensity": intensity * float(response["reflectivity"]), "remaining": remaining_after, "bounces": bounces + 1, "source_type": "laser", "special": false, "layer": layer + 1, "parent_layer": layer})
 	if float(response["transmission"]) * intensity > float(response["branch_min"]):
-		queue.append({"origin": hit_point + direction * lab.BEAM_OFFSET, "direction": direction, "intensity": intensity * float(response["transmission"]), "remaining": remaining_after * 0.9, "bounces": bounces, "source_type": "laser", "special": false})
+		queue.append({"origin": hit_point + direction * lab.BEAM_OFFSET, "direction": direction, "intensity": intensity * float(response["transmission"]), "remaining": remaining_after * 0.9, "bounces": bounces, "source_type": "laser", "special": false, "layer": layer + 1, "parent_layer": layer})
 	var label := String(Dictionary(response["material"]).get("label", material_id))
 	if material_id == "glass":
 		lab.last_event = "%s split the beam" % label
@@ -213,14 +241,17 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array) -> void:
 	else:
 		lab.last_event = "%s absorbed most of the beam" % label
 
-static func _append_segment(lab, a: Vector2, b: Vector2, intensity: float, material_id: String, special: bool) -> void:
+static func _append_segment(lab, a: Vector2, b: Vector2, intensity: float, material_id: String, special: bool, layer: int, bounce_index: int, hit_kind: String) -> void:
 	lab.beam_segments.append({
 		"a": a,
 		"b": b,
 		"intensity": intensity,
 		"material_id": material_id,
 		"special": special,
-		"source_type": "laser"
+		"source_type": "laser",
+		"layer": layer,
+		"bounce_index": bounce_index,
+		"kind": hit_kind
 	})
 	BeamResolver.damage_enemies_along_segment(lab, a, b, lab.beam_damage * (0.55 + intensity * 0.45))
 
@@ -231,7 +262,7 @@ static func _closest_hit(lab, origin: Vector2, direction: Vector2, max_distance:
 		var hit := _ray_segment_intersection(origin, direction, Vector2(surface["a"]), Vector2(surface["b"]))
 		if hit.is_empty():
 			continue
-		var t := float(hit["t"])
+		var t: float = float(hit["t"])
 		if t < 0.001 or t > best_t:
 			continue
 		best_t = t
@@ -241,18 +272,29 @@ static func _closest_hit(lab, origin: Vector2, direction: Vector2, max_distance:
 			"normal": surface["normal"],
 			"material_id": surface["material_id"],
 			"material_label": String(Dictionary(mat_resp["material"]).get("label", surface["material_id"])),
-			"special": false
+			"special": false,
+			"hit_kind": "bounce"
 		}
+	for trunk: Dictionary in lab.tree_trunks:
+		var trunk_hit := LightLabCollision.segment_intersects_circle(origin, origin + direction * max_distance, Vector2(trunk["pos"]), float(trunk["radius"]))
+		if trunk_hit.is_empty():
+			continue
+		var point: Vector2 = trunk_hit["point"]
+		var t_tree := origin.distance_to(point)
+		if t_tree > best_t:
+			continue
+		best_t = t_tree
+		best = {"point": point, "normal": (point - Vector2(trunk["pos"])).normalized(), "material_id": "tree", "material_label": "Tree Trunk", "special": false, "hit_kind": "block"}
 	for prism_station: Dictionary in lab.prism_stations:
 		var prism_hit := BeamResolver.segment_circle_hit(origin, origin + direction * max_distance, prism_station["pos"], prism_station["radius"])
 		if prism_hit.is_empty():
 			continue
-		var point: Vector2 = prism_hit["point"]
-		var t_prism := origin.distance_to(point)
+		var point2: Vector2 = prism_hit["point"]
+		var t_prism := origin.distance_to(point2)
 		if t_prism > best_t:
 			continue
 		best_t = t_prism
-		best = {"point": point, "normal": Vector2.UP, "material_id": "prism", "material_label": "Prism", "special": true}
+		best = {"point": point2, "normal": Vector2.UP, "material_id": "prism", "material_label": "Prism", "special": true, "hit_kind": "redirect"}
 	return best
 
 static func _ray_segment_intersection(origin: Vector2, direction: Vector2, a: Vector2, b: Vector2) -> Dictionary:

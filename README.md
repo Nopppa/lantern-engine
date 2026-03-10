@@ -1,6 +1,6 @@
 # Lantern Engine — Light Lab Pivot
 
-Godot 4 prototype now centered on a permanent **Light Lab** instead of treating the old wave-survival arena as the main game direction. `v0.5.1` makes the lab the default runtime so light behavior, authored surfaces, dead/alive blending, collision credibility, and water-readability checks become the primary validation loop.
+Godot 4 prototype now centered on a permanent **Light Lab** instead of treating the old wave-survival arena as the main game direction. `v0.5.2` keeps the lab as default runtime and strengthens it as a clearer validation space for light behavior, authored surfaces, dead/alive blending, collision credibility, water-readability checks, and future runtime extraction planning.
 
 ## Current primary runtime
 
@@ -16,7 +16,7 @@ The project now boots straight into the **Light Lab**:
 
 The older wave-survival run still exists in the repo as temporary legacy scaffolding (`scenes/run_scene.tscn`, `scripts/run_scene.gd`, encounter data, reward flow), but it is no longer the primary target or default scene flow.
 
-## Light Lab content shipped in v0.5.1
+## Light Lab content shipped in v0.5.2
 
 - surrounding outer walls
 - several internal wall segments for routing / occlusion tests
@@ -30,6 +30,8 @@ The older wave-survival run still exists in the repo as temporary legacy scaffol
 - dead/alive blend test zones
 - open validation deck for manual spawn tests
 - manual Prism Node placement plus fixed prism station routing
+- authored in-world signage cards + one-line hints for every comparison bay/lane/station/deck
+- layered beam path labels and clearer bounce / redirect / secondary-light overlays for faster testing
 
 ## Light behavior shipped now
 
@@ -62,6 +64,7 @@ The flashlight now behaves as a proper gameplay light query in the lab:
 - distance falloff
 - brighter center / softer edge
 - queryable local intensity used by gameplay checks and blend response
+- properly occluded by solid brick walls and tree trunks
 - secondary reflected / diffused / transmitted lab response on nearby surfaces
 
 ### Dead/alive blend prototype
@@ -90,8 +93,9 @@ The lab floor now uses a temporary rendering-side dead/alive blend grid:
 Movement notes:
 
 - walls are now solid for player / enemies / miniboss movement in the Light Lab
-- shallow water lane slows only slightly
-- deep water lane slows a bit more for quick readability checks
+- tree trunks are now also solid blockers in the validation space
+- shallow water lane now causes a clearly noticeable slowdown
+- deep water lane now causes a much heavier slowdown for immediate comparison
 
 ### Manual debug spawn / probes
 
@@ -120,11 +124,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.5.1` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.5.2` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.5.1.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.5.2.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 
@@ -137,4 +141,5 @@ Windows builds are the default tester artifacts. Linux builds are not produced u
 - `docs/roadmap/current-state.md`
 - `docs/code-map.md`
 - `docs/devlog.md`
+- `docs/light_lab_runtime_boundary.md`
 - `CHANGELOG.md`

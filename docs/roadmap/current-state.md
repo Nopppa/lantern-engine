@@ -1,7 +1,7 @@
 # Current State
 
 Last updated: 2026-03-10
-Current shipped version target: `v0.5.1`
+Current shipped version target: `v0.5.2`
 
 ## Now shipped
 
@@ -29,11 +29,17 @@ That direction is no longer just a recommendation in docs; it is now reflected i
 The older wave-survival arena, encounter chain, reward flow, and run summary are still kept in-repo as temporary legacy scaffolding for reference and fallback testing.
 They are no longer the primary design center.
 
+## Now improved in v0.5.2
+
+- stronger authored signage now makes each comparison bay/lane/station/deck readable at a glance
+- secondary-light overlays now distinguish diffuse spread, reflected streaks, prism-emitted response, and glass continuation more clearly
+- beam-path instrumentation now exposes simple path layering (`L0/L1/L2...`) plus stronger bounce/redirect markers
+- reusable-vs-lab-only migration boundary is now documented explicitly in `docs/light_lab_runtime_boundary.md`
+
 ## Immediate next recommendation
 
-Build on the Light Lab by improving:
+Do a narrow runtime-light consolidation pass:
 
-- material readability/signage and authored comparison cases
-- beam-path instrumentation and debug overlays
-- light-to-surface tuning for dead/alive restoration semantics
-- extraction boundaries so lab systems can migrate cleanly into the eventual exploration runtime
+- separate scene-agnostic trace/query inputs from `light_surface_resolver.gd`
+- keep Light Lab debug presentation as a consumer of those outputs
+- begin proving the same reusable light query pieces in the first small exploration-room prototype later, not yet in a full exploration system

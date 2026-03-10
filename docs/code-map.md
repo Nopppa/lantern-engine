@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: `v0.5.1` Unified Light Response patch shipped
+Current internal state: `v0.5.2` Light Lab Readability & Extraction patch shipped
 
 ## Purpose
 
@@ -31,8 +31,12 @@ This file tells future contributors where the new Light Lab responsibilities now
 
 ### Data
 - `scripts/data/light_materials.gd`
-  - first-pass authored surface material definitions
+  - shared authored surface material definitions
   - readable reflectivity / diffusion / transmission / absorption tuning
+
+- `scripts/data/light_lab_layout.gd`
+  - Light Lab-only authored comparison layout + signage metadata
+  - keeps bay/lane/station labeling out of the scene coordinator
 
 ### Gameplay / simulation
 - `scripts/gameplay/light_surface_resolver.gd`
@@ -44,8 +48,13 @@ This file tells future contributors where the new Light Lab responsibilities now
   - shared source/material response truth for laser / flashlight / prism light
   - normalizes reflectivity / diffusion / transmission / absorption into readable gameplay branches
 
+- `scripts/gameplay/light_query.gd`
+  - reusable intensity query helpers for flashlight cone, segment/path exposure, and radial falloff
+  - intended to survive beyond the lab into future exploration/runtime light checks
+
 - `scripts/gameplay/light_lab_collision.gd`
   - circle-vs-segment collision helper for Light Lab movement / placement
+  - generic enough to survive later rename/extraction beyond the lab
   - keeps player, enemy, boss, and spawn placement out of walls
 
 - `scripts/gameplay/dead_alive_grid.gd`
@@ -64,9 +73,11 @@ This file tells future contributors where the new Light Lab responsibilities now
 
 ### Put new work here first if it belongs to:
 - material definitions -> `scripts/data/light_materials.gd`
+- Light Lab authored comparison content/signage -> `scripts/data/light_lab_layout.gd`
+- reusable light intensity math -> `scripts/gameplay/light_query.gd`
 - beam/surface interaction -> `scripts/gameplay/light_surface_resolver.gd`
 - dead/alive blend state -> `scripts/gameplay/dead_alive_grid.gd`
-- lab content / debug probes / lab UI glue -> `scripts/light_lab_scene.gd`
+- lab-only debug probes / lab UI glue / validation presentation -> `scripts/light_lab_scene.gd`
 
 ### Avoid
 - pushing new exploration/light systems back into `scripts/run_scene.gd`

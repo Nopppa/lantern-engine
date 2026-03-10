@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.2 - 2026-03-10
+
+Light Lab Readability & Extraction patch:
+
+- extracted Light Lab authored comparison content into `scripts/data/light_lab_layout.gd` so bay/lane/prism/deck content no longer lives as a long inline build block inside `scripts/light_lab_scene.gd`
+- extracted generic intensity helpers into `scripts/gameplay/light_query.gd`, establishing a reusable boundary for flashlight cone checks, segment/path exposure checks, and radial light queries beyond the lab
+- upgraded Light Lab authored signage to use titled comparison cards plus short behavior hints for brick, wood, wet stone, mirror, glass, prism station, shallow water, deep water, dead/alive blend zone, and the open spawn validation deck
+- improved secondary-light readability with clearer response-specific overlay language: transmitted glass continuation now reads as dashed aqua continuation, diffuse spread reads as warm cloud/ring response, flashlight secondary response reads warm, prism secondary response reads cyan, and wet/mirror-style reflected streaks remain clean directional lines
+- improved beam-path instrumentation with per-layer `L0/L1/L2...` path labeling, stronger bounce/redirect markers, and metadata for primary vs redirected/secondary path order so testers can follow the logic without reading code
+- strengthened water readability: shallow/deep lanes now slow movement much more noticeably, and wet-light response now shows clearer glossy disturbance rather than reading as a perfectly straight unaffected pass
+- added hard flashlight occlusion against brick walls and solid tree trunks so no obvious light leaks through blockers; tiny local response remains only at/near the contacted surface
+- added solid tree trunks to the Light Lab as movement blockers and beam/light blockers; player movement, beam tracing, and flashlight queries now all respect trunk solidity
+- made `F1` a true full overlay toggle for the Light Lab so both top panels disappear for unobstructed testing view and return cleanly on the next press
+- slightly widened flashlight/prism restoration influence so alive/dead response reads more naturally without turning into a floodlight
+- documented the reusable-vs-lab-only migration boundary in `docs/light_lab_runtime_boundary.md` and updated project docs to point at the extracted/shared light pieces honestly
+- updated release metadata for `v0.5.2`
+
 ## 0.5.1 - 2026-03-10
 
 Unified Light Response patch:

@@ -51,7 +51,7 @@ static func force_reward(run: RunScene) -> void:
 
 static func toggle_help(run: RunScene) -> void:
 	run.help_collapsed = !run.help_collapsed
-	run.last_event = "Help %s" % ("shown" if not run.help_collapsed else "collapsed")
+	run.last_event = "Overlay %s" % ("shown" if not run.help_collapsed else "hidden")
 
 static func toggle_immortal(run: RunScene) -> void:
 	run.debug_immortal = !run.debug_immortal
