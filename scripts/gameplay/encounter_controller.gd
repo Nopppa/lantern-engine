@@ -2,6 +2,7 @@ extends RefCounted
 class_name EncounterController
 
 const EncounterDefs = preload("res://scripts/data/encounter_defs.gd")
+const BossController = preload("res://scripts/gameplay/boss_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 
 static func check_complete(run: RunScene) -> void:
@@ -10,8 +11,14 @@ static func check_complete(run: RunScene) -> void:
 	for enemy: Dictionary in run.enemies:
 		if enemy["alive"]:
 			return
-	run.encounter_active = false
 	var encounter := EncounterDefs.get_encounter(run.encounter_index)
+	var miniboss_phase: Dictionary = encounter.get("miniboss_phase", {})
+	if not miniboss_phase.is_empty() and not bool(run.current_encounter_miniboss_spawned):
+		run.current_encounter_miniboss_spawned = true
+		BossController.spawn_boss(run, String(miniboss_phase.get("boss_id", "")), Vector2(miniboss_phase.get("pos", Vector2(1005, 360))))
+		run.last_event = String(miniboss_phase.get("entry_event", "The miniboss phase begins"))
+		return
+	run.encounter_active = false
 	RunSummary.note_encounter_cleared(run, encounter)
 	if run.encounter_index + 1 >= run.encounters.size():
 		run.run_over = true
@@ -28,6 +35,8 @@ static func start_encounter(run: RunScene, index: int) -> void:
 	var encounter := EncounterDefs.get_encounter(index)
 	run.encounter_index = index
 	run.enemies.clear()
+	run.boss_projectiles.clear()
+	run.current_encounter_miniboss_spawned = false
 	for child in run.world_layer.get_children():
 		if child.name.begins_with("Enemy_"):
 			child.queue_free()

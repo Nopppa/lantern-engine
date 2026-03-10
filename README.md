@@ -1,6 +1,6 @@
-# Lantern Engine — MVP-1 Patch 3
+# Lantern Engine — MVP-1 Patch 5
 
-Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but complete authored run. `v0.4.3` ships a tight Prism Surge identity follow-up: the burst still shoves, refunds, and jams specials, but now also sears enemies with a short Light Burn that is clearly telegraphed in-game.
+Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but complete authored run. `v0.4.4` ships the first Hollow Matriarch miniboss pass: round 5 clears its regular pack first, then the Matriarch enters as a controlled miniboss finisher built from authored boss data.
 
 ## What is included
 
@@ -11,6 +11,7 @@ Godot 4 prototype advancing beyond the MVP-0 mechanic proof into a small but com
 - one placeable setup skill: **Prism Node**
 - one Prism detonation skill: **Prism Surge** (burst damage + shove + short special-ability jam + Light Burn)
 - beam wall-bounce support plus Prism redirect chaining
+- first miniboss: **Hollow Matriarch** as the round-5 finisher
 - 2 enemy archetypes:
   - **Moth** chaser
   - **Hollow** ambusher/blinker
@@ -30,7 +31,6 @@ This is a **small MVP-1 patch**, not a vertical slice and not a content explosio
 
 Explicitly *not* implemented yet:
 
-- miniboss
 - procedural generation
 - save persistence
 - multiple schools
@@ -80,11 +80,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.4.3` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.4.4` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.4.3.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.4.4.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 

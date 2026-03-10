@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: post `v0.4.1` MVP-1 patch 2 skill pass
+Current internal state: post `v0.4.4` Hollow Matriarch miniboss pass
 
 ## Purpose
 
@@ -40,6 +40,10 @@ Use this before making structural changes so new work lands in the right file in
   - authored baseline data for active Prism skills
   - currently seeds Prism Surge stats into runtime instead of hardcoding them only in scene state
 
+- `scripts/data/boss_defs.gd`
+  - authored boss-data loader/cache
+  - currently loads `scripts/data/bosses/hollow_matriarch.json` into runtime so miniboss tuning values live in data instead of inline scene code
+
 ### Gameplay
 - `scripts/gameplay/run_summary.gd`
   - owns the run-summary tracker schema
@@ -63,6 +67,7 @@ Use this before making structural changes so new work lands in the right file in
   - encounter completion checks
   - encounter start/reset flow
   - enemy spawn construction from authored encounter data
+  - round-to-miniboss handoff for encounters that include a `miniboss_phase`
 
 - `scripts/gameplay/enemy_controller.gd`
   - per-frame enemy runtime updates
@@ -82,6 +87,10 @@ Use this before making structural changes so new work lands in the right file in
 - `scripts/gameplay/skill_controller.gd`
   - active non-beam Prism skill execution
   - current owner of Prism Surge burst logic, knockback, node consumption, and summary hooks
+
+- `scripts/gameplay/boss_controller.gd`
+  - Hollow Matriarch spawn construction from authored data
+  - boss-specific runtime logic: dark regen, phase split, shadow-bolt firing, Veil Pounce windup/pounce flow, and darkness-projectile light corrosion
 
 ### Player / debug input
 - `scripts/player/debug_actions.gd`

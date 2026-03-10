@@ -60,13 +60,14 @@
 
 ## Current playtest focus
 
-For the current `v0.4.3` patch-4 build, testers should pay extra attention to:
+For the current `v0.4.4` patch-5 build, testers should pay extra attention to:
 
-- Prism Surge value: does `Q` create a real tactical decision now that it also applies Light Burn on top of the special jam?
-- node tension: does consuming the Prism Node for an AOE burst create interesting timing choices versus keeping it for beam redirects?
-- reward readability: does `Surge Capacitors` read clearly when it appears in the reward pool?
-- burn readability: can you tell at a glance which enemies are Light Burning and roughly how much longer it will last?
-- baseline safety: do `F2`, `F3`, `F1`, `F4`, `Q`, and `R` all behave reliably in the shipped build, including Prism HUD readiness after consuming a node?
+- round-5 flow: does the normal final wave read clearly before the Hollow Matriarch enters, or does the miniboss handoff feel abrupt/confusing?
+- regen truth: can you clearly tell when the Matriarch is healing in darkness versus when flashlight / Prism light has shut the regen off?
+- projectile defense: can flashlight or Prism placement safely dissolve shadow bolts often enough to feel intentional without becoming trivial?
+- Surge interrupt timing: does `Q` clearly jam Veil Pounce during windup when used correctly?
+- kit coherence: does the fight naturally reward Beam + Prism Node + Prism Surge together rather than only beam kiting?
+- baseline safety: do `F2`, `F3`, `F1`, `F4`, `Q`, and `R` all behave reliably in the shipped build?
 
 Use the relevant playtest notes under `docs/playtests/` when capturing observations.
 
@@ -76,7 +77,6 @@ Use the relevant playtest notes under `docs/playtests/` when capturing observati
 godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 godot --path /opt/openclaw/projects/lantern_engine
 godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
-godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Linux/X11" build/linux/lantern_engine.x86_64
 ```
 
 ## Export outputs and canonical tester artifacts
@@ -85,9 +85,7 @@ Raw Godot export outputs land here:
 
 - `build/windows/lantern_engine.exe`
 - `build/windows/lantern_engine.pck`
-- `build/linux/lantern_engine.x86_64`
-- `build/linux/lantern_engine.pck`
 
 For the current version, the canonical packaged artifact to distribute is:
 
-- `build/windows/lantern_engine-windows-v0.4.3.zip`
+- `build/windows/lantern_engine-windows-v0.4.4.zip`

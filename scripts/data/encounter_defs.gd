@@ -52,7 +52,7 @@ const RUN := {
 		{
 			"id": "final_convergence",
 			"title": "Final Convergence",
-			"summary": "Full mixed pressure closes the run without stepping into miniboss scope.",
+			"summary": "Round 5 clears its normal mixed pack first, then the Hollow Matriarch enters as the miniboss finisher.",
 			"reward_tags": ["core", "prism", "prism"],
 			"spawns": [
 				{"type": "hollow", "pos": Vector2(965, 155)},
@@ -60,7 +60,12 @@ const RUN := {
 				{"type": "hollow", "pos": Vector2(1040, 360)},
 				{"type": "moth", "pos": Vector2(1080, 470)},
 				{"type": "hollow", "pos": Vector2(965, 570)}
-			]
+			],
+			"miniboss_phase": {
+				"boss_id": "hollow_matriarch",
+				"pos": Vector2(1005, 360),
+				"entry_event": "Round 5 pack cleared — the Hollow Matriarch descends"
+			}
 		}
 	]
 }

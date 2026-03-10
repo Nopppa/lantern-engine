@@ -41,6 +41,10 @@ static func cast_prism_surge(run: RunScene) -> void:
 			enemy["blink_winding_up"] = false
 			enemy["blink_transiting"] = false
 			enemy["shimmer_timer"] = max(float(enemy.get("shimmer_timer", 0.0)), 0.45)
+		elif enemy["type"] == "boss_hollow_matriarch":
+			enemy["special_state"] = "idle"
+			enemy["special_timer"] = 0.0
+			enemy["special_cooldown"] = max(float(enemy.get("special_cooldown", 0.0)), run.prism_surge_special_lock_duration)
 		var hit_color := Color(0.72, 0.96, 1.0, 0.95)
 		run._add_hit_flash(enemy["node"].position, enemy["radius"] + 20.0, hit_color, 0.18)
 		if enemy["hp"] <= 0.0:

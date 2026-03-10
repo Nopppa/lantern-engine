@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.4 - 2026-03-10
+
+First Hollow Matriarch miniboss shipping pass:
+
+- added authored boss-data loading through `scripts/data/boss_defs.gd`, so the runtime now consumes `scripts/data/bosses/hollow_matriarch.json` as live input instead of decorative spec data
+- extended round 5 into a two-step finisher: the normal mixed pack still spawns first, then the Hollow Matriarch enters only after those enemies are cleared
+- shipped the Stage-1 Hollow Matriarch kit from the implementation plan: darkness regeneration, regen suppression in flashlight/Prism light, shadow-bolt pressure with projectile HP and light corrosion, readable Veil Pounce, and a 50% HP cadence escalation
+- made Prism light act as anti-darkness light for the miniboss/hollow rules where appropriate, so it can suppress regen and help melt shadow bolts just like the fight spec requires
+- made Prism Surge explicitly jam/interrupt the boss special instead of only functioning as generic burst damage
+- validated with headless boot and Windows export; packaged a fresh Windows release artifact for GitHub Releases
+
 ## 0.4.3 - 2026-03-10
 
 Focused follow-up patch for Prism Surge's debuff identity:

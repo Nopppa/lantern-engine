@@ -1,9 +1,11 @@
 extends RefCounted
 class_name EnemyController
 
+const BossController = preload("res://scripts/gameplay/boss_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 
 static func update_enemies(run: RunScene, delta: float) -> void:
+	BossController.update_projectiles(run, delta)
 	for enemy: Dictionary in run.enemies:
 		if not enemy["alive"]:
 			_tick_dead_enemy(enemy, delta)
@@ -19,8 +21,8 @@ static func update_enemies(run: RunScene, delta: float) -> void:
 			_update_moth(enemy, dir, delta)
 		elif enemy["type"] == "hollow":
 			_update_hollow(run, enemy, dir, delta)
-		if enemy["node"].position.distance_to(run.player_pos) < run.ENEMY_CONTACT_RADIUS + enemy["radius"]:
-			run._apply_contact_damage(enemy["contact_damage"] * delta)
+		elif enemy["type"] == "boss_hollow_matriarch":
+			BossController.update_boss(run, enemy, dir, delta)
 
 static func _tick_dead_enemy(enemy: Dictionary, delta: float) -> void:
 	enemy["death_timer"] -= delta
@@ -66,7 +68,8 @@ static func _update_moth(enemy: Dictionary, dir: Vector2, delta: float) -> void:
 	enemy["node"].position += dir * enemy["speed"] * delta
 
 static func _update_hollow(run: RunScene, enemy: Dictionary, dir: Vector2, delta: float) -> void:
-	var in_light := run._is_in_flashlight_cone(enemy["node"].position)
+	var light_state := run._light_state_for_position(enemy["node"].position)
+	var in_light := bool(light_state.get("flashlight", false)) or bool(light_state.get("prism", false))
 	enemy["revealed_by_light"] = in_light
 	if enemy["blink_transiting"]:
 		_update_hollow_transit(run, enemy, delta)

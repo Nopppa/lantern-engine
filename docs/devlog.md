@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-03-10 — v0.4.4 MVP-1 Patch 5 Hollow Matriarch Stage-1 Pass
+
+This pass deliberately shipped the first authored miniboss as a controlled extension of the existing three-skill run rather than a broad boss-framework rewrite.
+
+What changed:
+- added `scripts/data/boss_defs.gd` so the runtime now loads the authored Hollow Matriarch profile from `scripts/data/bosses/hollow_matriarch.json`
+- extended `scripts/data/encounter_defs.gd` + `scripts/gameplay/encounter_controller.gd` so round 5 resolves its normal mixed wave first, then spawns a `miniboss_phase` finisher instead of ending immediately
+- added `scripts/gameplay/boss_controller.gd` to keep miniboss-specific state/logic out of `run_scene.gd`; it owns Hollow Matriarch spawn shaping, dark regen, phase split, shadow-bolt firing, Veil Pounce, and darkness-projectile light corrosion
+- taught Hollow / Hollow Matriarch light checks to respect Prism light as anti-darkness light where appropriate, not only flashlight cone truth
+- made Prism Surge cleanly jam/interrupt the boss special so the fight reinforces Beam + Prism Node + Prism Surge as one coherent kit
+- kept scope tight: no `shroud_bloom` yet, no broader arena rewrite, no new general-purpose boss framework beyond what this miniboss needed
+
+Validation:
+```bash
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --quit
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
+```
+
+Validation result:
+- headless boot passed
+- Windows export passed
+- packaged Windows release artifact prepared for GitHub Release upload
+
+Recommended next step:
+- do one tight playtest/tuning pass on Hollow Matriarch readability and only add `shroud_bloom` if the shipped Stage-1 fight is clearly too thin after that
+
 ## 2026-03-10 — v0.4.3 MVP-1 Patch 4 Prism Surge Light Burn Pass
 
 This pass stayed deliberately narrow: preserve the `v0.4.2` special-jam identity, then layer in one readable luminous-corrosion debuff on top instead of widening into a broader combat rebalance.

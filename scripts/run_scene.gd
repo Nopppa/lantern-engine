@@ -25,7 +25,7 @@ const BEAM_PULSE_DURATION := 0.15
 const BEAM_OFFSET := 4.0
 const PRISM_RADIUS := 18.0
 const PRISM_REDIRECT_ANGLE := 55.0
-const BUILD_LABEL := "MVP-1.0 patch 4"
+const BUILD_LABEL := "MVP-1.0 patch 5"
 
 var player_hp := 100.0
 var player_max_hp := 100.0
@@ -77,6 +77,7 @@ var last_event := "Booted MVP-0 sandbox"
 var enemies: Array = []
 var beam_segments: Array = []
 var lit_zones: Array = []
+var boss_projectiles: Array = []
 var beam_flash := 0.0
 var beam_pulse_timer := 0.0
 var hit_flashes: Array = []
@@ -100,6 +101,7 @@ var fx_layer: Node2D
 var player_node: Node2D
 var arena_node: Node2D
 var encounters := EncounterDefs.LIST.duplicate(true)
+var current_encounter_miniboss_spawned := false
 
 func _ready() -> void:
 	randomize()
@@ -322,6 +324,27 @@ func _is_in_flashlight_cone(pos: Vector2) -> bool:
 	var angle_to: float = absf(facing.angle_to(to_pos.normalized()))
 	return rad_to_deg(angle_to) <= flashlight_half_angle
 
+func _is_in_prism_light(pos: Vector2) -> bool:
+	return prism_node != null and is_instance_valid(prism_node) and prism_node.position.distance_to(pos) <= 88.0
+
+func _is_in_beam_light(pos: Vector2) -> bool:
+	for segment: Array in beam_segments:
+		var hit := BeamResolver.segment_circle_hit(segment[0], segment[1], pos, 30.0)
+		if not hit.is_empty():
+			return true
+	return false
+
+func _light_state_for_position(pos: Vector2) -> Dictionary:
+	var flashlight := _is_in_flashlight_cone(pos)
+	var prism := _is_in_prism_light(pos)
+	var beam := _is_in_beam_light(pos)
+	return {
+		"flashlight": flashlight,
+		"prism": prism,
+		"beam": beam,
+		"honest": flashlight or prism or beam
+	}
+
 func _apply_contact_damage(amount: float) -> void:
 	if debug_immortal:
 		last_event = "Immortal mode absorbed damage"
@@ -375,6 +398,7 @@ func _restart_run() -> void:
 	reward_panel.visible = false
 	end_panel.visible = false
 	beam_segments.clear()
+	boss_projectiles.clear()
 	hit_flashes.clear()
 	beam_pulse_timer = 0.0
 	RunSummary.reset(self)
@@ -422,10 +446,13 @@ func _update_ui() -> void:
 	var surge_state := "[color=#8be9fd]READY[/color]" if prism_surge_timer <= 0.0 else "[color=#ffb86c]%.1fs[/color]" % prism_surge_timer
 	var current_encounter := _current_encounter()
 	var encounter_title := String(current_encounter.get("title", "Encounter"))
+	var miniboss_text := ""
+	if bool(current_encounter.get("miniboss_phase", {}).size() > 0):
+		miniboss_text = " [color=#ff79c6]| Matriarch %s[/color]" % ("ACTIVE" if current_encounter_miniboss_spawned and encounter_active and _alive_enemy_count() > 0 else ("pending" if not current_encounter_miniboss_spawned else "cleared"))
 	var objective := "Pick one upgrade" if reward_pending else (String(current_encounter.get("summary", "Survive encounter and route beam through walls/prism")) if not run_over else ("Run complete — restart from center panel or R" if player_hp > 0.0 else "Run failed — restart from center panel or R"))
 	var immortal_text := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
 	var flashlight_text := "[color=#f1fa8c]ON[/color] (%.0f/s)" % flashlight_drain if flashlight_on else "[color=#6272a4]OFF[/color]"
-	hud_label.text = "[b]Lantern Engine %s[/b]\n[color=#a4b1cd]Encounter:[/color] %s\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#f1fa8c]Prism[/color] +%.0f redirect dmg | +%.0f radius | +%.0f° bend | +%d post-prism bounce\n[color=#f1fa8c]Surge[/color] %.0f burst  |  %.0f radius  |  [color=#fff1a8]Light Burn[/color] %.1f/%.1fs for %.1fs  |  [color=#a4b1cd]Q[/color] %s\n[color=#f1fa8c]Flashlight[/color] %s    [color=#a4b1cd]Beam:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d    [color=#a4b1cd]Enemies:[/color] %d\n[color=#a4b1cd]Immortal:[/color] %s" % [BUILD_LABEL, encounter_title, objective, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, prism_redirect_damage_bonus, prism_radius_bonus, prism_redirect_angle_bonus, prism_redirect_bonus_bounces, prism_surge_damage, prism_surge_radius, prism_surge_light_burn_damage, prism_surge_light_burn_tick, prism_surge_light_burn_duration, surge_state, flashlight_text, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), _alive_enemy_count(), immortal_text]
+	hud_label.text = "[b]Lantern Engine %s[/b]\n[color=#a4b1cd]Encounter:[/color] %s\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#f1fa8c]Prism[/color] +%.0f redirect dmg | +%.0f radius | +%.0f° bend | +%d post-prism bounce\n[color=#f1fa8c]Surge[/color] %.0f burst  |  %.0f radius  |  [color=#fff1a8]Light Burn[/color] %.1f/%.1fs for %.1fs  |  [color=#a4b1cd]Q[/color] %s\n[color=#f1fa8c]Flashlight[/color] %s    [color=#a4b1cd]Beam:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d%s    [color=#a4b1cd]Enemies:[/color] %d\n[color=#a4b1cd]Immortal:[/color] %s" % [BUILD_LABEL, encounter_title, objective, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, prism_redirect_damage_bonus, prism_radius_bonus, prism_redirect_angle_bonus, prism_redirect_bonus_bounces, prism_surge_damage, prism_surge_radius, prism_surge_light_burn_damage, prism_surge_light_burn_tick, prism_surge_light_burn_duration, surge_state, flashlight_text, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), miniboss_text, _alive_enemy_count(), immortal_text]
 	var help_hint := "[color=#8be9fd]F1 show full help[/color]" if help_collapsed else "[color=#8be9fd]F1 hide full help[/color]"
 	var immortal_hint := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
 	if reward_pending:
@@ -509,10 +536,20 @@ func _draw() -> void:
 		draw_arc(player_pos, flashlight_range, base_angle - cone_angle, base_angle + cone_angle, 20, Color(1.0, 0.94, 0.6, 0.25), 2.0)
 	# --- End flashlight cone ---
 
+	for projectile: Dictionary in boss_projectiles:
+		var projectile_pos: Vector2 = projectile["pos"]
+		var projectile_radius: float = float(projectile.get("radius", 18.0))
+		var decay: float = clampf(float(projectile.get("light_decay", 0.0)), 0.0, 1.0)
+		var outer := Color(0.34 + 0.5 * decay, 0.08 + 0.82 * decay, 0.52 + 0.28 * decay, 0.18 + 0.24 * (1.0 - decay))
+		var inner := Color(0.38 + 0.62 * decay, 0.15 + 0.8 * decay, 0.62 + 0.18 * decay, 0.88)
+		draw_circle(projectile_pos, projectile_radius + 10.0, outer)
+		draw_circle(projectile_pos, projectile_radius, inner)
+		draw_arc(projectile_pos, projectile_radius + 4.0 + 8.0 * decay, 0.0, TAU, 18, Color(1.0, 0.96, 0.8, 0.35 + 0.3 * decay), 2.0)
+
 	for enemy: Dictionary in enemies:
 		if not is_instance_valid(enemy["node"]):
 			continue
-		var color: Color = Color("ffb86c") if enemy["type"] == "moth" else Color("bd93f9")
+		var color: Color = Color("ffb86c") if enemy["type"] == "moth" else (Color("ff4fd8") if enemy["type"] == "boss_hollow_matriarch" else Color("bd93f9"))
 		if enemy["flash"] > 0.0:
 			color = Color.WHITE
 		# Disrupted transit flicker for hollows moving through light
@@ -556,6 +593,15 @@ func _draw() -> void:
 			var shimmer_pulse: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() / 80.0)
 			draw_circle(enemy["node"].position, enemy["radius"] + 14.0, Color(1.0, 0.94, 0.6, 0.18 * shimmer_pulse))
 			draw_arc(enemy["node"].position, enemy["radius"] + 10.0, 0.0, TAU, 20, Color(1.0, 0.96, 0.72, 0.5 * shimmer_pulse), 2.0)
+		if enemy["type"] == "boss_hollow_matriarch":
+			var regen_glow := 0.18 if bool(enemy.get("regen_active", false)) else 0.0
+			var boss_ratio: float = clampf(float(enemy.get("hp", 0.0)) / max(float(enemy.get("max_hp", 1.0)), 0.001), 0.0, 1.0)
+			draw_circle(enemy["node"].position, enemy["radius"] + 18.0, Color(0.22, 0.0, 0.18, 0.18 + regen_glow))
+			draw_arc(enemy["node"].position, enemy["radius"] + 24.0, -PI * 0.5, -PI * 0.5 + TAU * boss_ratio, 32, Color(1.0, 0.82, 0.95, 0.9), 3.2)
+			if String(enemy.get("special_state", "idle")) == "windup":
+				var windup_pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 45.0)
+				draw_arc(enemy["node"].position, enemy["radius"] + 32.0, 0.0, TAU, 28, Color(1.0, 0.65, 0.85, 0.42 + 0.26 * windup_pulse), 3.0)
+				draw_circle(enemy["node"].position, enemy["radius"] + 10.0, Color(1.0, 0.76, 0.9, 0.12 + 0.08 * windup_pulse))
 		draw_circle(enemy["node"].position + Vector2(4, 6), enemy["radius"] + 2.0, SHADOW_COLOR)
 		draw_circle(enemy["node"].position, enemy["radius"] + 8.0, Color(color.r, color.g, color.b, 0.1))
 		draw_circle(enemy["node"].position, enemy["radius"] + 4.0, Color(color.r, color.g, color.b, 0.18))

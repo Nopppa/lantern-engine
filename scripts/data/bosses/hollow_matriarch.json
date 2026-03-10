@@ -1,0 +1,181 @@
+{
+  "id": "hollow_matriarch",
+  "version": 1,
+  "display_name": "Hollow Matriarch",
+  "role": "miniboss",
+  "theme": [
+    "darkness_regeneration",
+    "light_suppression",
+    "projectile_pressure",
+    "blink_predator"
+  ],
+  "fantasy": "A darkness-breeding matriarch that heals in shadow, weaponizes dark projectiles, and loses control when pinned in honest light.",
+  "design_goals": [
+    "Force meaningful use of all three player tools: Refraction Beam, Prism Node, and Prism Surge.",
+    "Make light an active defensive and offensive rule, not just visibility.",
+    "Reward correct Prism placement and flashlight discipline.",
+    "Create a boss that feels distinctly Lantern Engine rather than a generic dodge-and-shoot encounter."
+  ],
+  "core_rules": {
+    "hp": 420.0,
+    "contact_damage_per_second": 18.0,
+    "base_move_speed": 72.0,
+    "phase_thresholds": [0.5],
+    "dark_regen": {
+      "enabled": true,
+      "delay_out_of_light": 1.35,
+      "hp_per_second": 7.0,
+      "stops_in_flashlight": true,
+      "stops_in_prism_light": true,
+      "visual": "black tissue reknits over the body in shadow and tears away under light"
+    },
+    "light_interaction": {
+      "flashlight": {
+        "suppresses_regen": true,
+        "weakens_specials": true,
+        "notes": "Flashlight is the quickest manual way to stop healing and expose telegraphed aggression."
+      },
+      "prism_light": {
+        "suppresses_regen": true,
+        "suppresses_dark_projectiles": true,
+        "inherits_flashlight_effects": true,
+        "notes": "The light area around the Prism Node should behave like a persistent anti-darkness zone, including anti-blink / anti-special pressure where appropriate."
+      },
+      "prism_surge": {
+        "interrupts_specials": true,
+        "applies_existing_special_jam": true,
+        "applies_existing_light_burn": true,
+        "notes": "Surge is the punish / denial tool, not just raw damage."
+      }
+    }
+  },
+  "encounter_role": {
+    "summary": "Area-denial miniboss that heals in darkness, pressures with shadow bolts, and demands active light management.",
+    "arena_needs": [
+      "clear occluders with meaningful sightlines",
+      "space for projectile traversal through light zones",
+      "room for Prism placement to create safe corridors"
+    ],
+    "player_counters": {
+      "refraction_beam": "primary sustained damage and punish windows",
+      "prism_node": "creates anti-darkness safe zones and projectile-melting lanes",
+      "prism_surge": "interrupts specials and creates burst punish windows",
+      "flashlight": "stops regen, exposes dishonest dark play, and can safely dissolve projectiles"
+    }
+  },
+  "skills": [
+    {
+      "id": "shadow_bolt",
+      "type": "projectile",
+      "phase": "all",
+      "summary": "Launches a dense darkness bolt toward the player.",
+      "cooldown": 2.2,
+      "projectile": {
+        "speed": 250.0,
+        "radius": 18.0,
+        "contact_damage": 22.0,
+        "hp": 28.0,
+        "lifetime": 4.5,
+        "dies_in_light": true,
+        "light_damage": {
+          "flashlight_dps": 18.0,
+          "prism_light_dps": 26.0
+        },
+        "on_light_decay": "The projectile visibly erodes and collapses before impact if kept in honest light long enough."
+      },
+      "design_notes": [
+        "This is the key anti-projectile light mechanic: darkness shots can be dissolved by light rather than only dodged.",
+        "The projectile should visually crack, shrink, and vaporize under light exposure."
+      ]
+    },
+    {
+      "id": "veil_pounce",
+      "type": "special_mobility",
+      "phase": "all",
+      "summary": "A blink-pounce from darkness toward the player or the edge of a lit zone.",
+      "cooldown": 5.5,
+      "windup": 0.65,
+      "range": 220.0,
+      "impact_damage": 28.0,
+      "light_rules": {
+        "interrupted_by_surge": true,
+        "weakened_in_flashlight": true,
+        "weakened_in_prism_light": true,
+        "regen_disabled_during_light_pressure": true
+      },
+      "design_notes": [
+        "This should be the miniboss special most clearly countered by Prism Surge's current jam identity.",
+        "The attack should remain readable and punishable, not instant nonsense."
+      ]
+    },
+    {
+      "id": "shroud_bloom",
+      "type": "zone_control",
+      "phase": "phase_2",
+      "summary": "Creates a darkness field that helps the boss recover if the player fails to contest it with light.",
+      "cooldown": 9.0,
+      "duration": 4.5,
+      "radius": 140.0,
+      "effects": {
+        "supports_regen": true,
+        "reduces_player_visibility": true,
+        "projectiles_fired_from_inside_gain_survival_time": true
+      },
+      "light_rules": {
+        "suppressed_by_flashlight": true,
+        "suppressed_by_prism_light": true,
+        "collapsed_by_surge_if_boss_is_hit": true
+      },
+      "design_notes": [
+        "This is the phase-2 escalation lever if a plain projectile + pounce kit feels too light.",
+        "If implementation scope gets tight, this is the first skill that can be simplified."
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "id": "phase_1",
+      "hp_ratio_above": 0.5,
+      "behavior": [
+        "steady pursuit",
+        "shadow_bolt pressure",
+        "occasional veil_pounce",
+        "regen in darkness"
+      ],
+      "goal": "Teach the player that light stops healing and can destroy projectiles safely."
+    },
+    {
+      "id": "phase_2",
+      "hp_ratio_at_or_below": 0.5,
+      "behavior": [
+        "faster cadence",
+        "more frequent veil_pounce",
+        "optional shroud_bloom usage",
+        "stronger demand for prism placement discipline"
+      ],
+      "goal": "Force confident use of all three Prism tools instead of just beam kiting."
+    }
+  ],
+  "telegraphing": {
+    "regen": "Dark flesh knits back together in shadow; effect tears away under honest light.",
+    "projectile_decay": "Bolts crack, flare, and evaporate while crossing flashlight/prism light.",
+    "veil_pounce": "Visible compression / windup before blink-pounce.",
+    "shroud_bloom": "Darkness flower / veil field expands from the boss, then collapses when overwhelmed by light."
+  },
+  "implementation_notes": {
+    "minimum_viable_boss": [
+      "dark regen in shadow",
+      "shadow_bolt with projectile HP and light corrosion",
+      "veil_pounce interrupted by Prism Surge",
+      "phase split at 50% HP"
+    ],
+    "phase_2_optional_first_cut": [
+      "shroud_bloom"
+    ],
+    "debug_requests_from_user": [
+      "debug HP display over enemies should eventually support boss HP readout too",
+      "refill should reset prism timer",
+      "future Prism carry-vs-throw choice may affect boss counterplay later"
+    ]
+  }
+}
