@@ -241,10 +241,17 @@ func _find_valid_spawn(target: Vector2, radius: float) -> Vector2:
 		for step in range(12):
 			var angle := TAU * float(step) / 12.0
 			var probe := candidate + Vector2.RIGHT.rotated(angle) * float(ring) * 18.0
-			probe = probe.clamp(ARENA_RECT.position + Vector2(radius + 8.0, radius + 8.0), ARENA_RECT.end - Vector2(radius + 8.0, radius + 8.0))
+			probe = _resolve_point_in_lab(probe, radius)
 			if not LightLabCollision.is_circle_blocked(probe, radius, surface_segments):
 				return probe
 	return Vector2.INF
+
+func _resolve_actor_motion(position: Vector2, radius: float, motion: Vector2) -> Vector2:
+	var resolved := LightLabCollision.resolve_circle_motion(position, radius, motion, surface_segments)
+	return _resolve_point_in_lab(resolved, radius)
+
+func _resolve_point_in_lab(position: Vector2, radius: float) -> Vector2:
+	return position.clamp(ARENA_RECT.position + Vector2(radius, radius), ARENA_RECT.end - Vector2(radius, radius))
 
 func _flashlight_intensity(source_pos: Vector2, source_facing: Vector2, target: Vector2, max_range: float, half_angle_deg: float, base_intensity: float) -> float:
 	var to_target := target - source_pos
