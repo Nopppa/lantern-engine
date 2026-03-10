@@ -4,12 +4,14 @@ class_name FlashlightVisuals
 const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 const LightResponseModel = preload("res://scripts/gameplay/light_response_model.gd")
 const LightSurfaceResolver = preload("res://scripts/gameplay/light_surface_resolver.gd")
+const LightStability = preload("res://scripts/gameplay/light_stability.gd")
 
 static func build_visual_trace(lab) -> Dictionary:
 	if not lab.flashlight_on:
 		return {"segments": [], "zones": [], "debug_points": [], "fills": [], "perf": {}}
 	var config := LightApproximation.config_for_source("flashlight")
 	var ray_count: int = int(config.get("guide_rays", 9))
+	var previous_frontier: Dictionary = lab.approx_flashlight_frontier
 	var max_bounces: int = 1
 	var segments: Array = []
 	var zones: Array = []
@@ -96,46 +98,55 @@ static func build_visual_trace(lab) -> Dictionary:
 				})
 			if material_id == "wood":
 				var scatter_dir: Vector2 = Vector2(response["reflect_dir"]).lerp(direction, 0.68).normalized()
-				segments.append({
-					"a": hit_point,
-					"b": hit_point + scatter_dir * remaining * 0.18,
-					"intensity": intensity * 0.12,
-					"kind": "scatter",
-					"material_id": material_id,
-					"bounce_index": bounce_index + 1,
-					"sample": t
-				})
+				var scatter_segment := LightSurfaceResolver._clip_secondary_branch(lab, hit_point, scatter_dir, remaining * 0.18, material_id, false)
+				if not scatter_segment.is_empty():
+					segments.append({
+						"a": scatter_segment["a"],
+						"b": scatter_segment["b"],
+						"intensity": intensity * 0.12,
+						"kind": "scatter",
+						"material_id": material_id,
+						"bounce_index": bounce_index + 1,
+						"sample": t
+					})
 			elif material_id == "wet":
-				segments.append({
-					"a": hit_point,
-					"b": hit_point + Vector2(response["reflect_dir"]) * remaining * 0.20,
-					"intensity": intensity * 0.11,
-					"kind": "disturb",
-					"material_id": material_id,
-					"bounce_index": bounce_index + 1,
-					"sample": t
-				})
+				var wet_segment := LightSurfaceResolver._clip_secondary_branch(lab, hit_point, Vector2(response["reflect_dir"]), remaining * 0.20, material_id, false)
+				if not wet_segment.is_empty():
+					segments.append({
+						"a": wet_segment["a"],
+						"b": wet_segment["b"],
+						"intensity": intensity * 0.11,
+						"kind": "disturb",
+						"material_id": material_id,
+						"bounce_index": bounce_index + 1,
+						"sample": t
+					})
 			elif material_id == "mirror":
-				segments.append({
-					"a": hit_point,
-					"b": hit_point + Vector2(response["reflect_dir"]) * remaining * 0.26,
-					"intensity": intensity * 0.18,
-					"kind": "reflect",
-					"material_id": material_id,
-					"bounce_index": bounce_index + 1,
-					"sample": t
-				})
+				var mirror_segment := LightSurfaceResolver._clip_secondary_branch(lab, hit_point, Vector2(response["reflect_dir"]), remaining * 0.26, material_id, false)
+				if not mirror_segment.is_empty():
+					segments.append({
+						"a": mirror_segment["a"],
+						"b": mirror_segment["b"],
+						"intensity": intensity * 0.18,
+						"kind": "reflect",
+						"material_id": material_id,
+						"bounce_index": bounce_index + 1,
+						"sample": t
+					})
 			var continued: bool = false
 			if float(response["transmission"]) * intensity > float(response["branch_min"]):
-				segments.append({
-					"a": hit_point,
-					"b": hit_point + Vector2(response["transmit_dir"]) * remaining * float(response["branch_range_scale"]),
-					"intensity": intensity * float(response["transmission"]),
-					"kind": "transmit",
-					"material_id": material_id,
-					"bounce_index": bounce_index,
-					"sample": t
-				})
+				var transmit_segment := LightSurfaceResolver._clip_secondary_branch(lab, hit_point, Vector2(response["transmit_dir"]), remaining * float(response["branch_range_scale"]), material_id, true)
+				if not transmit_segment.is_empty():
+					segments.append({
+						"a": transmit_segment["a"],
+						"b": transmit_segment["b"],
+						"intensity": intensity * float(response["transmission"]),
+						"kind": "transmit",
+						"material_id": material_id,
+						"bounce_index": bounce_index,
+						"sample": t,
+						"blocked": transmit_segment.get("blocked", false)
+					})
 				direction = Vector2(response["transmit_dir"]).normalized()
 				origin = hit_point + direction * lab.BEAM_OFFSET
 				intensity *= float(response["transmission"])
@@ -151,7 +162,11 @@ static func build_visual_trace(lab) -> Dictionary:
 			if not continued:
 				break
 		primary_frontier.append(frontier_point)
+	primary_frontier = LightStability.smooth_frontier(lab.player_pos, primary_frontier, previous_frontier, float(config.get("envelope_smoothing", 0.35)))
 	fills = _build_beam_fills(lab.player_pos, primary_frontier, config)
+	var new_frontier: Dictionary = {}
+	for i in range(primary_frontier.size()):
+		new_frontier[LightStability.stable_frontier_key(Vector2(primary_frontier[i]), i)] = primary_frontier[i]
 	return {
 		"segments": segments,
 		"zones": zones,
@@ -161,7 +176,8 @@ static func build_visual_trace(lab) -> Dictionary:
 			"guide_rays": ray_count,
 			"traces": trace_count,
 			"fills": fills.size()
-		}
+		},
+		"frontier": new_frontier
 	}
 
 static func _build_beam_fills(origin: Vector2, frontier: Array, config: Dictionary) -> Array:

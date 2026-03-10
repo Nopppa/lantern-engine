@@ -21,17 +21,17 @@ const TIER_CONFIG := {
 	},
 	TIER_GUIDED: {
 		"label": "Guided approximation",
-		"update_interval": 0.08,
-		"sample_budget": 10,
-		"guide_rays": 9,
-		"envelope_smoothing": 0.38
+		"update_interval": 0.10,
+		"sample_budget": 8,
+		"guide_rays": 7,
+		"envelope_smoothing": 0.44
 	},
 	TIER_SECONDARY: {
 		"label": "Cheap secondary response",
-		"update_interval": 0.12,
-		"sample_budget": 6,
+		"update_interval": 0.16,
+		"sample_budget": 5,
 		"guide_rays": 0,
-		"envelope_smoothing": 0.22
+		"envelope_smoothing": 0.28
 	}
 }
 

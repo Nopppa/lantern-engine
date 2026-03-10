@@ -11,7 +11,7 @@ const LightLabLayout = preload("res://scripts/data/light_lab_layout.gd")
 const FlashlightVisuals = preload("res://scripts/gameplay/flashlight_visuals.gd")
 const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 
-const LAB_LABEL := "Light Lab v0.5.4"
+const LAB_LABEL := "Light Lab v0.5.5"
 const CELL_SIZE := 32.0
 const PROBE_RADIUS := 18.0
 
@@ -30,6 +30,8 @@ var flashlight_visual_fills: Array = []
 var dead_alive_cells: Array = []
 var approx_refresh_timer := 999.0
 var approx_state := {}
+var approx_flashlight_frontier := {}
+var approx_secondary_sample_order := {}
 var perf_snapshot := {
 	"secondary": {},
 	"flashlight": {},
@@ -75,6 +77,10 @@ func _build_light_lab() -> void:
 		prism_stations.append(prism_station.duplicate(true))
 	for trunk: Dictionary in layout.get("tree_trunks", []):
 		tree_trunks.append(trunk.duplicate(true))
+	approx_state = {}
+	approx_flashlight_frontier = {}
+	approx_secondary_sample_order = {}
+	approx_refresh_timer = 999.0
 
 func _input(event: InputEvent) -> void:
 	DebugActions.handle_key_input(self, event)
@@ -116,14 +122,6 @@ func _process(delta: float) -> void:
 	if beam_pulse_timer <= 0.0 and not beam_segments.is_empty():
 		beam_segments.clear()
 		beam_debug_hits.clear()
-	diffuse_zones.clear()
-	secondary_light_segments.clear()
-	secondary_light_zones.clear()
-	secondary_debug_points.clear()
-	flashlight_visual_segments.clear()
-	flashlight_visual_zones.clear()
-	flashlight_visual_debug_points.clear()
-	flashlight_visual_fills.clear()
 	approx_refresh_timer += delta
 	_refresh_light_approximations_if_needed()
 	energy = min(max_energy, energy + energy_regen * delta)
@@ -163,6 +161,7 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		flashlight_visual_zones = flashlight_visuals.get("zones", [])
 		flashlight_visual_debug_points = flashlight_visuals.get("debug_points", [])
 		flashlight_visual_fills = flashlight_visuals.get("fills", [])
+		approx_flashlight_frontier = flashlight_visuals.get("frontier", {})
 		perf_snapshot["flashlight"] = flashlight_visuals.get("perf", {})
 		perf_snapshot["tier_b_ms"] = (Time.get_ticks_usec() - t1) / 1000.0
 	if tier_b_due or tier_c_due:
@@ -227,6 +226,8 @@ func _restart_lab() -> void:
 	flashlight_on = true
 	_build_light_lab()
 	approx_state = {}
+	approx_flashlight_frontier = {}
+	approx_secondary_sample_order = {}
 	approx_refresh_timer = 999.0
 	last_event = "Light Lab reset"
 

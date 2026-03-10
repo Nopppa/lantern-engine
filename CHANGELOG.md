@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.5 - 2026-03-10
+
+Light Stability & Surface Spill Fix patch:
+
+- fixed the main steady-aim flicker bug in `scripts/light_lab_scene.gd` by keeping Tier B/Tier C approximation outputs alive between refreshes instead of clearing them every frame before a budgeted rebuild
+- reduced remaining approximation cost again in `scripts/gameplay/light_approximation.gd` by lowering guide-ray count, lowering secondary sample budget, and slightly lengthening guided/secondary refresh cadence now that cached outputs stay stable between refreshes
+- added `scripts/gameplay/light_stability.gd` and used it from `scripts/gameplay/flashlight_visuals.gd` and `scripts/gameplay/light_surface_resolver.gd` so near-equal material samples/frontier points resolve deterministically instead of swapping order from tiny score differences
+- made flashlight/prism spill/scatter obey blocker truth more reliably by clipping reflected/transmitted/scatter branches against the next blocker in `scripts/gameplay/light_surface_resolver.gd` rather than drawing cheap secondary lines straight through solid surfaces
+- changed authored patch sampling to choose a source-facing point on each patch instead of always using the patch center, which keeps spill/scatter visually attached to the lit side of wood/wet/glass/mirror bays
+- updated docs/runtime-boundary notes and release metadata for `v0.5.5`
+
 ## 0.5.4 - 2026-03-10
 
 Unified Light Approximation & Performance patch:

@@ -1,7 +1,7 @@
 # Lantern Engine Code Map
 
 Last updated: 2026-03-10
-Current internal state: `v0.5.4` Unified Light Approximation & Performance patch shipped
+Current internal state: `v0.5.5` Light Stability & Surface Spill Fix patch shipped
 
 ## Purpose
 
@@ -68,6 +68,10 @@ This file tells future contributors where the new Light Lab responsibilities now
 - `scripts/gameplay/light_approximation.gd`
   - small shared approximation-tier contract (`A/B/C`) for precise beam logic, guided beam presentation, and cheap secondary response
   - centralizes cadence/sample-budget knobs so performance tuning does not sprawl across the scene coordinator
+
+- `scripts/gameplay/light_stability.gd`
+  - deterministic sample/frontier helpers for approximation-state reuse
+  - used to avoid tie-order flicker and to smooth guided flashlight frontier updates across refreshes
 
 - `scripts/gameplay/light_lab_navigation.gd`
   - small Light Lab-only waypoint/A* helper for obstacle routing around walls/tree trunks

@@ -1,7 +1,7 @@
 # Current State
 
 Last updated: 2026-03-10
-Current shipped version target: `v0.5.4`
+Current shipped version target: `v0.5.5`
 
 ## Now shipped
 
@@ -38,10 +38,18 @@ They are no longer the primary design center.
 - the lab HUD now shows lightweight approximation/perf counters for Tier B and Tier C work
 - reusable-vs-lab-only migration boundary now documents the new approximation module honestly
 
+## Now improved in v0.5.5
+
+- fixed the main visible approximation stability bug: guided flashlight + secondary-light arrays now persist between refreshes instead of being cleared on non-refresh frames
+- tightened cadence/sample cost again by lowering Tier B guide-ray count, lowering Tier C sample budget, and stretching both refresh intervals slightly without letting the beam presentation visibly blink
+- added deterministic sample ordering and lightweight frontier smoothing in `scripts/gameplay/light_stability.gd` so near-equal material candidates stop swapping frame-to-frame when aim is steady
+- clipped reflected/transmitted/scatter spill branches against the next blocker/surface, so brick/tree truth and other solid blockers now stop obvious secondary-light leaks instead of letting lines sail through geometry
+- made patch sampling on surface rectangles more source-relative, which keeps prism/flashlight spill anchored to the actually lit side of the surface rather than a detached center-point guess
+
 ## Immediate next recommendation
 
-Do a narrow runtime-light consolidation pass:
+Do one more narrow extraction/perf pass only if testers still find the lab heavy:
 
-- separate scene-agnostic trace/query inputs from `light_surface_resolver.gd`
-- keep Light Lab debug presentation as a consumer of those outputs
-- begin proving the same reusable light query pieces in the first small exploration-room prototype later, not yet in a full exploration system
+- split generic blocker-query helpers farther out of `light_surface_resolver.gd`
+- cache per-source candidate surface sets for short windows during movement
+- keep Light Lab debug presentation as a thin consumer instead of adding more special-case fixes into the scene coordinator

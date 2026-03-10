@@ -1,5 +1,28 @@
 # Devlog
 
+## 2026-03-10 — v0.5.5 Light Stability & Surface Spill Fix patch
+
+This patch stays intentionally tight. The goal was not to make the Light Lab fancier; it was to make the current approximation cheaper, more trustworthy, and visually stable.
+
+What changed:
+- fixed the biggest stability bug in the approximation loop: flashlight/prism approximation outputs are no longer cleared on frames where the cadence says "reuse last result", which was causing visible blink/flicker while aiming steadily
+- added `scripts/gameplay/light_stability.gd` to keep near-equal surface candidates in a deterministic order and to lightly smooth the guided flashlight frontier between refreshes
+- reduced Tier B / Tier C approximation work again by trimming guide rays and sample budgets while increasing reuse through stable cached outputs instead of empty-frame redraw gaps
+- clipped flashlight/prism reflected, transmitted, and scatter spill branches against the next blocker/surface so secondary light no longer obviously travels through brick walls, tree trunks, and other solid blockers
+- moved patch sampling on authored surface rectangles closer to the actually source-facing side so spill/scatter reads as attached to the contacted surface instead of floating from the patch midpoint
+
+Validation:
+```bash
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --quit
+/opt/openclaw/bin/godot --headless --path /opt/openclaw/projects/lantern_engine --export-release "Windows Desktop" build/windows/lantern_engine.exe
+```
+
+Validation result:
+- headless boot passed locally during implementation; Windows export result is tracked in the release/build step for `v0.5.5`
+
+Recommended next step:
+- if testers still want more smoothness, do a tiny follow-up on short-lived per-source candidate caching before attempting any deeper runtime lighting generalization
+
 ## 2026-03-10 — v0.5.3 Surface Optics & Navigation Truth patch
 
 This patch stays narrow on the remaining trust gaps: the flashlight should show what it is actually doing, enemies should stop lying about reachable paths, and `F1` should mean what the UI says it means.

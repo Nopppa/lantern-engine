@@ -1,7 +1,7 @@
 # Light Lab Runtime Boundary
 
 Last updated: 2026-03-10  
-Target version: `v0.5.4`
+Target version: `v0.5.5`
 
 ## Purpose
 
@@ -128,7 +128,7 @@ Lab-only parts right now:
 ### `scripts/gameplay/light_approximation.gd`
 **Status:** reusable now
 
-New in `v0.5.4`.
+Updated in `v0.5.5`.
 
 This file defines the practical fidelity split used by the patch:
 
@@ -137,6 +137,19 @@ This file defines the practical fidelity split used by the patch:
 - Tier C = cheap secondary response
 
 It also owns the cadence/sample-budget knobs that keep the approximation work cheaper without changing material truth itself.
+
+### `scripts/gameplay/light_stability.gd`
+**Status:** reusable now
+
+New in `v0.5.5`.
+
+This helper owns deterministic approximation ordering and lightweight frontier smoothing:
+
+- stable sort keys for near-equal surface candidates
+- refresh-to-refresh frontier reuse for guided flashlight presentation
+- tie-break behavior that keeps steady aim visually steady instead of letting sample order jitter
+
+It is reusable because it knows nothing about the Light Lab map itself; it only stabilizes approximation outputs.
 
 ### `scripts/gameplay/light_lab_navigation.gd`
 **Status:** Light Lab-only for now

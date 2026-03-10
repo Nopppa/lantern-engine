@@ -1,6 +1,6 @@
 # Lantern Engine — Light Lab Pivot
 
-Godot 4 prototype now centered on a permanent **Light Lab** instead of treating the old wave-survival arena as the main game direction. `v0.5.4` keeps the lab as default runtime and shifts the light presentation toward cheaper approximation tiers while preserving material/obstacle truth.
+Godot 4 prototype now centered on a permanent **Light Lab** instead of treating the old wave-survival arena as the main game direction. `v0.5.5` keeps the lab as default runtime and tightens the approximation system around stability, surface-truthful spill blocking, and lower-cost refresh work while preserving material/obstacle truth.
 
 ## Current primary runtime
 
@@ -130,11 +130,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.5.4` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.5.5` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.5.4.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.5.5.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 

@@ -6,6 +6,7 @@ const LightApproximation = preload("res://scripts/gameplay/light_approximation.g
 const LightResponseModel = preload("res://scripts/gameplay/light_response_model.gd")
 const LightQuery = preload("res://scripts/gameplay/light_query.gd")
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
+const LightStability = preload("res://scripts/gameplay/light_stability.gd")
 
 static func cast_beam(lab, target: Vector2) -> void:
 	if lab.beam_timer > 0.0:
@@ -49,7 +50,7 @@ static func build_secondary_light(lab) -> Dictionary:
 	var source_index := 0
 	var sampled_targets := 0
 	for source in _environment_sources(lab):
-		for sample in _surface_samples_for_source(lab, source):
+		for sample in _surface_samples_for_source(lab, source, lab.approx_secondary_sample_order):
 			sampled_targets += 1
 			var response := LightResponseModel.response(String(sample["material_id"]), String(source["source_type"]), float(sample["intensity"]), Vector2(source["direction"]), Vector2(sample["normal"]))
 			var hit_point: Vector2 = sample["point"]
@@ -67,29 +68,35 @@ static func build_secondary_light(lab) -> Dictionary:
 			if float(response["reflectivity"]) * float(sample["intensity"]) > float(response["branch_min"]):
 				var reflect_dir: Vector2 = Vector2(response["reflect_dir"])
 				var reflect_len := float(source["range"]) * float(response["branch_range_scale"]) * (0.62 + float(response["reflectivity"]) * 0.28)
-				secondary_segments.append({
-					"a": hit_point,
-					"b": hit_point + reflect_dir * reflect_len,
-					"intensity": float(sample["intensity"]) * float(response["reflectivity"]),
-					"material_id": material_id,
-					"source_type": source["source_type"],
-					"kind": "reflect",
-					"layer": 1,
-					"source_index": source_index
-				})
+				var reflect_segment := _clip_secondary_branch(lab, hit_point, reflect_dir, reflect_len, material_id, false)
+				if not reflect_segment.is_empty():
+					secondary_segments.append({
+						"a": reflect_segment["a"],
+						"b": reflect_segment["b"],
+						"intensity": float(sample["intensity"]) * float(response["reflectivity"]),
+						"material_id": material_id,
+						"source_type": source["source_type"],
+						"kind": "reflect",
+						"layer": 1,
+						"source_index": source_index,
+						"blocked": reflect_segment.get("blocked", false)
+					})
 			if float(response["transmission"]) * float(sample["intensity"]) > float(response["branch_min"]):
 				var transmit_dir: Vector2 = Vector2(response["transmit_dir"])
 				var transmit_len := float(source["range"]) * float(response["branch_range_scale"])
-				secondary_segments.append({
-					"a": hit_point,
-					"b": hit_point + transmit_dir * transmit_len,
-					"intensity": float(sample["intensity"]) * float(response["transmission"]),
-					"material_id": material_id,
-					"source_type": source["source_type"],
-					"kind": "transmit",
-					"layer": 2,
-					"source_index": source_index
-				})
+				var transmit_segment := _clip_secondary_branch(lab, hit_point, transmit_dir, transmit_len, material_id, true)
+				if not transmit_segment.is_empty():
+					secondary_segments.append({
+						"a": transmit_segment["a"],
+						"b": transmit_segment["b"],
+						"intensity": float(sample["intensity"]) * float(response["transmission"]),
+						"material_id": material_id,
+						"source_type": source["source_type"],
+						"kind": "transmit",
+						"layer": 2,
+						"source_index": source_index,
+						"blocked": transmit_segment.get("blocked", false)
+					})
 			debug_points.append({
 				"point": hit_point,
 				"material_id": material_id,
@@ -142,7 +149,7 @@ static func _environment_sources(lab) -> Array:
 		})
 	return sources
 
-static func _surface_samples_for_source(lab, source: Dictionary) -> Array:
+static func _surface_samples_for_source(lab, source: Dictionary, previous_keys: Dictionary) -> Array:
 	var candidates: Array = []
 	for surface: Dictionary in lab.surface_segments:
 		var sample := _sample_segment_from_source(lab, source, surface)
@@ -152,13 +159,13 @@ static func _surface_samples_for_source(lab, source: Dictionary) -> Array:
 		var patch_sample := _sample_patch_from_source(lab, source, patch)
 		if not patch_sample.is_empty():
 			candidates.append(patch_sample)
-	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return float(a.get("score", 0.0)) > float(b.get("score", 0.0))
-	)
+	LightStability.sort_samples(candidates, previous_keys)
 	var budget := int(LightApproximation.config_for_source(String(source.get("source_type", "prism"))).get("sample_budget", 6))
-	if budget <= 0 or candidates.size() <= budget:
-		return candidates
-	return candidates.slice(0, budget)
+	if budget > 0 and candidates.size() > budget:
+		candidates = candidates.slice(0, budget)
+	for i in range(candidates.size()):
+		previous_keys[LightStability.stable_surface_key(candidates[i])] = i
+	return candidates
 
 static func _sample_segment_from_source(lab, source: Dictionary, surface: Dictionary) -> Dictionary:
 	var a: Vector2 = surface["a"]
@@ -184,15 +191,18 @@ static func _sample_segment_from_source(lab, source: Dictionary, surface: Dictio
 
 static func _sample_patch_from_source(lab, source: Dictionary, patch: Dictionary) -> Dictionary:
 	var rect: Rect2 = patch["rect"]
+	var source_origin: Vector2 = Vector2(source["origin"])
 	var point: Vector2 = rect.get_center().clamp(rect.position + Vector2(12, 12), rect.end - Vector2(12, 12))
-	var visibility: float = lab._visibility_between(Vector2(source["origin"]), point)
+	point.x = clampf(source_origin.x, rect.position.x + 12.0, rect.end.x - 12.0)
+	point.y = clampf(source_origin.y, rect.position.y + 12.0, rect.end.y - 12.0)
+	var visibility: float = lab._visibility_between(source_origin, point)
 	if visibility <= 0.0:
 		return {}
 	var intensity: float = LightQuery.flashlight_intensity(Vector2(source["origin"]), Vector2(source["direction"]), point, float(source["range"]), float(source["half_angle"]), float(source["intensity"])) if String(source["source_type"]) == "flashlight" else LightQuery.radial_intensity(Vector2(source["origin"]), point, float(source["range"]), float(source["intensity"]))
 	intensity *= visibility
 	if intensity <= 0.06:
 		return {}
-	var normal := (point - Vector2(source["origin"])).normalized()
+	var normal := (point - source_origin).normalized()
 	if normal == Vector2.ZERO:
 		normal = Vector2.UP
 	return {
@@ -200,7 +210,29 @@ static func _sample_patch_from_source(lab, source: Dictionary, patch: Dictionary
 		"normal": normal,
 		"material_id": patch["material_id"],
 		"intensity": intensity,
-		"score": intensity / max(8.0, Vector2(source["origin"]).distance_to(point))
+		"score": intensity / max(8.0, source_origin.distance_to(point))
+	}
+
+static func _clip_secondary_branch(lab, origin: Vector2, direction: Vector2, max_distance: float, source_material_id: String, allow_glass_exit: bool) -> Dictionary:
+	var branch_dir := direction.normalized()
+	if branch_dir == Vector2.ZERO or max_distance <= 6.0:
+		return {}
+	var start: Vector2 = origin + branch_dir * lab.BEAM_OFFSET
+	var hit: Dictionary = _closest_hit(lab, start, branch_dir, max_distance)
+	if hit.is_empty():
+		return {"a": start, "b": start + branch_dir * max_distance, "blocked": false}
+	var hit_material := String(hit.get("material_id", "brick"))
+	if allow_glass_exit and hit_material == source_material_id and hit_material == "glass":
+		start = Vector2(hit["point"]) + branch_dir * lab.BEAM_OFFSET
+		hit = _closest_hit(lab, start, branch_dir, max_distance)
+		if hit.is_empty():
+			return {"a": start, "b": start + branch_dir * max_distance, "blocked": false}
+	return {
+		"a": start,
+		"b": Vector2(hit["point"]),
+		"blocked": true,
+		"block_material_id": hit_material,
+		"block_kind": String(hit.get("hit_kind", "block"))
 	}
 
 static func _trace_ray(lab, ray: Dictionary, queue: Array) -> void:
