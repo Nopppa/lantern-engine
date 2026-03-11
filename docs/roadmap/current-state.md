@@ -145,3 +145,22 @@ They are no longer the primary design center.
 **Procedural-readiness improved:**
 - producer and solver code now have clearer internal seams where a generated `LightWorld` can be supplied without rewriting every consumer first
 - scene-local arrays are less central in producer/query flow and more confined to fallback/layout/collision roles
+
+
+## Light Lab adapter-layer follow-up (2026-03-11)
+
+**Adapter seam introduced:**
+- added `scripts/gameplay/light_lab_world_adapter.gd`
+- authored Light Lab layout is now translated in one place into:
+  - legacy runtime arrays (`surface_segments`, `surface_patches`, `prism_stations`, `tree_trunks`)
+  - a populated `LightWorld`
+
+**What moved out of Light Lab:**
+- direct authored-layout copying loops were removed from `_build_light_lab()`
+- prism-station production in the approximation refresh now iterates shared prism entities instead of scene-owned `prism_stations`
+- collision entry points now go through tiny adapter helpers (`_collision_surface_segments()`, `_collision_tree_trunks()`) instead of hardwiring scene fields at each call site
+
+**Boundary effect:**
+- Light Lab is more clearly an orchestrator that asks an adapter for world/runtime data
+- raw-array production loops now live mainly in the adapter seam rather than the scene coordinator itself
+- this makes future procedural input easier because authored-layout translation has one obvious replacement point

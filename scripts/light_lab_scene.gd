@@ -8,6 +8,7 @@ const BossController = preload("res://scripts/gameplay/boss_controller.gd")
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 const LightQuery = preload("res://scripts/gameplay/light_query.gd")
 const LightLabLayout = preload("res://scripts/data/light_lab_layout.gd")
+const LightLabWorldAdapter = preload("res://scripts/gameplay/light_lab_world_adapter.gd")
 const FlashlightVisuals = preload("res://scripts/gameplay/flashlight_visuals.gd")
 const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 
@@ -70,22 +71,14 @@ func _ready() -> void:
 	_update_ui()
 
 func _build_light_lab() -> void:
-	surface_segments = []
-	surface_patches = []
-	prism_stations = []
-	tree_trunks = []
 	var layout := LightLabLayout.build_layout(base_alive_flip)
+	var adapted := LightLabWorldAdapter.build(layout, ARENA_RECT, prism_node, current_prism_radius())
+	surface_segments = adapted.get("surface_segments", [])
+	surface_patches = adapted.get("surface_patches", [])
+	prism_stations = adapted.get("prism_stations", [])
+	tree_trunks = adapted.get("tree_trunks", [])
+	light_world = adapted.get("light_world", null)
 	dead_alive_cells = DeadAliveGrid.build(ARENA_RECT, CELL_SIZE, layout.get("dead_alive_cells", []))
-	for segment: Dictionary in layout.get("segments", []):
-		surface_segments.append(segment.duplicate(true))
-	for patch: Dictionary in layout.get("patches", []):
-		surface_patches.append(patch.duplicate(true))
-	for prism_station: Dictionary in layout.get("prism_stations", []):
-		prism_stations.append(prism_station.duplicate(true))
-	for trunk: Dictionary in layout.get("tree_trunks", []):
-		tree_trunks.append(trunk.duplicate(true))
-	approx_state = {}
-	light_world = LightWorldBuilder.from_light_lab_scene(self)
 	approx_state = {}
 	approx_flashlight_frontier = {}
 	approx_prism_frontiers = {}
@@ -176,9 +169,11 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 			prism_visual_debug_points.append_array(prism_packet.get("debug_points", []))
 			prism_visual_fills.append_array(prism_packet.get("fills", []))
 			approx_prism_frontiers["manual"] = prism_packet.get("frontier", {})
-		for prism_station: Dictionary in prism_stations:
-			var station_key := "station_%d_%d" % [int(prism_station["pos"].x), int(prism_station["pos"].y)]
-			var station_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_station["pos"], Vector2.LEFT, approx_prism_frontiers.get(station_key, {})))
+		for prism_entity: Dictionary in _light_world_prism_entities():
+			if String(prism_entity.get("kind", "")) != "prism_station":
+				continue
+			var station_key := "station_%d_%d" % [int(prism_entity["pos"].x), int(prism_entity["pos"].y)]
+			var station_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_entity["pos"], Vector2.LEFT, approx_prism_frontiers.get(station_key, {})))
 			prism_visual_segments.append_array(station_packet.get("segments", []))
 			prism_visual_zones.append_array(station_packet.get("zones", []))
 			prism_visual_debug_points.append_array(station_packet.get("debug_points", []))
@@ -208,7 +203,7 @@ func _handle_player(delta: float) -> void:
 	player_velocity = input * player_speed * speed_scale
 	if input.length() > 0.1:
 		facing = input.normalized()
-	var target_pos := LightLabCollision.resolve_circle_motion(player_pos, PLAYER_RADIUS + 5.0, player_velocity * delta, surface_segments, tree_trunks)
+	var target_pos := LightLabCollision.resolve_circle_motion(player_pos, PLAYER_RADIUS + 5.0, player_velocity * delta, _collision_surface_segments(), _collision_tree_trunks())
 	target_pos.x = clamp(target_pos.x, ARENA_RECT.position.x + PLAYER_RADIUS, ARENA_RECT.end.x - PLAYER_RADIUS)
 	target_pos.y = clamp(target_pos.y, ARENA_RECT.position.y + PLAYER_RADIUS, ARENA_RECT.end.y - PLAYER_RADIUS)
 	player_pos = target_pos
@@ -264,9 +259,6 @@ func _restart_lab() -> void:
 	prism_surge_timer = 0.0
 	flashlight_on = true
 	_build_light_lab()
-	light_world = LightWorldBuilder.from_light_lab_scene(self)
-	approx_state = {}
-	light_world = LightWorldBuilder.from_light_lab_scene(self)
 	approx_state = {}
 	approx_flashlight_frontier = {}
 	approx_prism_frontiers = {}
@@ -316,6 +308,12 @@ func _movement_speed_multiplier_at(pos: Vector2) -> float:
 	var multiplier := LightMaterials.water_speed_multiplier(material)
 	return multiplier if LightMaterials.water_depth(material) > 0.0 else 1.0
 
+func _collision_surface_segments() -> Array:
+	return surface_segments
+
+func _collision_tree_trunks() -> Array:
+	return tree_trunks
+
 func _find_valid_spawn(target: Vector2, radius: float) -> Vector2:
 	var candidate := target
 	for ring in range(5):
@@ -323,12 +321,12 @@ func _find_valid_spawn(target: Vector2, radius: float) -> Vector2:
 			var angle := TAU * float(step) / 12.0
 			var probe := candidate + Vector2.RIGHT.rotated(angle) * float(ring) * 18.0
 			probe = _resolve_point_in_lab(probe, radius)
-			if not LightLabCollision.is_circle_blocked(probe, radius, surface_segments, tree_trunks):
+			if not LightLabCollision.is_circle_blocked(probe, radius, _collision_surface_segments(), _collision_tree_trunks()):
 				return probe
 	return Vector2.INF
 
 func _resolve_actor_motion(position: Vector2, radius: float, motion: Vector2) -> Vector2:
-	var resolved := LightLabCollision.resolve_circle_motion(position, radius, motion, surface_segments, tree_trunks)
+	var resolved := LightLabCollision.resolve_circle_motion(position, radius, motion, _collision_surface_segments(), _collision_tree_trunks())
 	return _resolve_point_in_lab(resolved, radius)
 
 func _resolve_point_in_lab(position: Vector2, radius: float) -> Vector2:
