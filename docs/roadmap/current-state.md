@@ -241,3 +241,19 @@ They are no longer the primary design center.
 
 **Phase 2 direction kept aligned:**
 - laser packets now also record `world_type` from the current `LightWorld` when available, reinforcing the shared solver → packet → world-backed runtime direction on the authored field
+
+## Laser trace-state seam + packet-first debug visuals (2026-03-11)
+
+**Task A movement — damage/debug off legacy internal truth:**
+- `LightSurfaceResolver.cast_beam()` now accumulates laser trace state in local packet-adjacent arrays (`segments`, `zones`, `debug_hits`) during solve time
+- legacy scene mirrors (`beam_segments`, `diffuse_zones`, `beam_debug_hits`) are now assigned from that trace state after solve completion rather than being mutated as the primary internal truth throughout the trace
+- damage application still occurs during `_append_segment(...)`, preserving authored-field behavior while making `beam_segments` more clearly compatibility output
+
+**Task B movement — Phase 3 visible-light cleanup:**
+- Light Lab beam diffuse overlays now render from `beam_render_packet` zones instead of scene-owned `diffuse_zones`
+- Light Lab beam debug markers now render from packet-carried `debug_hits` instead of scene-owned `beam_debug_hits`
+- this pushes another visible-light/debug slice of the current field onto packet consumption rather than legacy CPU-visible beam structures
+
+**Task C movement — Phase 2 / world-path coherence:**
+- the laser solver now has a cleaner local trace-to-packet flow that mirrors the broader solver → packet direction used by other light sources
+- no new laser-only architecture was introduced; instead the pass narrowed the seam between solver trace state and shared packet output

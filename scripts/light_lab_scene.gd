@@ -158,7 +158,7 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 	var tier_c_due := force or approx_state != state or LightApproximation.should_refresh(approx_refresh_timer, "prism")
 	if tier_c_due:
 		var t0 := Time.get_ticks_usec()
-		var secondary := LightSurfaceResolver.build_secondary_light(self)
+		var secondary: Dictionary = LightSurfaceResolver.build_secondary_light(self)
 		secondary_render_packet = _build_secondary_render_packet(secondary)
 		secondary_light_segments = secondary_render_packet.get("segments", [])
 		secondary_light_zones = secondary_render_packet.get("zones", [])
@@ -404,7 +404,7 @@ func _visibility_between(a: Vector2, b: Vector2) -> float:
 			continue
 		if not bool(blocker.get("blocks_flashlight", true)):
 			continue
-		var hit := LightSurfaceResolver._ray_segment_intersection(a, (b - a).normalized(), Vector2(blocker["a"]), Vector2(blocker["b"]))
+		var hit: Dictionary = LightSurfaceResolver._ray_segment_intersection(a, (b - a).normalized(), Vector2(blocker["a"]), Vector2(blocker["b"]))
 		if hit.is_empty():
 			continue
 		var t: float = float(hit["t"])
@@ -426,6 +426,9 @@ func _beam_packet_segments() -> Array:
 
 func _beam_packet_zones() -> Array:
 	return _packet_zones(beam_render_packet)
+
+func _beam_packet_debug_hits() -> Array:
+	return Array(beam_render_packet.get("debug_hits", [])).duplicate(true)
 
 func _beam_packet_active() -> bool:
 	return bool(beam_render_packet.get("active", false)) and not _beam_packet_segments().is_empty()
@@ -816,7 +819,7 @@ func _draw_primary_beam_segments() -> void:
 			draw_string(ThemeDB.fallback_font, mid2 + Vector2(-10, 4), "L%d" % layer, HORIZONTAL_ALIGNMENT_LEFT, 24.0, 11, Color(0.92, 0.98, 1.0, 0.9))
 
 func _draw_secondary_overlays() -> void:
-	for diffuse: Dictionary in diffuse_zones:
+	for diffuse: Dictionary in _beam_packet_zones():
 		draw_circle(diffuse["pos"], diffuse["radius"], Color(1.0, 0.84, 0.48, 0.06 * float(diffuse["strength"])))
 		draw_arc(diffuse["pos"], diffuse["radius"] * 0.58, 0.0, TAU, 20, Color(1.0, 0.88, 0.54, 0.18 * float(diffuse["strength"])), 2.0)
 	for zone: Dictionary in _packet_zones(secondary_render_packet):
@@ -849,7 +852,7 @@ func _draw_secondary_overlays() -> void:
 				draw_line(da, db, Color(1.0, 1.0, 1.0, 0.42 * intensity), 2.0)
 
 func _draw_debug_markers() -> void:
-	for hit: Dictionary in beam_debug_hits:
+	for hit: Dictionary in _beam_packet_debug_hits():
 		var color := Color(0.9, 1.0, 1.0, 0.4)
 		if String(hit.get("kind", "bounce")) == "redirect":
 			color = Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.55)

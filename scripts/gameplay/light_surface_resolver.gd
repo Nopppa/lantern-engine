@@ -65,6 +65,14 @@ static func cast_beam(lab, target: Vector2) -> void:
 	lab.beam_render_packet = LightTypes.empty_render_packet("laser")
 	lab.beam_debug_hits.clear()
 	lab.hit_flashes.clear()
+	var trace_segments: Array = []
+	var trace_zones: Array = []
+	var trace_debug_hits: Array = []
+	var trace_state := {
+		"segments": trace_segments,
+		"zones": trace_zones,
+		"debug_hits": trace_debug_hits
+	}
 	var direction: Vector2 = (target - lab.player_pos).normalized()
 	if direction == Vector2.ZERO:
 		direction = lab.facing
@@ -86,7 +94,10 @@ static func cast_beam(lab, target: Vector2) -> void:
 	var processed := 0
 	while not queue.is_empty() and processed < 16:
 		processed += 1
-		_trace_ray(lab, queue.pop_front(), queue)
+		_trace_ray(lab, queue.pop_front(), queue, trace_state)
+	lab.beam_segments = Array(trace_state.get("segments", [])).duplicate(true)
+	lab.diffuse_zones = Array(trace_state.get("zones", [])).duplicate(true)
+	lab.beam_debug_hits = Array(trace_state.get("debug_hits", [])).duplicate(true)
 	lab.beam_render_packet = LightTypes.light_render_packet("laser", source_spec, lab.beam_segments, [], [], lab.diffuse_zones, {
 		"debug_hits": lab.beam_debug_hits.duplicate(true),
 		"active": not lab.beam_segments.is_empty(),
@@ -280,7 +291,7 @@ static func _clip_secondary_branch(lab, origin: Vector2, direction: Vector2, max
 		"block_kind": String(hit.get("hit_kind", "block"))
 	}
 
-static func _trace_ray(lab, ray: Dictionary, queue: Array) -> void:
+static func _trace_ray(lab, ray: Dictionary, queue: Array, trace_state: Dictionary) -> void:
 	var origin: Vector2 = ray["origin"]
 	var direction: Vector2 = Vector2(ray["direction"]).normalized()
 	var intensity: float = float(ray["intensity"])
@@ -291,13 +302,13 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array) -> void:
 		return
 	var best: Dictionary = _closest_hit(lab, origin, direction, remaining)
 	if best.is_empty():
-		_append_segment(lab, origin, origin + direction * remaining, intensity, "open", false, layer, bounces, "primary")
+		_append_segment(lab, trace_state, origin, origin + direction * remaining, intensity, "open", false, layer, bounces, "primary")
 		return
 	var hit_point: Vector2 = best["point"]
 	var travel: float = origin.distance_to(hit_point)
-	_append_segment(lab, origin, hit_point, intensity, String(best.get("material_id", "open")), bool(best.get("special", false)), layer, bounces, String(best.get("hit_kind", "primary")))
+	_append_segment(lab, trace_state, origin, hit_point, intensity, String(best.get("material_id", "open")), bool(best.get("special", false)), layer, bounces, String(best.get("hit_kind", "primary")))
 	var material_id := String(best.get("material_id", "brick"))
-	lab.beam_debug_hits.append({
+	trace_state["debug_hits"].append({
 		"point": hit_point,
 		"material_id": material_id,
 		"label": String(best.get("material_label", material_id)),
@@ -315,7 +326,7 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array) -> void:
 	var response := LightResponseModel.response(material_id, "laser", intensity, direction, Vector2(best["normal"]))
 	var remaining_after := remaining - travel
 	if float(response["diffusion"]) > 0.0:
-		lab.diffuse_zones.append({"pos": hit_point, "radius": response["diffuse_radius"], "strength": intensity * float(response["diffusion"]), "material_id": material_id, "source_type": "laser", "layer": layer + 1, "kind": "diffuse"})
+		trace_state["zones"].append({"pos": hit_point, "radius": response["diffuse_radius"], "strength": intensity * float(response["diffusion"]), "material_id": material_id, "source_type": "laser", "layer": layer + 1, "kind": "diffuse"})
 	if remaining_after <= 8.0:
 		return
 	if material_id == "tree":
@@ -335,8 +346,8 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array) -> void:
 	else:
 		lab.last_event = "%s absorbed most of the beam" % label
 
-static func _append_segment(lab, a: Vector2, b: Vector2, intensity: float, material_id: String, special: bool, layer: int, bounce_index: int, hit_kind: String) -> void:
-	lab.beam_segments.append({
+static func _append_segment(lab, trace_state: Dictionary, a: Vector2, b: Vector2, intensity: float, material_id: String, special: bool, layer: int, bounce_index: int, hit_kind: String) -> void:
+	trace_state["segments"].append({
 		"a": a,
 		"b": b,
 		"intensity": intensity,
