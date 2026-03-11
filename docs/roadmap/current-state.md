@@ -273,3 +273,20 @@ They are no longer the primary design center.
 **Boundary effect:**
 - this is a more truthful adapter seam: solver trace → packet, with only the minimum remaining beam segment mirror kept for compatibility
 - `beam_segments` now stands out more clearly as the last significant compatibility shadow rather than one member of a larger mirrored beam state bundle
+
+## `beam_segments` compatibility seam narrowed into explicit adapter hook (2026-03-11)
+
+**Remaining usage audit on Light Lab side:**
+- active beam lifecycle/state already relied on packet data
+- beam drawing already relied on packet segments
+- the main remaining Light Lab-specific mirror need was `beam_segments` as a compatibility output surface
+
+**What changed:**
+- `LightSurfaceResolver.cast_beam()` now builds `beam_render_packet` from local trace output first
+- only after packet emission does it synchronize `beam_segments`, via explicit scene adapter hook `_sync_beam_segment_compat(packet)` when available
+- solver-side beam cleanup now also prefers `_clear_beam_compat_state()` when the scene exposes it, instead of hardwiring direct field cleanup first
+
+**Why this matters:**
+- `beam_segments` is no longer treated as part of the normal solver-owned runtime path inside Light Lab
+- the remaining mirror write now happens at a narrower, more explicit adapter seam after packet construction
+- this makes the distinction clearer between true runtime state (`beam_render_packet`) and backward-compat scene output (`beam_segments`)

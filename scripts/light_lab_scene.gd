@@ -430,6 +430,9 @@ func _beam_packet_active() -> bool:
 func _clear_beam_compat_state() -> void:
 	beam_segments.clear()
 
+func _sync_beam_segment_compat(packet: Dictionary) -> void:
+	beam_segments = _packet_segments(packet).duplicate(true)
+
 func _light_world_patches() -> Array:
 	return light_world.material_patches if light_world else surface_patches
 
