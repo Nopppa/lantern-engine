@@ -54,6 +54,10 @@ static func cast_prism_surge(run: RunScene) -> void:
 			run._add_hit_flash(enemy["node"].position, enemy["radius"] + 24.0, Color(1.0, 0.98, 0.82, 1.0), 0.24)
 	var refunded_energy: float = minf(run.max_energy - run.energy, float(hit_count) * run.prism_surge_energy_refund_on_hit)
 	run.energy += refunded_energy
+	run.prism_surge_flash_timer = 0.34
+	run.prism_surge_flash_origin = origin
+	run.prism_surge_flash_radius = run.prism_surge_radius
+	run.prism_surge_flash_strength = 1.0
 	run._add_hit_flash(origin, run.prism_surge_radius, Color(0.62, 0.94, 1.0, 0.9), 0.26)
 	if run.prism_node:
 		run.prism_node.queue_free()

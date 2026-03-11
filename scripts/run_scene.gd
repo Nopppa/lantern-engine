@@ -57,6 +57,10 @@ var prism_surge_special_lock_duration := 2.2
 var prism_surge_light_burn_duration := 4.0
 var prism_surge_light_burn_tick := 0.5
 var prism_surge_light_burn_damage := 1.5
+var prism_surge_flash_timer := 0.0
+var prism_surge_flash_origin := Vector2.ZERO
+var prism_surge_flash_radius := 0.0
+var prism_surge_flash_strength := 0.0
 var prism_node: Node2D
 var player_velocity := Vector2.ZERO
 var player_speed := 285.0

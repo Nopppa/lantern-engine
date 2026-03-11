@@ -17,7 +17,7 @@ class_name NativeLightPresentation
 # Tunables  (all presentation-only)
 # ---------------------------------------------------------------------------
 
-const AMBIENT_COLOR := Color(0.06, 0.07, 0.10, 1.0)
+const AMBIENT_COLOR := Color(0.14, 0.15, 0.19, 1.0)
 
 const NATIVE_LIGHT_ITEM_MASK := 1
 const NATIVE_SHADOW_MASK := 2
