@@ -53,6 +53,7 @@ var ui_overlays_hidden := false
 var base_alive_flip := false
 var movement_surface_probe := {}
 var spawn_validation_enabled := true
+var generated_light_world_override = null
 
 func _ready() -> void:
 	randomize()
@@ -77,7 +78,7 @@ func _build_light_lab() -> void:
 	surface_patches = adapted.get("surface_patches", [])
 	prism_stations = adapted.get("prism_stations", [])
 	tree_trunks = adapted.get("tree_trunks", [])
-	light_world = adapted.get("light_world", null)
+	light_world = generated_light_world_override if generated_light_world_override != null else adapted.get("light_world", null)
 	dead_alive_cells = DeadAliveGrid.build(ARENA_RECT, CELL_SIZE, layout.get("dead_alive_cells", []))
 	approx_state = {}
 	approx_flashlight_frontier = {}
@@ -203,7 +204,7 @@ func _handle_player(delta: float) -> void:
 	player_velocity = input * player_speed * speed_scale
 	if input.length() > 0.1:
 		facing = input.normalized()
-	var target_pos := LightLabCollision.resolve_circle_motion(player_pos, PLAYER_RADIUS + 5.0, player_velocity * delta, _collision_surface_segments(), _collision_tree_trunks())
+	var target_pos := LightLabCollision.resolve_circle_motion_in_space(player_pos, PLAYER_RADIUS + 5.0, player_velocity * delta, _collision_space())
 	target_pos.x = clamp(target_pos.x, ARENA_RECT.position.x + PLAYER_RADIUS, ARENA_RECT.end.x - PLAYER_RADIUS)
 	target_pos.y = clamp(target_pos.y, ARENA_RECT.position.y + PLAYER_RADIUS, ARENA_RECT.end.y - PLAYER_RADIUS)
 	player_pos = target_pos
@@ -308,11 +309,18 @@ func _movement_speed_multiplier_at(pos: Vector2) -> float:
 	var multiplier := LightMaterials.water_speed_multiplier(material)
 	return multiplier if LightMaterials.water_depth(material) > 0.0 else 1.0
 
-func _collision_surface_segments() -> Array:
-	return surface_segments
+func _collision_space() -> Dictionary:
+	if light_world:
+		return light_world.collision_space()
+	return {"segments": surface_segments, "circles": tree_trunks}
 
-func _collision_tree_trunks() -> Array:
-	return tree_trunks
+func _inject_generated_light_world(world) -> void:
+	generated_light_world_override = world
+	if generated_light_world_override != null:
+		light_world = generated_light_world_override
+
+func _clear_generated_light_world_override() -> void:
+	generated_light_world_override = null
 
 func _find_valid_spawn(target: Vector2, radius: float) -> Vector2:
 	var candidate := target
@@ -321,12 +329,12 @@ func _find_valid_spawn(target: Vector2, radius: float) -> Vector2:
 			var angle := TAU * float(step) / 12.0
 			var probe := candidate + Vector2.RIGHT.rotated(angle) * float(ring) * 18.0
 			probe = _resolve_point_in_lab(probe, radius)
-			if not LightLabCollision.is_circle_blocked(probe, radius, _collision_surface_segments(), _collision_tree_trunks()):
+			if not LightLabCollision.is_circle_blocked_in_space(probe, radius, _collision_space()):
 				return probe
 	return Vector2.INF
 
 func _resolve_actor_motion(position: Vector2, radius: float, motion: Vector2) -> Vector2:
-	var resolved := LightLabCollision.resolve_circle_motion(position, radius, motion, _collision_surface_segments(), _collision_tree_trunks())
+	var resolved := LightLabCollision.resolve_circle_motion_in_space(position, radius, motion, _collision_space())
 	return _resolve_point_in_lab(resolved, radius)
 
 func _resolve_point_in_lab(position: Vector2, radius: float) -> Vector2:
@@ -389,14 +397,12 @@ func _light_world_tree_entities() -> Array:
 	return light_world.entity_list("tree_trunk") if light_world else tree_trunks
 
 func _light_world_prism_entities() -> Array:
-	var entities: Array = []
 	if light_world:
-		entities.append_array(light_world.entity_list("prism_station"))
-		entities.append_array(light_world.entity_list("prism_node"))
-	else:
-		entities.append_array(prism_stations)
-		if prism_node:
-			entities.append({"kind": "prism_node", "pos": prism_node.position, "radius": current_prism_radius(), "material_id": "prism"})
+		return light_world.prism_emitters()
+	var entities: Array = []
+	entities.append_array(prism_stations)
+	if prism_node:
+		entities.append({"kind": "prism_node", "pos": prism_node.position, "radius": current_prism_radius(), "material_id": "prism"})
 	return entities
 
 func _packet_intensity_at(packet: Dictionary, pos: Vector2, primary_radius: float, secondary_radius: float, primary_scale: float, secondary_scale: float) -> float:

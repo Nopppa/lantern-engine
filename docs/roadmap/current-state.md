@@ -164,3 +164,20 @@ They are no longer the primary design center.
 - Light Lab is more clearly an orchestrator that asks an adapter for world/runtime data
 - raw-array production loops now live mainly in the adapter seam rather than the scene coordinator itself
 - this makes future procedural input easier because authored-layout translation has one obvious replacement point
+
+
+## Collision/world-space seam + generated injection hook (2026-03-11)
+
+**Legacy runtime-array dependency reduced further:**
+- `LightLabCollision` now exposes `resolve_circle_motion_in_space()` and `is_circle_blocked_in_space()` that operate on collision-space dictionaries instead of raw segment/circle arrays at call sites
+- `LightLabScene` collision/spawn entry points now pass `_collision_space()` rather than handing `surface_segments` / `tree_trunks` directly to collision helpers
+- `LightWorld` now exposes `collision_space()` and `prism_emitters()` so shared world data can feed collision and producer/solver helper code more directly
+
+**Producer/helper state moved outward:**
+- prism emitter lookup now comes from `LightWorld.prism_emitters()` when world data is present
+- collision-space composition now comes from `LightWorld.collision_space()` instead of being reassembled repeatedly at scene call sites
+
+**Generated-LightWorld injection point introduced:**
+- `LightLabScene` now supports `generated_light_world_override`
+- `_inject_generated_light_world(world)` and `_clear_generated_light_world_override()` provide the first explicit hook for feeding a generated/shared `LightWorld` into the lab without rewriting the whole scene stack
+- `_build_light_lab()` now respects this override, making a first procedural test path credible

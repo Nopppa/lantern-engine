@@ -20,15 +20,13 @@ static func _world_patches(lab) -> Array:
 
 static func _world_tree_entities(lab) -> Array:
 	if lab.get("light_world") != null and lab.light_world:
-		return lab.light_world.entity_list("tree_trunk")
+		return lab.light_world.collision_space().get("circles", [])
 	return lab.tree_trunks
 
 static func _world_prism_entities(lab) -> Array:
 	var entities: Array = []
 	if lab.get("light_world") != null and lab.light_world:
-		entities.append_array(lab.light_world.entity_list("prism_station"))
-		entities.append_array(lab.light_world.entity_list("prism_node"))
-		return entities
+		return lab.light_world.prism_emitters()
 	for prism_station: Dictionary in lab.prism_stations:
 		var entity := prism_station.duplicate(true)
 		entity["kind"] = "prism_station"

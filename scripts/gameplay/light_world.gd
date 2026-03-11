@@ -39,3 +39,15 @@ func all_blockers() -> Array:
 					"material_id": entity.get("material_id", "tree")
 				})
 	return blockers
+
+func collision_space() -> Dictionary:
+	return {
+		"segments": occluder_segments.duplicate(true),
+		"circles": entity_list("tree_trunk")
+	}
+
+func prism_emitters() -> Array:
+	var emitters: Array = []
+	emitters.append_array(entity_list("prism_station"))
+	emitters.append_array(entity_list("prism_node"))
+	return emitters

@@ -51,3 +51,9 @@ static func _closest_point_on_segment(point: Vector2, a: Vector2, b: Vector2) ->
 	var ab := b - a
 	var t := clampf((point - a).dot(ab) / max(ab.length_squared(), 0.001), 0.0, 1.0)
 	return a + ab * t
+
+static func resolve_circle_motion_in_space(position: Vector2, radius: float, motion: Vector2, collision_space: Dictionary, iterations: int = 4) -> Vector2:
+	return resolve_circle_motion(position, radius, motion, collision_space.get("segments", []), collision_space.get("circles", []), iterations)
+
+static func is_circle_blocked_in_space(position: Vector2, radius: float, collision_space: Dictionary) -> bool:
+	return is_circle_blocked(position, radius, collision_space.get("segments", []), collision_space.get("circles", []))
