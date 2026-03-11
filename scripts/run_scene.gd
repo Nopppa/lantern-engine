@@ -227,6 +227,12 @@ func _build_hud() -> void:
 
 func _input(event: InputEvent) -> void:
 	DebugActions.handle_key_input(self, event)
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.physical_keycode:
+			KEY_0:
+				toggle_native_light_layer()
+			KEY_MINUS:
+				toggle_native_light_shadows()
 
 func _process(delta: float) -> void:
 	if DebugActions.handle_process_actions(self):
@@ -332,6 +338,18 @@ func _toggle_flashlight() -> void:
 		return
 	flashlight_on = !flashlight_on
 	last_event = "Flashlight %s" % ("ON" if flashlight_on else "OFF")
+
+func toggle_native_light_layer() -> void:
+	if native_light_presentation == null:
+		return
+	native_light_presentation.enabled = !native_light_presentation.enabled
+	last_event = "Native Light2D layer %s" % ("ON" if native_light_presentation.enabled else "OFF")
+
+func toggle_native_light_shadows() -> void:
+	if native_light_presentation == null:
+		return
+	native_light_presentation.shadows_enabled = !native_light_presentation.shadows_enabled
+	last_event = "Native flashlight shadows %s" % ("ON" if native_light_presentation.shadows_enabled else "OFF")
 
 func _is_in_flashlight_cone(pos: Vector2) -> bool:
 	if not flashlight_on:
@@ -499,15 +517,16 @@ func _update_ui() -> void:
 	hud_label.text = "[b]Lantern Engine %s[/b]\n[color=#a4b1cd]Encounter:[/color] %s\n[color=#a4b1cd]Objective:[/color] %s\n\n[color=#ff6b6b]HP[/color]  %.0f / %.0f  %s\n[color=#8be9fd]EN[/color]  %.0f / %.0f  %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg  |  %.0f range  |  %d bounce\n[color=#f1fa8c]Prism[/color] +%.0f redirect dmg | +%.0f radius | +%.0f° bend | +%d post-prism bounce\n[color=#f1fa8c]Surge[/color] %.0f burst  |  %.0f radius  |  [color=#fff1a8]Light Burn[/color] %.1f/%.1fs for %.1fs  |  [color=#a4b1cd]Q[/color] %s\n[color=#f1fa8c]Flashlight[/color] %s    [color=#a4b1cd]Beam:[/color] %s    [color=#a4b1cd]Prism:[/color] %s\n[color=#a4b1cd]Encounter:[/color] %d / %d%s    [color=#a4b1cd]Enemies:[/color] %d\n[color=#a4b1cd]Immortal:[/color] %s" % [BUILD_LABEL, encounter_title, objective, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, prism_redirect_damage_bonus, prism_radius_bonus, prism_redirect_angle_bonus, prism_redirect_bonus_bounces, prism_surge_damage, prism_surge_radius, prism_surge_light_burn_damage, prism_surge_light_burn_tick, prism_surge_light_burn_duration, surge_state, flashlight_text, beam_ready, prism_state, min(encounter_index + 1, encounters.size()), encounters.size(), miniboss_text, _alive_enemy_count(), immortal_text]
 	var help_hint := "[color=#8be9fd]F1 show full help[/color]" if help_collapsed else "[color=#8be9fd]F1 hide full help[/color]"
 	var immortal_hint := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
+	var native_state := native_light_presentation.debug_state_summary() if native_light_presentation else "layer OFF"
 	if reward_pending:
 		if reward_title_label:
 			reward_title_label.text = "Choose one Prism upgrade — current beam: %.0f dmg | %.0f range | %d bounce" % [beam_damage, beam_range, beam_bounces]
 		RewardController.update_button_states(self)
 		status_label.text = "[b]Reward pause[/b]\nChoose one Prism upgrade before the next encounter.\n\n[color=#8be9fd]1/2/3[/color] direct pick\n[color=#8be9fd]W/S or ↑/↓[/color] move highlight\n[color=#8be9fd]E / Enter[/color] confirm highlighted reward\n\n[b]Current kit[/b]\nBeam %.0f dmg | %.0f range | %d bounce\nSurge %.0f burst | %.0f radius | Light Burn %.1f/%.1fs | Q" % [beam_damage, beam_range, beam_bounces, prism_surge_damage, prism_surge_radius, prism_surge_light_burn_damage, prism_surge_light_burn_tick]
 	elif help_collapsed and not run_over:
-		status_label.text = "[b]Event[/b]\n%s\n\n%s\n[color=#6272a4]Key actions: F1 help | F flashlight | R restart | F4 immortal %s[/color]" % [last_event, help_hint, immortal_hint]
+		status_label.text = "[b]Event[/b]\n%s\n\n%s\n[color=#6272a4]Key actions: F1 help | F flashlight | R restart | F4 immortal %s | 0 native layer | - native shadows[/color]\n[color=#8be9fd]Native:[/color] %s" % [last_event, help_hint, immortal_hint, native_state]
 	else:
-		status_label.text = "[b]Readability legend[/b]\n[color=#f1fa8c]Warm core[/color] + [color=#8be9fd]cyan bloom[/color] = live beam path\n[color=#8be9fd]Cyan wall ring[/color] = bounce / redirect point\n[color=#8be9fd]Diamond aura[/color] = Prism Node\n[color=#ffb86c]Orange[/color] moth | [color=#bd93f9]Purple[/color] hollow\n\n[b]Controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight | R restart\nReward: 1/2/3 or W/S + E/Enter\nF1 help | F2 refill | F3 reward | F4 immortal | 1/2 spawn\n\n[b]Event[/b]\n%s" % [last_event]
+		status_label.text = "[b]Readability legend[/b]\n[color=#f1fa8c]Warm core[/color] + [color=#8be9fd]cyan bloom[/color] = live beam path\n[color=#8be9fd]Cyan wall ring[/color] = bounce / redirect point\n[color=#8be9fd]Diamond aura[/color] = Prism Node\n[color=#ffb86c]Orange[/color] moth | [color=#bd93f9]Purple[/color] hollow\n\n[b]Controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight | R restart\nReward: 1/2/3 or W/S + E/Enter\nF1 help | F2 refill | F3 reward | F4 immortal | 0 native layer | - native shadows | 1/2 spawn\n\n[b]Native helper[/b]\n%s\n\n[b]Event[/b]\n%s" % [native_state, last_event]
 	status_label.visible = true
 	if run_over:
 		end_title_label.text = "Run complete" if player_hp > 0.0 else "Lantern extinguished"

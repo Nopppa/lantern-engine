@@ -68,6 +68,14 @@ var shadows_enabled := true:
 		shadows_enabled = value
 		_apply_shadow_state()
 
+func debug_state_summary() -> String:
+	return "layer %s | flashlight shadows %s | items %d / shadows %d" % [
+		("ON" if enabled else "OFF"),
+		("ON" if shadows_enabled else "OFF"),
+		NATIVE_LIGHT_ITEM_MASK,
+		NATIVE_SHADOW_MASK
+	]
+
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
