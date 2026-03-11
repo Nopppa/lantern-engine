@@ -92,7 +92,13 @@ static func build_light_lab_smoke_test(arena_rect: Rect2) -> LightWorld:
 		"arena_rect": arena_rect,
 		"ready_for_randomgen": true,
 		"smoke_test": true,
-		"adapter": "light_world_builder.build_light_lab_smoke_test"
+		"adapter": "light_world_builder.build_light_lab_smoke_test",
+		"dead_alive_zones": [
+			{"rect": Rect2(Vector2(112, 112), Vector2(224, 128)), "value": 0.95},
+			{"rect": Rect2(Vector2(612, 248), Vector2(240, 132)), "value": 0.72},
+			{"rect": Rect2(Vector2(860, 448), Vector2(164, 112)), "value": 0.48}
+		],
+		"spawn_hint": Vector2(924, 516)
 	})
 
 static func _normalized_patch(rect: Rect2, material_id: String, label: String) -> Dictionary:

@@ -51,3 +51,7 @@ func prism_emitters() -> Array:
 	emitters.append_array(entity_list("prism_station"))
 	emitters.append_array(entity_list("prism_node"))
 	return emitters
+
+func metadata_array(key: String) -> Array:
+	var value = metadata.get(key, [])
+	return Array(value).duplicate(true)

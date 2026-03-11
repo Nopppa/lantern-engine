@@ -80,7 +80,7 @@ func _build_light_lab() -> void:
 	prism_stations = adapted.get("prism_stations", [])
 	tree_trunks = adapted.get("tree_trunks", [])
 	light_world = generated_light_world_override if generated_light_world_override != null else adapted.get("light_world", null)
-	dead_alive_cells = DeadAliveGrid.build(ARENA_RECT, CELL_SIZE, layout.get("dead_alive_cells", []))
+	dead_alive_cells = DeadAliveGrid.build(ARENA_RECT, CELL_SIZE, _dead_alive_zone_defs(layout))
 	approx_state = {}
 	approx_flashlight_frontier = {}
 	approx_prism_frontiers = {}
@@ -317,6 +317,13 @@ func _collision_space() -> Dictionary:
 		return light_world.collision_space()
 	return {"segments": surface_segments, "circles": tree_trunks}
 
+func _dead_alive_zone_defs(layout: Dictionary = {}) -> Array:
+	if light_world and light_world.has_method("metadata_array"):
+		var zones: Array = light_world.metadata_array("dead_alive_zones")
+		if not zones.is_empty():
+			return zones
+	return Array(layout.get("dead_alive_cells", [])).duplicate(true)
+
 func _inject_generated_light_world(world) -> void:
 	generated_light_world_override = world
 	if generated_light_world_override != null:
@@ -336,8 +343,17 @@ func _toggle_generated_smoke_test() -> void:
 	_build_light_lab()
 	approx_refresh_timer = 999.0
 
+func _generated_spawn_hint() -> Vector2:
+	if light_world and generated_smoke_test_enabled:
+		var spawn_hint = light_world.metadata.get("spawn_hint", Vector2.INF)
+		if spawn_hint is Vector2 and spawn_hint != Vector2.INF:
+			return Vector2(spawn_hint)
+	return Vector2.INF
+
 func _find_valid_spawn(target: Vector2, radius: float) -> Vector2:
-	var candidate := target
+	var candidate := _generated_spawn_hint() if generated_smoke_test_enabled else target
+	if candidate == Vector2.INF:
+		candidate = target
 	for ring in range(5):
 		for step in range(12):
 			var angle := TAU * float(step) / 12.0
@@ -491,6 +507,7 @@ func _update_ui() -> void:
 		hud_label.visible = false
 		status_label.visible = false
 		return
+	var world_mode := "generated smoke-test" if generated_smoke_test_enabled else "authored validation map"
 	hud_label.visible = true
 	status_label.visible = true
 	var mouse_world := get_global_mouse_position()
@@ -511,7 +528,7 @@ func _update_ui() -> void:
 	var tier_c_ms := float(perf_snapshot.get("tier_c_ms", 0.0))
 	var secondary_perf: Dictionary = perf_snapshot.get("secondary", {})
 	var flash_perf: Dictionary = perf_snapshot.get("flashlight", {})
-	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] Permanent validation map (no auto encounters)\n[color=#a4b1cd]Goal:[/color] Behavioral light truth + cheaper approximation\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | unified beam fill | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s\n[color=#a4b1cd]Approx:[/color] T-B %.2fms / %d rays / %d fills | T-C %.2fms / %d samples / %d zones" % [LAB_LABEL, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text, tier_b_ms, int(flash_perf.get("guide_rays", 0)), int(flash_perf.get("fills", 0)), tier_c_ms, int(secondary_perf.get("samples", 0)), int(secondary_perf.get("zones", 0))]
+	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] %s\n[color=#a4b1cd]Goal:[/color] Behavioral light truth + cheaper approximation\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | unified beam fill | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s\n[color=#a4b1cd]Approx:[/color] T-B %.2fms / %d rays / %d fills | T-C %.2fms / %d samples / %d zones" % [LAB_LABEL, world_mode, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text, tier_b_ms, int(flash_perf.get("guide_rays", 0)), int(flash_perf.get("fills", 0)), tier_c_ms, int(secondary_perf.get("samples", 0)), int(secondary_perf.get("zones", 0))]
 	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle | 9 generated smoke test\nF1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Approximation tiers[/b]\nTier A laser = precise beam logic\nTier B flashlight = guided beam fill from guide rays\nTier C prism/scatter = cheap material-aware secondary response\n\n[b]Readability legend[/b]\nWarm beam fill = main flashlight volume | faint lines = guide truth only\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nAqua dashed = glass continuation | Wood = soft scatter | Wet = glossy disturbance\n\n[b]Event[/b]\n%s" % last_event
 
 func _flashlight_source_spec() -> Dictionary:

@@ -48,7 +48,8 @@ static func build(layout: Dictionary, arena_rect: Rect2, prism_node = null, pris
 		"world_type": "light_lab",
 		"arena_rect": arena_rect,
 		"ready_for_randomgen": true,
-		"adapter": "light_lab_world_adapter"
+		"adapter": "light_lab_world_adapter",
+		"dead_alive_zones": layout.get("dead_alive_cells", []).duplicate(true)
 	})
 	return {
 		"surface_segments": surface_segments,

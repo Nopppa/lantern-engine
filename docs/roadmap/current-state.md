@@ -196,3 +196,19 @@ They are no longer the primary design center.
 **Legacy mirror state reduced in practice:**
 - scene-owned arrays still exist as compatibility fallback, but more runtime consumers now prefer world/collision adapter helpers first
 - this further narrows the set of systems that care whether the lab was authored from layout arrays or injected from a generated `LightWorld`
+
+## Dead/alive world metadata seam + stronger generated runtime path (2026-03-11)
+
+**Dead/alive dependency decoupled from authored layout first:**
+- `LightWorld` now exposes a tiny metadata-array accessor for array-like metadata payloads
+- authored `LightLabWorldAdapter` now copies `dead_alive_cells` into `LightWorld.metadata.dead_alive_zones`
+- `LightLabScene` now builds `dead_alive_cells` from world metadata first and only falls back to authored layout data when no world-provided zones exist
+
+**Generated path is more end-to-end than before:**
+- generated smoke-test worlds now include their own `dead_alive_zones`
+- generated smoke-test worlds also carry a `spawn_hint`, and Light Lab spawn validation now prefers that hint while the generated override is active
+- this means the generated path now drives not just collision/render/material/entity queries, but also floor alive/dead state and one small runtime spawn behavior
+
+**Additional scene-array leakage reduced:**
+- `LightSurfaceResolver` now prefers scene-provided world helper methods (`_light_world_occluders()`, `_light_world_patches()`, `_light_world_tree_entities()`, `_light_world_prism_entities()`) before touching raw fallback arrays
+- this keeps the solver/helper side more aligned with the shared world/adapter seam without forcing a broad rewrite

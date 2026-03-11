@@ -9,21 +9,29 @@ const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd
 const LightStability = preload("res://scripts/gameplay/light_stability.gd")
 
 static func _world_occluders(lab) -> Array:
+	if lab.has_method("_light_world_occluders"):
+		return lab._light_world_occluders()
 	if lab.get("light_world") != null and lab.light_world:
 		return lab.light_world.occluder_segments
 	return lab.surface_segments
 
 static func _world_patches(lab) -> Array:
+	if lab.has_method("_light_world_patches"):
+		return lab._light_world_patches()
 	if lab.get("light_world") != null and lab.light_world:
 		return lab.light_world.material_patches
 	return lab.surface_patches
 
 static func _world_tree_entities(lab) -> Array:
+	if lab.has_method("_light_world_tree_entities"):
+		return lab._light_world_tree_entities()
 	if lab.get("light_world") != null and lab.light_world:
 		return lab.light_world.collision_space().get("circles", [])
 	return lab.tree_trunks
 
 static func _world_prism_entities(lab) -> Array:
+	if lab.has_method("_light_world_prism_entities"):
+		return lab._light_world_prism_entities()
 	var entities: Array = []
 	if lab.get("light_world") != null and lab.light_world:
 		return lab.light_world.prism_emitters()
