@@ -44,8 +44,11 @@ var ui_overlays_hidden := false
 var base_alive_flip := false
 var movement_surface_probe := {}
 var spawn_validation_enabled := true
-var generated_light_world_override = null
+var generated_layout_override: Dictionary = {}
 var generated_smoke_test_enabled := false
+var light_world_layout_cache_key := "authored_light_lab"
+var light_world_static_signature := ""
+var light_world_cache_hits := 0
 
 func _ready() -> void:
 	randomize()
@@ -64,13 +67,22 @@ func _ready() -> void:
 	_update_ui()
 
 func _build_light_lab() -> void:
-	var layout := LightLabLayout.build_layout(base_alive_flip)
-	var adapted := LightLabWorldAdapter.build(layout, ARENA_RECT, prism_node, current_prism_radius())
+	var layout := _current_light_lab_layout()
+	var adapted := LightLabWorldAdapter.build(layout, ARENA_RECT, prism_node, current_prism_radius(), {
+		"cache_key": light_world_layout_cache_key,
+		"world_type": "generated_smoke_test" if generated_smoke_test_enabled else "light_lab",
+		"ready_for_randomgen": true,
+		"adapter": "light_lab_world_adapter"
+	})
 	surface_segments = adapted.get("surface_segments", [])
 	surface_patches = adapted.get("surface_patches", [])
 	prism_stations = adapted.get("prism_stations", [])
 	tree_trunks = adapted.get("tree_trunks", [])
-	light_world = generated_light_world_override if generated_light_world_override != null else adapted.get("light_world", null)
+	light_world = adapted.get("light_world", null)
+	if light_world:
+		light_world_static_signature = String(light_world.metadata.get("static_signature", light_world.metadata.get("layout_signature", "")))
+		if bool(light_world.metadata.get("cache_hit", false)):
+			light_world_cache_hits += 1
 	dead_alive_cells = DeadAliveGrid.build(ARENA_RECT, CELL_SIZE, _dead_alive_zone_defs(layout))
 	approx_state = {}
 	approx_flashlight_frontier = {}
@@ -129,6 +141,7 @@ func _process(delta: float) -> void:
 	if prism_node and prism_timer <= 0.0:
 		prism_node.queue_free()
 		prism_node = null
+		_refresh_light_world_runtime_entities()
 	_handle_player(delta)
 	EnemyController.update_enemies(self, delta)
 	DeadAliveGrid.update(dead_alive_cells, delta, Callable(self, "_light_intensity_at"))
@@ -233,6 +246,7 @@ func _restart_lab() -> void:
 	if prism_node:
 		prism_node.queue_free()
 		prism_node = null
+	_refresh_light_world_runtime_entities()
 	prism_timer = 0.0
 	beam_timer = 0.0
 	prism_surge_timer = 0.0
@@ -265,6 +279,10 @@ func _place_prism(target: Vector2) -> void:
 		last_event = "Prism placement blocked"
 		return
 	super._place_prism(valid)
+	_refresh_light_world_runtime_entities()
+	approx_state = {}
+	approx_prism_frontiers = {}
+	approx_refresh_timer = 999.0
 
 func _surface_patch_at(pos: Vector2) -> Dictionary:
 	if light_world:
@@ -299,21 +317,47 @@ func _dead_alive_zone_defs(layout: Dictionary = {}) -> Array:
 			return zones
 	return Array(layout.get("dead_alive_cells", [])).duplicate(true)
 
-func _inject_generated_light_world(world) -> void:
-	generated_light_world_override = world
-	if generated_light_world_override != null:
-		light_world = generated_light_world_override
+func _current_light_lab_layout() -> Dictionary:
+	if generated_smoke_test_enabled and not generated_layout_override.is_empty():
+		return generated_layout_override.duplicate(true)
+	return LightLabLayout.build_layout(base_alive_flip)
 
-func _clear_generated_light_world_override() -> void:
-	generated_light_world_override = null
+func _refresh_light_world_runtime_entities() -> void:
+	if light_world == null:
+		return
+	var runtime_entities: Array = []
+	if prism_node and is_instance_valid(prism_node):
+		runtime_entities.append({
+			"kind": "prism_node",
+			"pos": prism_node.position,
+			"radius": current_prism_radius(),
+			"material_id": "prism"
+		})
+	var static_entities: Array = []
+	for entity: Dictionary in light_world.entity_list():
+		if String(entity.get("kind", "")) == "prism_node":
+			continue
+		static_entities.append(entity)
+	light_world = light_world.clone_with_entities(static_entities + runtime_entities, {
+		"runtime_entity_count": runtime_entities.size(),
+		"runtime_entities_refreshed": true
+	})
+
+func _inject_generated_layout(layout: Dictionary, cache_key: String = "generated_layout") -> void:
+	generated_layout_override = layout.duplicate(true)
+	light_world_layout_cache_key = cache_key
+
+func _clear_generated_layout_override() -> void:
+	generated_layout_override = {}
+	light_world_layout_cache_key = "authored_light_lab"
 
 func _toggle_generated_smoke_test() -> void:
 	generated_smoke_test_enabled = !generated_smoke_test_enabled
 	if generated_smoke_test_enabled:
-		_inject_generated_light_world(LightWorldBuilder.build_light_lab_smoke_test(ARENA_RECT))
+		_inject_generated_layout(LightWorldBuilder.build_light_lab_smoke_test_layout(ARENA_RECT), "generated_smoke_test")
 		last_event = "Generated LightWorld smoke test ON"
 	else:
-		_clear_generated_light_world_override()
+		_clear_generated_layout_override()
 		last_event = "Generated LightWorld smoke test OFF"
 	_build_light_lab()
 	approx_refresh_timer = 999.0
@@ -504,6 +548,7 @@ func _update_ui() -> void:
 		status_label.visible = false
 		return
 	var world_mode := "generated smoke-test" if generated_smoke_test_enabled else "authored validation map"
+	var world_cache_text := "%s | cache hits %d" % [light_world_static_signature.left(18), light_world_cache_hits]
 	hud_label.visible = true
 	status_label.visible = true
 	var mouse_world := get_global_mouse_position()
@@ -527,7 +572,7 @@ func _update_ui() -> void:
 	var native_layer_text := "[color=#50fa7b]ON[/color]" if native_light_presentation and native_light_presentation.enabled else "[color=#6272a4]OFF[/color]"
 	var native_shadow_text := "[color=#8be9fd]ON[/color]" if native_light_presentation and native_light_presentation.shadows_enabled else "[color=#6272a4]OFF[/color]"
 	var native_mask_text := native_light_presentation.debug_state_summary() if native_light_presentation else "layer OFF"
-	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] %s\n[color=#a4b1cd]Goal:[/color] Behavioral light truth + cheaper approximation\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | unified beam fill | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s\n[color=#a4b1cd]Native:[/color] Layer %s | Flashlight shadows %s | %s\n[color=#a4b1cd]Approx:[/color] T-B %.2fms / %d rays / %d fills | T-C %.2fms / %d samples / %d zones" % [LAB_LABEL, world_mode, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text, native_layer_text, native_shadow_text, native_mask_text, tier_b_ms, int(flash_perf.get("guide_rays", 0)), int(flash_perf.get("fills", 0)), tier_c_ms, int(secondary_perf.get("samples", 0)), int(secondary_perf.get("zones", 0))]
+	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] %s\n[color=#a4b1cd]World cache:[/color] %s\n[color=#a4b1cd]Goal:[/color] Behavioral light truth + cheaper approximation\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | unified beam fill | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s\n[color=#a4b1cd]Native:[/color] Layer %s | Flashlight shadows %s | %s\n[color=#a4b1cd]Approx:[/color] T-B %.2fms / %d rays / %d fills | T-C %.2fms / %d samples / %d zones" % [LAB_LABEL, world_mode, world_cache_text, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text, native_layer_text, native_shadow_text, native_mask_text, tier_b_ms, int(flash_perf.get("guide_rays", 0)), int(flash_perf.get("fills", 0)), tier_c_ms, int(secondary_perf.get("samples", 0)), int(secondary_perf.get("zones", 0))]
 	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle | 9 generated smoke test | 0 native Light2D\n- native shadows | F1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Approximation tiers[/b]\nTier A laser = precise beam logic\nTier B flashlight = guided beam fill from guide rays\nTier C prism/scatter = cheap material-aware secondary response\n\n[b]Readability legend[/b]\nWarm beam fill = main flashlight volume | faint lines = guide truth only\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nAqua dashed = glass continuation | Wood = soft scatter | Wet = glossy disturbance\n\n[b]Event[/b]\n%s" % last_event
 
 func _flashlight_source_spec() -> Dictionary:

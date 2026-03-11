@@ -55,3 +55,9 @@ func prism_emitters() -> Array:
 func metadata_array(key: String) -> Array:
 	var value = metadata.get(key, [])
 	return Array(value).duplicate(true)
+
+func clone_with_entities(entities: Array, metadata_patch: Dictionary = {}):
+	var merged_meta := metadata.duplicate(true)
+	for key in metadata_patch.keys():
+		merged_meta[key] = metadata_patch[key]
+	return get_script().new(occluder_segments, material_patches, entities, merged_meta)
