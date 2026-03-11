@@ -50,8 +50,12 @@ static func force_reward(run: RunScene) -> void:
 	run._show_rewards()
 
 static func toggle_help(run: RunScene) -> void:
-	run.help_collapsed = !run.help_collapsed
-	run.last_event = "Overlay %s" % ("shown" if not run.help_collapsed else "hidden")
+	if "ui_overlays_hidden" in run:
+		run.ui_overlays_hidden = !run.ui_overlays_hidden
+		run.last_event = "UI overlays %s" % ("shown" if not run.ui_overlays_hidden else "hidden")
+	else:
+		run.help_collapsed = !run.help_collapsed
+		run.last_event = "Overlay %s" % ("shown" if not run.help_collapsed else "hidden")
 
 static func toggle_immortal(run: RunScene) -> void:
 	run.debug_immortal = !run.debug_immortal

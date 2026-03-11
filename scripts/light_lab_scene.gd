@@ -11,7 +11,7 @@ const LightLabLayout = preload("res://scripts/data/light_lab_layout.gd")
 const FlashlightVisuals = preload("res://scripts/gameplay/flashlight_visuals.gd")
 const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 
-const LAB_LABEL := "Light Lab v0.5.5"
+const LAB_LABEL := "Light Lab v0.5.6"
 const CELL_SIZE := 32.0
 const PROBE_RADIUS := 18.0
 
@@ -42,6 +42,7 @@ var beam_debug_hits: Array = []
 var beam_debug_enabled := true
 var hp_overhead_enabled := true
 var cursor_probe_enabled := true
+var ui_overlays_hidden := false
 var base_alive_flip := false
 var movement_surface_probe := {}
 var spawn_validation_enabled := true
@@ -394,7 +395,7 @@ func _build_lit_zones() -> Array:
 	return zones
 
 func _update_ui() -> void:
-	if help_collapsed:
+	if ui_overlays_hidden:
 		hud_label.visible = false
 		status_label.visible = false
 		return
@@ -491,13 +492,12 @@ func _draw() -> void:
 	for prism_station: Dictionary in prism_stations:
 		draw_circle(prism_station["pos"], 26.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.18))
 		draw_arc(prism_station["pos"], 26.0, 0.0, TAU, 24, PRISM_COLOR, 3.0)
-	if not help_collapsed:
-		for patch: Dictionary in surface_patches:
-			_draw_sign_patch(patch)
+	for patch: Dictionary in surface_patches:
+		_draw_sign_patch(patch)
 	_draw_flashlight_trace()
 	_draw_primary_beam_segments()
 	_draw_secondary_overlays()
-	if beam_debug_enabled and not help_collapsed:
+	if beam_debug_enabled and not ui_overlays_hidden:
 		_draw_debug_markers()
 	for enemy: Dictionary in enemies:
 		if not is_instance_valid(enemy["node"]):
@@ -505,12 +505,12 @@ func _draw() -> void:
 		var color: Color = Color("ffb86c") if enemy["type"] == "moth" else (Color("ff4fd8") if enemy["type"] == "boss_hollow_matriarch" else Color("bd93f9"))
 		draw_circle(enemy["node"].position, enemy["radius"] + 7.0, Color(color.r, color.g, color.b, 0.15))
 		draw_circle(enemy["node"].position, enemy["radius"], color)
-		if hp_overhead_enabled and not help_collapsed:
+		if hp_overhead_enabled and not ui_overlays_hidden:
 			draw_string(ThemeDB.fallback_font, enemy["node"].position + Vector2(-28, -24), "%d/%d" % [int(ceil(float(enemy["hp"]))), int(ceil(float(enemy.get("max_hp", enemy["hp"]))))], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1,1,1,0.9))
 	draw_circle(player_pos, PLAYER_RADIUS + 10.0, Color(1.0, 0.95, 0.72, 0.12))
 	draw_circle(player_pos, PLAYER_RADIUS, Color("f1fa8c"))
 	draw_line(player_pos, player_pos + facing * 26.0, Color(0.14, 0.18, 0.24, 1.0), 2.0)
-	if cursor_probe_enabled and not help_collapsed and ARENA_RECT.has_point(get_global_mouse_position()):
+	if cursor_probe_enabled and not ui_overlays_hidden and ARENA_RECT.has_point(get_global_mouse_position()):
 		var probe := get_global_mouse_position()
 		var intensity := _light_intensity_at(probe)
 		var mat := _material_under_cursor(probe)
@@ -577,7 +577,7 @@ func _draw_flashlight_trace() -> void:
 		if material_id == "wet":
 			var wet_mid := a.lerp(b, 0.48)
 			draw_arc(wet_mid, 10.0, 0.0, TAU, 16, Color(0.76, 0.96, 1.0, 0.30 * intensity), 1.2)
-		if not help_collapsed and kind != "primary":
+		if not ui_overlays_hidden and kind != "primary":
 			var label := "FX" if kind == "reflect" else ("TX" if kind == "transmit" else "SC")
 			draw_string(ThemeDB.fallback_font, a.lerp(b, 0.5) + Vector2(-8, -8), label, HORIZONTAL_ALIGNMENT_LEFT, 28.0, 9, Color(1, 1, 1, 0.65))
 
@@ -606,7 +606,7 @@ func _draw_primary_beam_segments() -> void:
 			var mid: Vector2 = a.lerp(b, 0.5)
 			draw_arc(mid, 18.0, 0.0, TAU, 18, Color(0.72, 0.94, 1.0, 0.38 * alpha), 2.0)
 			draw_arc(mid + Vector2(8, -4), 10.0, 0.0, TAU, 16, Color(1.0, 1.0, 1.0, 0.24 * alpha), 1.5)
-		if not help_collapsed:
+		if not ui_overlays_hidden:
 			var mid2: Vector2 = a.lerp(b, 0.5)
 			draw_circle(mid2, 10.0, Color(0.02, 0.04, 0.08, 0.36))
 			draw_string(ThemeDB.fallback_font, mid2 + Vector2(-10, 4), "L%d" % layer, HORIZONTAL_ALIGNMENT_LEFT, 24.0, 11, Color(0.92, 0.98, 1.0, 0.9))
