@@ -47,10 +47,12 @@ static func prism_source_options(source_origin: Vector2, source_direction: Vecto
 	}
 
 static func build_render_packet(lab, options: Dictionary) -> Dictionary:
-	var trace := _build_source_trace(lab, options)
 	var origin := Vector2(options.get("origin", Vector2.ZERO))
 	var direction := Vector2(options.get("direction", Vector2.RIGHT))
 	var source_type := String(options.get("source_type", "light"))
+	if source_type == "flashlight" and not bool(lab.flashlight_on):
+		return LightTypes.empty_render_packet("flashlight")
+	var trace := _build_source_trace(lab, options)
 	var source_spec := LightTypes.light_source_spec(source_type, origin, direction, 1.0, float(options.get("range", 0.0)), {
 		"half_angle_deg": float(options.get("half_angle_deg", 0.0)),
 		"guide_rays": int(options.get("guide_rays", 0)),
@@ -150,14 +152,15 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 				break
 			var material_id: String = String(hit.get("material_id", "brick"))
 			if material_id == "tree" or material_id == "brick":
-				zones.append({
-					"pos": hit_point,
-					"radius": 18.0 + 16.0 * intensity,
-					"strength": 0.04 + intensity * 0.07,
-					"material_id": material_id,
-					"kind": "block",
-					"source_type": source_type
-				})
+				if source_type != "flashlight" and source_type != "prism":
+					zones.append({
+						"pos": hit_point,
+						"radius": 18.0 + 16.0 * intensity,
+						"strength": 0.04 + intensity * 0.07,
+						"material_id": material_id,
+						"kind": "block",
+						"source_type": source_type
+					})
 				break
 			var response: Dictionary = LightResponseModel.response(material_id, source_type, intensity, direction, Vector2(hit["normal"]))
 			if float(response["diffusion"]) * intensity > 0.03:

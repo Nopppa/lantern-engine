@@ -191,10 +191,14 @@ static func _environment_sources(lab) -> Array:
 			"intensity": 0.62
 		})
 	for prism_entity: Dictionary in _world_prism_entities(lab):
+		var prism_pos: Vector2 = prism_entity["pos"]
+		var prism_radius: float = float(prism_entity.get("radius", 18.0)) + 8.0
+		if lab.has_method("_prism_emitter_energized") and not lab._prism_emitter_energized(prism_pos, prism_radius):
+			continue
 		var kind := String(prism_entity.get("kind", "prism_station"))
 		sources.append({
 			"source_type": "prism",
-			"origin": prism_entity["pos"],
+			"origin": prism_pos,
 			"direction": Vector2.RIGHT if kind == "prism_node" else Vector2.LEFT,
 			"range": 88.0 if kind == "prism_node" else 74.0,
 			"half_angle": 180.0,

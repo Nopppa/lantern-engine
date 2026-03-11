@@ -182,12 +182,19 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		var accum_segments: Array = []
 		var accum_zones: Array = []
 		var accum_fills: Array = []
+		var energized_prism_keys: Array = []
 		if prism_node and _prism_emitter_energized(prism_node.position, current_prism_radius() + 8.0):
 			var prism_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_node.position, Vector2.RIGHT, approx_prism_frontiers.get("manual", {})))
 			accum_segments.append_array(prism_packet.get("segments", []))
 			accum_zones.append_array(prism_packet.get("zones", []))
+			accum_zones.append(LightTypes.render_zone(prism_node.position, max(28.0, current_prism_radius() * 1.45), 0.44, {
+				"kind": "emitter_core",
+				"source_type": "prism",
+				"emitter_key": "manual"
+			}))
 			accum_fills.append_array(prism_packet.get("fills", []))
 			approx_prism_frontiers["manual"] = prism_packet.get("frontier", {})
+			energized_prism_keys.append("manual")
 		for prism_entity: Dictionary in _light_world_prism_entities():
 			if String(prism_entity.get("kind", "")) != "prism_station":
 				continue
@@ -197,9 +204,15 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 			var station_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_entity["pos"], Vector2.RIGHT, approx_prism_frontiers.get(station_key, {})))
 			accum_segments.append_array(station_packet.get("segments", []))
 			accum_zones.append_array(station_packet.get("zones", []))
+			accum_zones.append(LightTypes.render_zone(Vector2(prism_entity["pos"]), max(24.0, float(prism_entity.get("radius", 18.0)) * 1.75), 0.38, {
+				"kind": "emitter_core",
+				"source_type": "prism",
+				"emitter_key": station_key
+			}))
 			accum_fills.append_array(station_packet.get("fills", []))
 			approx_prism_frontiers[station_key] = station_packet.get("frontier", {})
-		prism_render_packet = _build_combined_prism_packet(accum_segments, accum_zones, accum_fills)
+			energized_prism_keys.append(station_key)
+		prism_render_packet = _build_combined_prism_packet(accum_segments, accum_zones, accum_fills, energized_prism_keys)
 	if tier_b_due:
 		var t1 := Time.get_ticks_usec()
 		flashlight_render_packet = FlashlightVisuals.build_render_packet(self, FlashlightVisuals.flashlight_source_options(self))
@@ -562,16 +575,20 @@ func _build_lit_zones() -> Array:
 	for segment: Dictionary in _packet_segments(flashlight_render_packet):
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.18, 24.0), "color": Color(1.0, 0.92, 0.72, 0.028 + 0.035 * float(segment["intensity"])), "layer": 0})
 	for zone: Dictionary in _packet_zones(flashlight_render_packet):
-		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.90, 0.68, 0.022 + 0.032 * float(zone["strength"])), "layer": 0})
+		var flashlight_zone_kind := String(zone.get("kind", ""))
+		var flashlight_zone_material := String(zone.get("material_id", ""))
+		if flashlight_zone_kind != "diffuse" and flashlight_zone_kind != "redirect" and flashlight_zone_material != "glass" and flashlight_zone_material != "wet":
+			continue
+		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.90, 0.68, 0.018 + 0.024 * float(zone["strength"])), "layer": 0})
 	for segment: Dictionary in _beam_packet_segments():
 		var beam_a: Vector2 = Vector2(segment["a"])
 		var beam_b: Vector2 = Vector2(segment["b"])
 		var beam_distance: float = beam_a.distance_to(beam_b)
-		var beam_steps: int = max(2, int(ceil(beam_distance / 78.0)))
-		var layer_alpha: float = max(0.035, 0.09 - float(segment.get("layer", 0)) * 0.008)
+		var beam_steps: int = max(3, int(ceil(beam_distance / 64.0)))
+		var layer_alpha: float = max(0.055, 0.13 - float(segment.get("layer", 0)) * 0.010)
 		for step in range(beam_steps):
 			var t0: float = (float(step) + 0.5) / float(beam_steps)
-			zones.append({"pos": beam_a.lerp(beam_b, t0), "radius": max(beam_distance / float(beam_steps) * 0.72, 44.0), "color": Color(0.55, 0.92, 1.0, layer_alpha * float(segment["intensity"])), "layer": int(segment.get("layer", 0))})
+			zones.append({"pos": beam_a.lerp(beam_b, t0), "radius": max(beam_distance / float(beam_steps) * 0.84, 52.0), "color": Color(0.55, 0.92, 1.0, layer_alpha * float(segment["intensity"])), "layer": int(segment.get("layer", 0))})
 	for zone: Dictionary in _beam_packet_zones():
 		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.92, 0.72, 0.05 * float(zone["strength"]) + 0.02), "layer": int(zone.get("layer", 1))})
 	for segment: Dictionary in _packet_segments(secondary_render_packet):
@@ -591,6 +608,7 @@ func _update_native_light_presentation() -> void:
 		native_light_presentation.update_from_packets(
 			flashlight_render_packet,
 			beam_render_packet,
+			prism_render_packet,
 			_light_world_prism_entities(),
 			prism_node,
 			flashlight_on,
@@ -646,11 +664,13 @@ func _prism_source_spec(origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> 
 		"radial_emission": true
 	})
 
-func _build_combined_prism_packet(segments: Array, zones: Array, fills: Array) -> Dictionary:
+func _build_combined_prism_packet(segments: Array, zones: Array, fills: Array, emitter_keys: Array = []) -> Dictionary:
 	var prism_entities := _light_world_prism_entities()
 	var origin := Vector2(prism_entities[0]["pos"]) if not prism_entities.is_empty() else Vector2.ZERO
 	return LightTypes.light_render_packet("prism", _prism_source_spec(origin), segments, [], fills, zones, {
-		"emitter_count": prism_entities.size()
+		"emitter_count": prism_entities.size(),
+		"emitter_keys": emitter_keys.duplicate(),
+		"active": not emitter_keys.is_empty() or not segments.is_empty() or not zones.is_empty()
 	})
 
 func _build_secondary_render_packet(secondary: Dictionary) -> Dictionary:
@@ -900,9 +920,9 @@ func _draw_primary_beam_segments() -> void:
 		var layer_tint := Color(0.48, 0.92 - min(layer * 0.06, 0.24), 1.0, 1.0)
 		if layer == 0:
 			layer_tint = Color(0.50, 0.96, 1.0, 1.0)
-		draw_line(a, b, Color(layer_tint.r, layer_tint.g, layer_tint.b, 0.15 * alpha), 22.0)
-		draw_line(a, b, Color(layer_tint.r, layer_tint.g, layer_tint.b, 0.34 * alpha), 12.0)
-		draw_line(a, b, Color(1.0, 0.96, 0.76, 0.92 * alpha), 4.0)
+		draw_line(a, b, Color(layer_tint.r, layer_tint.g, layer_tint.b, 0.22 * alpha), 28.0)
+		draw_line(a, b, Color(layer_tint.r, layer_tint.g, layer_tint.b, 0.42 * alpha), 16.0)
+		draw_line(a, b, Color(1.0, 0.96, 0.76, 0.96 * alpha), 4.4)
 		if _segment_crosses_wet(a, b):
 			var mid: Vector2 = a.lerp(b, 0.5)
 			draw_arc(mid, 18.0, 0.0, TAU, 18, Color(0.72, 0.94, 1.0, 0.38 * alpha), 2.0)

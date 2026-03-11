@@ -565,6 +565,7 @@ func _refresh_environment_light_traces() -> void:
 		native_light_presentation.update_from_packets(
 			flashlight_render_packet,
 			beam_render_packet,
+			prism_render_packet,
 			[],  # RunScene does not use prism entities from LightWorld
 			prism_node,
 			flashlight_on,

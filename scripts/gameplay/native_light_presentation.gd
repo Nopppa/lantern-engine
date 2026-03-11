@@ -17,7 +17,7 @@ class_name NativeLightPresentation
 # Tunables  (all presentation-only)
 # ---------------------------------------------------------------------------
 
-const AMBIENT_COLOR := Color(0.14, 0.15, 0.19, 1.0)
+const AMBIENT_COLOR := Color(0.24, 0.25, 0.28, 1.0)
 
 const NATIVE_LIGHT_ITEM_MASK := 1
 const NATIVE_SHADOW_MASK := 2
@@ -29,7 +29,7 @@ const FLASH_TEXTURE_SIZE := 512
 const BEAM_GLOW_ENERGY := 0.55
 const BEAM_GLOW_COLOR := Color(0.52, 0.94, 1.0, 1.0)
 const BEAM_GLOW_TEXTURE_SIZE := 128
-const BEAM_GLOW_POOL_SIZE := 12
+const BEAM_GLOW_POOL_SIZE := 10
 
 const PRISM_ENERGY := 0.34
 const PRISM_COLOR := Color(0.54, 0.93, 1.0, 1.0)
@@ -119,6 +119,7 @@ func _ready() -> void:
 func update_from_packets(
 	flashlight_packet: Dictionary,
 	beam_packet: Dictionary,
+	prism_packet: Dictionary,
 	prism_entities: Array,
 	prism_node_ref,
 	flashlight_on: bool,
@@ -137,8 +138,8 @@ func update_from_packets(
 	_update_occluders(world_occluders, tree_entities)
 	_update_flashlight(flashlight_packet, flashlight_on, player_pos, facing)
 	_update_beam_glows(beam_packet)
-	_update_prism_stations(prism_entities)
-	_update_prism_node(prism_node_ref)
+	_update_prism_stations(prism_entities, prism_packet)
+	_update_prism_node(prism_node_ref, prism_packet)
 
 # ---------------------------------------------------------------------------
 # Occluders
@@ -280,23 +281,27 @@ func _update_beam_glows(packet: Dictionary) -> void:
 
 	var points: Array[Dictionary] = []
 	for seg: Dictionary in segments:
+		var a_pos: Vector2 = seg.get("a", Vector2.ZERO)
 		var b_pos: Vector2 = seg.get("b", Vector2.ZERO)
 		var intensity: float = float(seg.get("intensity", 1.0))
 		var layer: int = int(seg.get("layer", 0))
-		var dominated := false
-		for existing: Dictionary in points:
-			if Vector2(existing["pos"]).distance_to(b_pos) < 18.0:
-				if intensity > float(existing["intensity"]):
-					existing["pos"] = b_pos
-					existing["intensity"] = intensity
-					existing["layer"] = layer
-				dominated = true
-				break
-		if not dominated:
-			points.append({"pos": b_pos, "intensity": intensity, "layer": layer})
+		var length: float = a_pos.distance_to(b_pos)
+		if length <= 4.0:
+			continue
+		var sample_count: int = max(1, min(3, int(ceil(length / 120.0))))
+		for sample_idx in range(sample_count):
+			var t: float = (float(sample_idx) + 0.5) / float(sample_count)
+			var sample_pos: Vector2 = a_pos.lerp(b_pos, t)
+			var sample_intensity: float = intensity * lerpf(0.78, 1.0, 1.0 - absf(t - 0.5) * 2.0)
+			points.append({
+				"pos": sample_pos,
+				"intensity": sample_intensity,
+				"layer": layer,
+				"length": length
+			})
 
 	points.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return float(a["intensity"]) > float(b["intensity"])
+		return float(a["intensity"]) * float(a["length"]) > float(b["intensity"]) * float(b["length"])
 	)
 
 	for i in range(beam_glow_pool.size()):
@@ -305,10 +310,10 @@ func _update_beam_glows(packet: Dictionary) -> void:
 			var pt: Dictionary = points[i]
 			glow.position = pt["pos"]
 			glow.enabled = true
-			glow.energy = BEAM_GLOW_ENERGY * clampf(float(pt["intensity"]), 0.15, 1.0)
+			glow.energy = BEAM_GLOW_ENERGY * clampf(float(pt["intensity"]), 0.18, 1.0)
 			var layer_ratio := clampf(float(pt["layer"]) / 3.0, 0.0, 1.0)
 			glow.color = BEAM_GLOW_COLOR.lerp(Color(0.42, 0.82, 1.0, 1.0), layer_ratio * 0.35)
-			glow.texture_scale = lerpf(0.35, 0.65, clampf(float(pt["intensity"]), 0.0, 1.0))
+			glow.texture_scale = lerpf(0.48, 0.92, clampf(float(pt["intensity"]), 0.0, 1.0))
 		else:
 			glow.enabled = false
 
@@ -316,8 +321,15 @@ func _update_beam_glows(packet: Dictionary) -> void:
 # Prism stations (from LightWorld entities)
 # ---------------------------------------------------------------------------
 
-func _update_prism_stations(entities: Array) -> void:
+func _prism_packet_keys(packet: Dictionary) -> Dictionary:
+	var keys: Dictionary = {}
+	for key in Array(packet.get("emitter_keys", [])):
+		keys[String(key)] = true
+	return keys
+
+func _update_prism_stations(entities: Array, prism_packet: Dictionary) -> void:
 	var active_keys: Dictionary = {}
+	var energized_keys := _prism_packet_keys(prism_packet)
 	for entity: Dictionary in entities:
 		if String(entity.get("kind", "")) != "prism_station":
 			continue
@@ -334,9 +346,9 @@ func _update_prism_stations(entities: Array) -> void:
 
 		var light: PointLight2D = prism_station_lights[key]
 		light.position = pos
-		light.texture_scale = 0.62
-		light.energy = PRISM_ENERGY
-		light.enabled = true
+		light.texture_scale = 0.70
+		light.energy = PRISM_ENERGY * 1.12
+		light.enabled = energized_keys.has(key)
 
 	for key: String in prism_station_lights.keys():
 		if not active_keys.has(key):
@@ -346,14 +358,17 @@ func _update_prism_stations(entities: Array) -> void:
 # Player-placed prism node
 # ---------------------------------------------------------------------------
 
-func _update_prism_node(prism_ref) -> void:
+func _update_prism_node(prism_ref, prism_packet: Dictionary) -> void:
 	if prism_ref == null or not is_instance_valid(prism_ref):
 		prism_node_light.enabled = false
 		return
-	prism_node_light.enabled = true
+	var energized_keys := _prism_packet_keys(prism_packet)
+	prism_node_light.enabled = energized_keys.has("manual")
+	if not prism_node_light.enabled:
+		return
 	prism_node_light.position = prism_ref.position
-	prism_node_light.texture_scale = 0.72
-	prism_node_light.energy = PRISM_NODE_ENERGY
+	prism_node_light.texture_scale = 0.84
+	prism_node_light.energy = PRISM_NODE_ENERGY * 1.18
 	prism_node_light.shadow_enabled = false
 
 # ---------------------------------------------------------------------------
