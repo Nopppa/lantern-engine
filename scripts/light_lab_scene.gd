@@ -20,17 +20,10 @@ var surface_segments: Array = []
 var surface_patches: Array = []
 var prism_stations: Array = []
 var tree_trunks: Array = []
-var secondary_light_segments: Array = []
-var secondary_light_zones: Array = []
-var secondary_debug_points: Array = []
-var flashlight_visual_segments: Array = []
-var flashlight_visual_zones: Array = []
-var flashlight_visual_debug_points: Array = []
-var flashlight_visual_fills: Array = []
-var prism_visual_segments: Array = []
-var prism_visual_zones: Array = []
-var prism_visual_debug_points: Array = []
-var prism_visual_fills: Array = []
+
+
+
+
 var secondary_render_packet: Dictionary = LightTypes.empty_render_packet("secondary")
 var dead_alive_cells: Array = []
 var approx_refresh_timer := 999.0
@@ -155,43 +148,30 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		var t0 := Time.get_ticks_usec()
 		var secondary: Dictionary = LightSurfaceResolver.build_secondary_light(self)
 		secondary_render_packet = _build_secondary_render_packet(secondary)
-		secondary_light_segments = secondary_render_packet.get("segments", [])
-		secondary_light_zones = secondary_render_packet.get("zones", [])
-		secondary_debug_points = secondary_render_packet.get("debug_points", [])
 		perf_snapshot["secondary"] = secondary_render_packet.get("perf", {})
 		perf_snapshot["tier_c_ms"] = (Time.get_ticks_usec() - t0) / 1000.0
-		prism_visual_segments = []
-		prism_visual_zones = []
-		prism_visual_debug_points = []
-		prism_visual_fills = []
+		var accum_segments: Array = []
+		var accum_zones: Array = []
+		var accum_fills: Array = []
 		if prism_node:
 			var prism_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_node.position, Vector2.RIGHT, approx_prism_frontiers.get("manual", {})))
-			prism_visual_segments.append_array(prism_packet.get("segments", []))
-			prism_visual_zones.append_array(prism_packet.get("zones", []))
-			prism_visual_debug_points.append_array(prism_packet.get("debug_points", []))
-			prism_visual_fills.append_array(prism_packet.get("fills", []))
+			accum_segments.append_array(prism_packet.get("segments", []))
+			accum_zones.append_array(prism_packet.get("zones", []))
+			accum_fills.append_array(prism_packet.get("fills", []))
 			approx_prism_frontiers["manual"] = prism_packet.get("frontier", {})
 		for prism_entity: Dictionary in _light_world_prism_entities():
 			if String(prism_entity.get("kind", "")) != "prism_station":
 				continue
 			var station_key := "station_%d_%d" % [int(prism_entity["pos"].x), int(prism_entity["pos"].y)]
 			var station_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_entity["pos"], Vector2.LEFT, approx_prism_frontiers.get(station_key, {})))
-			prism_visual_segments.append_array(station_packet.get("segments", []))
-			prism_visual_zones.append_array(station_packet.get("zones", []))
-			prism_visual_debug_points.append_array(station_packet.get("debug_points", []))
-			prism_visual_fills.append_array(station_packet.get("fills", []))
+			accum_segments.append_array(station_packet.get("segments", []))
+			accum_zones.append_array(station_packet.get("zones", []))
+			accum_fills.append_array(station_packet.get("fills", []))
 			approx_prism_frontiers[station_key] = station_packet.get("frontier", {})
-		prism_render_packet = _build_combined_prism_render_packet()
-		prism_visual_segments = prism_render_packet.get("segments", [])
-		prism_visual_zones = prism_render_packet.get("zones", [])
-		prism_visual_fills = prism_render_packet.get("fills", [])
+		prism_render_packet = _build_combined_prism_packet(accum_segments, accum_zones, accum_fills)
 	if tier_b_due:
 		var t1 := Time.get_ticks_usec()
 		flashlight_render_packet = FlashlightVisuals.build_render_packet(self, FlashlightVisuals.flashlight_source_options(self))
-		flashlight_visual_segments = flashlight_render_packet.get("segments", [])
-		flashlight_visual_zones = flashlight_render_packet.get("zones", [])
-		flashlight_visual_debug_points = flashlight_render_packet.get("debug_points", [])
-		flashlight_visual_fills = flashlight_render_packet.get("fills", [])
 		approx_flashlight_frontier = flashlight_render_packet.get("frontier", {})
 		perf_snapshot["flashlight"] = flashlight_render_packet.get("perf", {})
 		perf_snapshot["tier_b_ms"] = (Time.get_ticks_usec() - t1) / 1000.0
@@ -238,14 +218,8 @@ func _restart_lab() -> void:
 	enemies.clear()
 	boss_projectiles.clear()
 	beam_render_packet = LightTypes.empty_render_packet("laser")
-	flashlight_visual_segments.clear()
-	flashlight_visual_zones.clear()
-	flashlight_visual_debug_points.clear()
-	flashlight_visual_fills.clear()
-	prism_visual_segments.clear()
-	prism_visual_zones.clear()
-	prism_visual_debug_points.clear()
-	prism_visual_fills.clear()
+	flashlight_render_packet = LightTypes.empty_render_packet("flashlight")
+	prism_render_packet = _build_combined_prism_packet([], [], [])
 	secondary_render_packet = LightTypes.empty_render_packet("secondary")
 	player_hp = player_max_hp
 	energy = max_energy
@@ -545,10 +519,7 @@ func _prism_source_spec(origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> 
 		"radial_emission": true
 	})
 
-func _build_combined_prism_render_packet() -> Dictionary:
-	var segments: Array = prism_visual_segments.duplicate(true)
-	var fills: Array = prism_visual_fills.duplicate(true)
-	var zones: Array = prism_visual_zones.duplicate(true)
+func _build_combined_prism_packet(segments: Array, zones: Array, fills: Array) -> Dictionary:
 	var prism_entities := _light_world_prism_entities()
 	var origin := Vector2(prism_entities[0]["pos"]) if not prism_entities.is_empty() else Vector2.ZERO
 	return LightTypes.light_render_packet("prism", _prism_source_spec(origin), segments, [], fills, zones, {
@@ -851,7 +822,7 @@ func _draw_debug_markers() -> void:
 		draw_circle(hit["point"], 8.0, color)
 		draw_arc(hit["point"], 13.0, 0.0, TAU, 18, color, 2.0)
 		draw_string(ThemeDB.fallback_font, hit["point"] + Vector2(12, -10), "L%d" % int(hit.get("layer", 0)), HORIZONTAL_ALIGNMENT_LEFT, 24.0, 10, Color(1, 1, 1, 0.8))
-	for point: Dictionary in secondary_debug_points:
+	for point: Dictionary in Array(secondary_render_packet.get("debug_points", [])):
 		var segment_color: Color = _secondary_color({"source_type": point.get("source_type", "flashlight"), "kind": "reflect"})
 		draw_circle(point["point"], 6.0, Color(segment_color.r, segment_color.g, segment_color.b, 0.48))
 		draw_line(point["point"], point["point"] + Vector2(Dictionary(point["response"]).get("reflect_dir", Vector2.RIGHT)) * 18.0, Color(segment_color.r, segment_color.g, segment_color.b, 0.45), 1.5)
