@@ -1,7 +1,7 @@
 # Current State
 
-Last updated: 2026-03-10
-Current shipped version target: `v0.5.5`
+Last updated: 2026-03-11
+Current shipped version target: `v0.5.6-alpha` (hybrid lighting architecture Phase 1)
 
 ## Now shipped
 
@@ -45,6 +45,28 @@ They are no longer the primary design center.
 - added deterministic sample ordering and lightweight frontier smoothing in `scripts/gameplay/light_stability.gd` so near-equal material candidates stop swapping frame-to-frame when aim is steady
 - clipped reflected/transmitted/scatter spill branches against the next blocker/surface, so brick/tree truth and other solid blockers now stop obvious secondary-light leaks instead of letting lines sail through geometry
 - made patch sampling on surface rectangles more source-relative, which keeps prism/flashlight spill anchored to the actually lit side of the surface rather than a detached center-point guess
+
+## Phase 1 Hybrid Lighting Architecture (2026-03-11)
+
+**Introduced durable CPU-solver / GPU-presentation boundary:**
+- `scripts/gameplay/light_types.gd` – Shared abstractions: `light_source_spec()`, `light_material_spec()`, `light_render_packet()`
+- `scripts/gameplay/light_world.gd` + `light_world_builder.gd` – Light-world data boundary for procedural-generation readiness
+- Solver-to-presentation separation: Flashlight/prism/beam now emit **render packets** instead of raw arrays
+- `LightFieldPresentation` now has packet-based update methods: `update_flashlight_packet()`, `update_prism_packet()`
+- `run_scene.gd` wired to use packets for presentation; gameplay queries adapted
+- Material response model now returns normalized `material_spec` alongside response data
+
+**Preserved behavior:**
+- Laser compatibility intact
+- Existing material response logic (reflectivity, diffusion, transmission) unchanged
+- Current gameplay light queries adapted to use packets instead of raw arrays
+
+**Not yet migrated:**
+- Light Lab scene still uses legacy array-based flow (deferred to Phase 2)
+- Full randomgen pipeline (LightWorld scaffold exists but not yet consumed by map generation)
+- Complete retirement of CPU-visible beam artifacts (packets coexist with legacy arrays for now)
+
+**Documentation:** See `docs/architecture-hybrid-lighting-phase1.md`
 
 ## Immediate next recommendation
 

@@ -54,6 +54,23 @@ func clear_prism() -> void:
 	if prism_light:
 		prism_light.enabled = false
 
+
+func update_flashlight_packet(packet: Dictionary) -> void:
+	update_flashlight(
+		Vector2(packet.get("source", {}).get("origin", Vector2.ZERO)),
+		packet.get("frontier", []),
+		float(packet.get("source", {}).get("range", 0.0)),
+		Vector2(packet.get("source", {}).get("direction", Vector2.RIGHT)),
+		float(packet.get("source", {}).get("half_angle_deg", 0.0))
+	)
+
+func update_prism_packet(packet: Dictionary) -> void:
+	update_prism(
+		Vector2(packet.get("source", {}).get("origin", Vector2.ZERO)),
+		packet.get("frontier", []),
+		float(packet.get("source", {}).get("range", 0.0))
+	)
+
 func update_flashlight(origin: Vector2, frontier: Array, max_range: float, facing: Vector2, half_angle_deg: float) -> void:
 	if frontier.size() < 2:
 		clear_flashlight()

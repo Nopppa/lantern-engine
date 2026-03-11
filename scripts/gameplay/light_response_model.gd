@@ -3,6 +3,7 @@ class_name LightResponseModel
 
 const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 const LightMaterials = preload("res://scripts/data/light_materials.gd")
+const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 
 const SOURCE_PROFILES := {
 	"laser": {
@@ -45,6 +46,7 @@ static func source_profile(source_type: String) -> Dictionary:
 
 static func response(material_id: String, source_type: String, intensity: float, incoming_dir: Vector2, normal: Vector2) -> Dictionary:
 	var material: Dictionary = LightMaterials.get_definition(material_id)
+	var material_spec := LightTypes.light_material_spec(material_id, material)
 	var profile: Dictionary = source_profile(source_type)
 	var reflectivity: float = clampf(float(material.get("reflectivity", 0.0)) * float(profile.get("reflect_scale", 1.0)), 0.0, 1.0)
 	var diffusion: float = clampf(float(material.get("diffusion", 0.0)) * float(profile.get("diffuse_scale", 1.0)), 0.0, 1.0)
@@ -69,6 +71,7 @@ static func response(material_id: String, source_type: String, intensity: float,
 	return {
 		"material_id": material_id,
 		"material": material,
+		"material_spec": material_spec,
 		"source_type": source_type,
 		"source_tier": String(profile.get("tier", LightApproximation.TIER_SECONDARY)),
 		"intensity": intensity,

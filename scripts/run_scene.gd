@@ -13,6 +13,8 @@ const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 const HudText = preload("res://scripts/ui/hud_text.gd")
 const LightFieldPresentation = preload("res://scripts/gameplay/light_field_presentation.gd")
+const LightTypes = preload("res://scripts/gameplay/light_types.gd")
+const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd")
 
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
 const PLAYER_RADIUS := 14.0
@@ -100,6 +102,10 @@ var flashlight_visual_traces: Array = []
 var flashlight_visual_frontier: Array = []
 var prism_light_traces: Array = []
 var prism_light_frontier: Array = []
+var flashlight_render_packet: Dictionary = LightTypes.empty_render_packet("flashlight")
+var prism_render_packet: Dictionary = LightTypes.empty_render_packet("prism")
+var beam_render_packet: Dictionary = LightTypes.empty_render_packet("laser")
+var light_world = null
 var run_summary := RunSummary.make_tracker()
 var world_layer: Node2D
 var fx_layer: Node2D
@@ -139,6 +145,7 @@ func _setup_scene() -> void:
 	add_child(ui_layer)
 	_build_hud()
 	SfxController.setup(self)
+	light_world = LightWorldBuilder.from_run_scene(self)
 	queue_redraw()
 
 func _apply_skill_defaults() -> void:
@@ -283,6 +290,7 @@ func _handle_player(delta: float) -> void:
 
 func _cast_refraction_beam(target: Vector2) -> void:
 	BeamResolver.cast_beam(self, target)
+	_sync_beam_render_packet()
 
 func _redirected_prism_direction(direction: Vector2) -> Vector2:
 	return BeamResolver.redirected_prism_direction(self, direction)
@@ -316,6 +324,7 @@ func _place_prism(target: Vector2) -> void:
 	prism_timer = prism_duration
 	RunSummary.note_prism_placed(self)
 	last_event = "Prism Node deployed"
+	light_world = LightWorldBuilder.from_run_scene(self)
 
 func _toggle_flashlight() -> void:
 	if not flashlight_on and energy <= 0.0:
@@ -337,16 +346,15 @@ func _is_in_flashlight_cone(pos: Vector2) -> bool:
 func _is_in_prism_light(pos: Vector2) -> bool:
 	if prism_node != null and is_instance_valid(prism_node) and prism_node.position.distance_to(pos) <= 88.0:
 		return true
-	for trace: Dictionary in prism_light_traces:
-		for segment: Array in trace.get("segments", []):
-			var hit := BeamResolver.segment_circle_hit(segment[0], segment[1], pos, 26.0)
-			if not hit.is_empty():
-				return true
+	for segment: Dictionary in prism_render_packet.get("segments", []):
+		var hit := BeamResolver.segment_circle_hit(Vector2(segment["a"]), Vector2(segment["b"]), pos, 26.0)
+		if not hit.is_empty():
+			return true
 	return false
 
 func _is_in_beam_light(pos: Vector2) -> bool:
-	for segment: Array in beam_segments:
-		var hit := BeamResolver.segment_circle_hit(segment[0], segment[1], pos, 30.0)
+	for segment: Dictionary in beam_render_packet.get("segments", []):
+		var hit := BeamResolver.segment_circle_hit(Vector2(segment["a"]), Vector2(segment["b"]), pos, 30.0)
 		if not hit.is_empty():
 			return true
 	return false
@@ -408,6 +416,7 @@ func _restart_run() -> void:
 	if prism_node:
 		prism_node.queue_free()
 		prism_node = null
+	light_world = LightWorldBuilder.from_run_scene(self)
 	flashlight_on = false
 	run_over = false
 	reward_pending = false
@@ -422,6 +431,9 @@ func _restart_run() -> void:
 	if light_presentation:
 		light_presentation.clear_flashlight()
 		light_presentation.clear_prism()
+	flashlight_render_packet = LightTypes.empty_render_packet("flashlight")
+	prism_render_packet = LightTypes.empty_render_packet("prism")
+	beam_render_packet = LightTypes.empty_render_packet("laser")
 	boss_projectiles.clear()
 	hit_flashes.clear()
 	beam_pulse_timer = 0.0
@@ -453,15 +465,14 @@ func _build_lit_zones() -> Array:
 			zones.append({"pos": centroid, "radius": radius, "color": Color(1.0, 0.94, 0.7, 0.05)})
 	if prism_node:
 		zones.append({"pos": prism_node.position, "radius": 88.0, "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.05)})
-		for trace: Dictionary in prism_light_traces:
-			for segment: Array in trace.get("segments", []):
-				var a: Vector2 = segment[0]
-				var b: Vector2 = segment[1]
-				var distance2: float = a.distance_to(b)
-				zones.append({"pos": a.lerp(b, 0.5), "radius": max(distance2 * 0.22, 34.0), "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.032)})
-	for segment: Array in beam_segments:
-		var a: Vector2 = segment[0]
-		var b: Vector2 = segment[1]
+		for segment: Dictionary in prism_render_packet.get("segments", []):
+			var a: Vector2 = Vector2(segment["a"])
+			var b: Vector2 = Vector2(segment["b"])
+			var distance2: float = a.distance_to(b)
+			zones.append({"pos": a.lerp(b, 0.5), "radius": max(distance2 * 0.22, 34.0), "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.032)})
+	for segment: Dictionary in beam_render_packet.get("segments", []):
+		var a: Vector2 = Vector2(segment["a"])
+		var b: Vector2 = Vector2(segment["b"])
 		var distance: float = a.distance_to(b)
 		var steps: int = max(2, int(ceil(distance / 70.0)))
 		for step in range(steps + 1):
@@ -518,31 +529,28 @@ func _refresh_environment_light_traces() -> void:
 		light_presentation.clear_flashlight()
 		light_presentation.clear_prism()
 	if flashlight_on:
-		var guide_count := 72
-		var base_angle := facing.angle()
-		var cone_angle := deg_to_rad(flashlight_half_angle)
-		for i in range(guide_count):
-			var t: float = 0.0 if guide_count <= 1 else float(i) / float(guide_count - 1)
-			var angle: float = lerpf(base_angle - cone_angle, base_angle + cone_angle, t)
-			var direction := Vector2.RIGHT.rotated(angle)
-			var trace := _trace_bounced_light_path(player_pos, direction, flashlight_range, 1)
-			flashlight_visual_traces.append(trace)
-			flashlight_visual_frontier.append(Vector2(trace.get("frontier", player_pos + direction * flashlight_range)))
+		var flashlight_source := _build_light_source_spec("flashlight", player_pos, facing, flashlight_range, {"half_angle_deg": flashlight_half_angle, "guide_rays": 72})
+		flashlight_render_packet = _build_bounced_light_render_packet(flashlight_source, 1)
+		for point in flashlight_render_packet.get("frontier", []):
+			flashlight_visual_frontier.append(Vector2(point))
 		if light_presentation:
-			light_presentation.update_flashlight(player_pos, flashlight_visual_frontier, flashlight_range, facing, flashlight_half_angle)
-	elif light_presentation:
-		light_presentation.clear_flashlight()
+			light_presentation.update_flashlight_packet(flashlight_render_packet)
+	else:
+		flashlight_render_packet = LightTypes.empty_render_packet("flashlight")
+		if light_presentation:
+			light_presentation.clear_flashlight()
 	if prism_node:
-		var prism_rays := 96
-		for i in range(prism_rays):
-			var angle := TAU * float(i) / float(prism_rays)
-			var trace := _trace_bounced_light_path(prism_node.position, Vector2.RIGHT.rotated(angle), 128.0, 1)
-			prism_light_traces.append(trace)
-			prism_light_frontier.append(Vector2(trace.get("frontier", prism_node.position + Vector2.RIGHT.rotated(angle) * 128.0)))
+		var prism_source := _build_light_source_spec("prism", prism_node.position, Vector2.RIGHT, 128.0)
+		prism_render_packet = _build_bounced_light_render_packet(prism_source, 1, 96)
+		for point in prism_render_packet.get("frontier", []):
+			prism_light_frontier.append(Vector2(point))
 		if light_presentation:
-			light_presentation.update_prism(prism_node.position, prism_light_frontier, 128.0)
-	elif light_presentation:
-		light_presentation.clear_prism()
+			light_presentation.update_prism_packet(prism_render_packet)
+	else:
+		prism_render_packet = LightTypes.empty_render_packet("prism")
+		if light_presentation:
+			light_presentation.clear_prism()
+	_sync_beam_render_packet()
 
 func _trace_bounced_light_path(origin: Vector2, direction: Vector2, max_range: float, max_bounces: int) -> Dictionary:
 	var segments: Array = []
@@ -566,6 +574,37 @@ func _trace_bounced_light_path(origin: Vector2, direction: Vector2, max_range: f
 		current_origin = Vector2(bounce["point"]) + current_direction * BEAM_OFFSET
 		bounces_left -= 1
 	return {"segments": segments, "frontier": frontier}
+
+func _build_light_source_spec(source_type: String, origin: Vector2, direction: Vector2, max_range: float, extra: Dictionary = {}) -> Dictionary:
+	return LightTypes.light_source_spec(source_type, origin, direction, 1.0, max_range, extra)
+
+func _build_bounced_light_render_packet(source_spec: Dictionary, max_bounces: int, radial_samples: int = 0) -> Dictionary:
+	var segments: Array = []
+	var frontier: Array = []
+	if radial_samples > 0:
+		for i in range(radial_samples):
+			var angle := TAU * float(i) / float(radial_samples)
+			var trace := _trace_bounced_light_path(Vector2(source_spec["origin"]), Vector2.RIGHT.rotated(angle), float(source_spec["range"]), max_bounces)
+			segments.append_array(trace.get("segments", []))
+			frontier.append(Vector2(trace.get("frontier", source_spec["origin"])))
+	else:
+		var guide_count: int = int(source_spec.get("guide_rays", 1))
+		var base_angle := Vector2(source_spec["direction"]).angle()
+		var cone_angle := deg_to_rad(float(source_spec.get("half_angle_deg", 0.0)))
+		for i in range(guide_count):
+			var t: float = 0.5 if guide_count <= 1 else float(i) / float(guide_count - 1)
+			var angle: float = lerpf(base_angle - cone_angle, base_angle + cone_angle, t)
+			var direction := Vector2.RIGHT.rotated(angle)
+			var trace := _trace_bounced_light_path(Vector2(source_spec["origin"]), direction, float(source_spec["range"]), max_bounces)
+			segments.append_array(trace.get("segments", []))
+			frontier.append(Vector2(trace.get("frontier", source_spec["origin"] + direction * float(source_spec["range"]))))
+	return LightTypes.light_render_packet(String(source_spec.get("source_type", "light")), source_spec, segments, frontier, [], [])
+
+func _sync_beam_render_packet() -> void:
+	var beam_segments_packet: Array = []
+	for segment in beam_segments:
+		beam_segments_packet.append(LightTypes.render_segment(Vector2(segment[0]), Vector2(segment[1]), 1.0, {"source_type": "laser"}))
+	beam_render_packet = LightTypes.light_render_packet("laser", _build_light_source_spec("laser", player_pos, facing, beam_range), beam_segments_packet, [], [], [])
 
 func _alive_enemy_count() -> int:
 	var alive := 0
@@ -679,25 +718,28 @@ func _draw() -> void:
 		draw_circle(enemy["node"].position, enemy["radius"] + 4.0, Color(color.r, color.g, color.b, 0.18))
 		draw_circle(enemy["node"].position, enemy["radius"], color)
 		draw_arc(enemy["node"].position, enemy["radius"] + 6.0, 0.0, TAU, 24, Color(1.0, 1.0, 1.0, 0.08), 1.0)
-	for i in range(beam_segments.size()):
-		var segment: Array = beam_segments[i]
+	var beam_draw_segments: Array = beam_render_packet.get("segments", [])
+	for i in range(beam_draw_segments.size()):
+		var segment: Dictionary = beam_draw_segments[i]
 		var pulse_alpha: float = clamp(beam_pulse_timer / BEAM_PULSE_DURATION, 0.0, 1.0)
 		var glow_alpha := 0.34 * pulse_alpha
-		draw_line(segment[0], segment[1], Color(0.48, 0.92, 1.0, glow_alpha * 0.45), 28.0)
-		draw_line(segment[0], segment[1], Color(0.55, 0.95, 1.0, glow_alpha * 0.7), 18.0)
-		draw_line(segment[0], segment[1], Color(BEAM_OUTER_COLOR.r, BEAM_OUTER_COLOR.g, BEAM_OUTER_COLOR.b, BEAM_OUTER_COLOR.a * pulse_alpha), 12.0)
-		draw_line(segment[0], segment[1], Color(BEAM_INNER_COLOR.r, BEAM_INNER_COLOR.g, BEAM_INNER_COLOR.b, BEAM_INNER_COLOR.a * pulse_alpha), 5.0)
-		var distance: float = segment[0].distance_to(segment[1])
+		var a: Vector2 = Vector2(segment["a"])
+		var b: Vector2 = Vector2(segment["b"])
+		draw_line(a, b, Color(0.48, 0.92, 1.0, glow_alpha * 0.45), 28.0)
+		draw_line(a, b, Color(0.55, 0.95, 1.0, glow_alpha * 0.7), 18.0)
+		draw_line(a, b, Color(BEAM_OUTER_COLOR.r, BEAM_OUTER_COLOR.g, BEAM_OUTER_COLOR.b, BEAM_OUTER_COLOR.a * pulse_alpha), 12.0)
+		draw_line(a, b, Color(BEAM_INNER_COLOR.r, BEAM_INNER_COLOR.g, BEAM_INNER_COLOR.b, BEAM_INNER_COLOR.a * pulse_alpha), 5.0)
+		var distance: float = a.distance_to(b)
 		var sparkle_count: int = max(1, int(ceil(distance / 110.0)))
 		for sparkle_index in range(1, sparkle_count):
 			var sparkle_t: float = float(sparkle_index) / float(sparkle_count)
-			var sparkle_pos: Vector2 = segment[0].lerp(segment[1], sparkle_t)
+			var sparkle_pos: Vector2 = a.lerp(b, sparkle_t)
 			draw_circle(sparkle_pos, 8.0 + 4.0 * pulse_alpha, Color(0.72, 0.97, 1.0, 0.08 * pulse_alpha))
-		draw_circle(segment[0], 5.0 + 3.0 * pulse_alpha, Color(1.0, 1.0, 1.0, 0.28 * pulse_alpha))
-		var end_radius: float = 11.0 if i < beam_segments.size() - 1 else 8.0
-		var end_color: Color = BOUNCE_COLOR if i < beam_segments.size() - 1 else Color(0.92, 1.0, 1.0, 0.82)
-		draw_circle(segment[1], end_radius + 6.0 * pulse_alpha, Color(end_color.r, end_color.g, end_color.b, 0.12 * pulse_alpha))
-		draw_circle(segment[1], end_radius * 0.55 + 2.0 * pulse_alpha, Color(end_color.r, end_color.g, end_color.b, end_color.a * pulse_alpha))
+		draw_circle(a, 5.0 + 3.0 * pulse_alpha, Color(1.0, 1.0, 1.0, 0.28 * pulse_alpha))
+		var end_radius: float = 11.0 if i < beam_draw_segments.size() - 1 else 8.0
+		var end_color: Color = BOUNCE_COLOR if i < beam_draw_segments.size() - 1 else Color(0.92, 1.0, 1.0, 0.82)
+		draw_circle(b, end_radius + 6.0 * pulse_alpha, Color(end_color.r, end_color.g, end_color.b, 0.12 * pulse_alpha))
+		draw_circle(b, end_radius * 0.55 + 2.0 * pulse_alpha, Color(end_color.r, end_color.g, end_color.b, end_color.a * pulse_alpha))
 	draw_circle(player_pos + Vector2(4, 6), PLAYER_RADIUS + 4.0, SHADOW_COLOR)
 	draw_circle(player_pos, PLAYER_RADIUS + 5.0 + beam_flash * 3.0, Color(0.95, 0.98, 0.63, 0.10 + beam_flash * 0.14))
 	draw_circle(player_pos, PLAYER_RADIUS, Color("f1fa8c"))
