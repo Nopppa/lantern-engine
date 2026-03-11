@@ -320,9 +320,9 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array, trace_state: Dictiona
 		"bounce_index": bounces
 	})
 	if bool(best.get("special", false)):
-		var redirected: Vector2 = direction.rotated(deg_to_rad(60.0 if direction.y >= 0.0 else -60.0)).normalized()
+		var redirected: Vector2 = BeamResolver.redirected_prism_direction(lab, direction)
 		queue.append({"origin": hit_point + redirected * lab.BEAM_OFFSET, "direction": redirected, "intensity": intensity * 0.95, "remaining": remaining - travel, "bounces": bounces + 1, "source_type": "laser", "special": true, "layer": layer + 1, "parent_layer": layer})
-		lab.last_event = "Beam redirected through prism station"
+		lab.last_event = "Beam redirected through prism"
 		return
 	var response := LightResponseModel.response(material_id, "laser", intensity, direction, Vector2(best["normal"]))
 	var remaining_after := remaining - travel
@@ -336,7 +336,8 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array, trace_state: Dictiona
 	if float(response["reflectivity"]) * intensity > float(response["branch_min"]):
 		queue.append({"origin": hit_point + Vector2(response["reflect_dir"]) * lab.BEAM_OFFSET, "direction": response["reflect_dir"], "intensity": intensity * float(response["reflectivity"]), "remaining": remaining_after, "bounces": bounces + 1, "source_type": "laser", "special": false, "layer": layer + 1, "parent_layer": layer})
 	if float(response["transmission"]) * intensity > float(response["branch_min"]):
-		queue.append({"origin": hit_point + direction * lab.BEAM_OFFSET, "direction": direction, "intensity": intensity * float(response["transmission"]), "remaining": remaining_after * 0.9, "bounces": bounces, "source_type": "laser", "special": false, "layer": layer + 1, "parent_layer": layer})
+		var transmit_dir: Vector2 = Vector2(response["transmit_dir"]).normalized()
+		queue.append({"origin": hit_point + transmit_dir * lab.BEAM_OFFSET, "direction": transmit_dir, "intensity": intensity * float(response["transmission"]), "remaining": remaining_after * 0.9, "bounces": bounces, "source_type": "laser", "special": false, "layer": layer + 1, "parent_layer": layer})
 	var label := String(Dictionary(response["material"]).get("label", material_id))
 	if material_id == "glass":
 		lab.last_event = "%s split the beam" % label
@@ -393,7 +394,8 @@ static func _closest_hit(lab, origin: Vector2, direction: Vector2, max_distance:
 		best_t = t_tree
 		best = {"point": point, "normal": (point - Vector2(trunk["pos"])).normalized(), "material_id": "tree", "material_label": "Tree Trunk", "special": false, "hit_kind": "block"}
 	for prism_entity: Dictionary in _world_prism_entities(lab):
-		if String(prism_entity.get("kind", "")) != "prism_station":
+		var prism_kind := String(prism_entity.get("kind", ""))
+		if prism_kind != "prism_station" and prism_kind != "prism_node":
 			continue
 		var prism_hit := BeamResolver.segment_circle_hit(origin, origin + direction * max_distance, prism_entity["pos"], prism_entity["radius"])
 		if prism_hit.is_empty():

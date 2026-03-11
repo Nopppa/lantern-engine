@@ -64,9 +64,15 @@ static func response(material_id: String, source_type: String, intensity: float,
 	var refraction_strength: float = clampf(float(material.get("refraction_strength", 0.0)), 0.0, 0.35)
 	var transmit_dir := incoming
 	if refraction_strength > 0.0:
-		transmit_dir = incoming.lerp(incoming.slide(normal).normalized(), refraction_strength).normalized()
-		if transmit_dir == Vector2.ZERO:
-			transmit_dir = incoming
+		var tangent := Vector2(-normal.y, normal.x).normalized()
+		if tangent == Vector2.ZERO:
+			tangent = Vector2.RIGHT
+		var bend_sign := signf(incoming.cross(normal))
+		if is_zero_approx(bend_sign):
+			bend_sign = 1.0
+		var bend_dir := (incoming + tangent * bend_sign * refraction_strength * 0.55).normalized()
+		if bend_dir != Vector2.ZERO:
+			transmit_dir = bend_dir
 	var roughness: float = clampf(float(material.get("roughness", diffusion)) * float(profile.get("roughness_scale", 1.0)), 0.0, 1.0)
 	return {
 		"material_id": material_id,

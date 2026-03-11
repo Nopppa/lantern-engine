@@ -31,15 +31,15 @@ static func flashlight_source_options(lab) -> Dictionary:
 static func build_prism_visual_trace(lab, source_origin: Vector2, source_direction: Vector2, previous_frontier: Dictionary = {}) -> Dictionary:
 	return _build_source_trace(lab, prism_source_options(source_origin, source_direction, previous_frontier))
 
-static func prism_source_options(source_origin: Vector2, source_direction: Vector2, previous_frontier: Dictionary = {}) -> Dictionary:
+static func prism_source_options(source_origin: Vector2, source_direction: Vector2, previous_frontier: Dictionary = {}, range_override: float = 118.0, intensity_override: float = 0.78, guide_rays_override: int = -1) -> Dictionary:
 	return {
 		"source_type": "prism",
 		"origin": source_origin,
 		"direction": source_direction,
-		"range": 118.0,
-		"guide_rays": int(LightApproximation.config_for_source("prism").get("guide_rays", 40)),
-		"center_intensity": 0.78,
-		"edge_intensity": 0.78,
+		"range": range_override,
+		"guide_rays": guide_rays_override if guide_rays_override > 0 else int(LightApproximation.config_for_source("prism").get("guide_rays", 40)),
+		"center_intensity": intensity_override,
+		"edge_intensity": intensity_override,
 		"use_frontier_smoothing": false,
 		"previous_frontier": previous_frontier,
 		"source_anchor": source_origin,

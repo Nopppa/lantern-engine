@@ -62,6 +62,8 @@ static func cast_prism_surge(run: RunScene) -> void:
 	if run.prism_node:
 		run.prism_node.queue_free()
 		run.prism_node = null
+		if run.has_method("_refresh_runtime_light_world"):
+			run._refresh_runtime_light_world()
 	run.prism_timer = max(run.prism_timer, run.prism_cooldown)
 	run.prism_surge_timer = run.prism_surge_cooldown
 	RunSummary.note_skill_cast(run, "prism_surge")

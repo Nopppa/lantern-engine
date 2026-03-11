@@ -169,7 +169,10 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		"facing": Vector2(snapped(facing.x, 0.02), snapped(facing.y, 0.02)),
 		"prism": prism_pos.round(),
 		"beam_count": _beam_packet_segments().size(),
-		"beam_active": _beam_packet_active()
+		"beam_active": _beam_packet_active(),
+		"surge_active": prism_surge_flash_timer > 0.0,
+		"surge_origin": prism_surge_flash_origin.round(),
+		"surge_radius": int(round(prism_surge_flash_radius))
 	}
 	var tier_b_due := force or approx_state != state or LightApproximation.should_refresh(approx_refresh_timer, "flashlight")
 	var tier_c_due := force or approx_state != state or LightApproximation.should_refresh(approx_refresh_timer, "prism")
@@ -212,6 +215,16 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 			accum_fills.append_array(station_packet.get("fills", []))
 			approx_prism_frontiers[station_key] = station_packet.get("frontier", {})
 			energized_prism_keys.append(station_key)
+		if prism_surge_flash_timer > 0.0:
+			var surge_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_surge_flash_origin, Vector2.RIGHT, approx_prism_frontiers.get("surge", {}), prism_surge_flash_radius, clampf(prism_surge_flash_strength, 0.72, 1.0), 56))
+			accum_segments.append_array(surge_packet.get("segments", []))
+			accum_zones.append_array(surge_packet.get("zones", []))
+			accum_zones.append(LightTypes.render_zone(prism_surge_flash_origin, prism_surge_flash_radius, clampf(prism_surge_flash_strength, 0.0, 1.0), {
+				"kind": "surge_core",
+				"source_type": "prism"
+			}))
+			accum_fills.append_array(surge_packet.get("fills", []))
+			approx_prism_frontiers["surge"] = surge_packet.get("frontier", {})
 		prism_render_packet = _build_combined_prism_packet(accum_segments, accum_zones, accum_fills, energized_prism_keys)
 	if tier_b_due:
 		var t1 := Time.get_ticks_usec()
@@ -527,6 +540,29 @@ func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, sec
 	for zone: Dictionary in _packet_zones(packet):
 		gameplay_light_field.add_splat_world(zone["pos"], float(zone["radius"]), float(zone.get("strength", 0.0)))
 
+func _write_laser_packet_to_light_field(packet: Dictionary) -> void:
+	if gameplay_light_field == null:
+		return
+	for segment: Dictionary in _packet_segments(packet):
+		var a: Vector2 = Vector2(segment["a"])
+		var b: Vector2 = Vector2(segment["b"])
+		var length: float = a.distance_to(b)
+		if length <= 0.001:
+			continue
+		var intensity: float = clampf(float(segment.get("intensity", 0.0)), 0.0, 1.0)
+		var layer: int = int(segment.get("layer", 0))
+		var layer_scale: float = pow(0.88, float(layer))
+		var steps: int = max(2, int(ceil(length / max(gameplay_light_field.cell_size * 0.6, 10.0))))
+		for step in range(steps + 1):
+			var t: float = float(step) / float(steps)
+			var pos: Vector2 = a.lerp(b, t)
+			var along_scale: float = 0.86 + 0.14 * (1.0 - absf(t - 0.5) * 2.0)
+			var energy: float = clampf(intensity * layer_scale * along_scale, 0.0, 1.0)
+			gameplay_light_field.add_splat_world(pos, 38.0, energy * 0.74)
+			gameplay_light_field.add_splat_world(pos, 22.0, energy * 0.96)
+	for zone: Dictionary in _packet_zones(packet):
+		gameplay_light_field.add_splat_world(zone["pos"], float(zone["radius"]), clampf(float(zone.get("strength", 0.0)) * 1.18, 0.0, 1.0))
+
 func _rebuild_gameplay_light_field() -> void:
 	if gameplay_light_field == null:
 		return
@@ -535,10 +571,7 @@ func _rebuild_gameplay_light_field() -> void:
 		_write_packet_to_light_field(flashlight_render_packet, 30.0, 24.0, 0.86, 0.62)
 	_write_packet_to_light_field(prism_render_packet, 34.0, 28.0, 0.92, 0.72)
 	_write_packet_to_light_field(secondary_render_packet, 30.0, 28.0, 0.62, 0.56)
-	_write_packet_to_light_field(beam_render_packet, 56.0, 52.0, 1.22, 1.08)
-	if prism_surge_flash_timer > 0.0:
-		var burst_strength: float = clampf(prism_surge_flash_strength * (prism_surge_flash_timer / 0.34), 0.0, 1.0)
-		gameplay_light_field.add_splat_world(prism_surge_flash_origin, prism_surge_flash_radius, burst_strength)
+	_write_laser_packet_to_light_field(beam_render_packet)
 
 func _prism_emitter_energized(pos: Vector2, radius: float) -> bool:
 	if flashlight_on and _flashlight_intensity(player_pos, facing, pos, flashlight_range, flashlight_half_angle, 1.0) > 0.12 and _visibility_between(player_pos, pos) > 0.0:
