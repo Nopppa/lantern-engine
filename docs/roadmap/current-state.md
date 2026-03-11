@@ -257,3 +257,19 @@ They are no longer the primary design center.
 **Task C movement — Phase 2 / world-path coherence:**
 - the laser solver now has a cleaner local trace-to-packet flow that mirrors the broader solver → packet direction used by other light sources
 - no new laser-only architecture was introduced; instead the pass narrowed the seam between solver trace state and shared packet output
+
+## Packet-only beam debug/diffuse + narrower post-solve mirrors (2026-03-11)
+
+**Mirror writes narrowed further:**
+- `beam_debug_hits` and `diffuse_zones` are no longer actively maintained as post-solve scene mirrors in the Light Lab laser path
+- after solve completion, the remaining explicit compatibility mirror write is now primarily `beam_segments`
+- debug hit and diffuse zone data stay in packet-adjacent local trace state long enough to populate `beam_render_packet`, then are consumed from the packet
+
+**What became packet-only:**
+- Light Lab beam debug marker rendering is now packet-only
+- Light Lab beam diffuse overlay rendering is now packet-only
+- packet lifecycle cleanup no longer needs to clear separate beam debug/diffuse mirror arrays because those mirrors no longer exist in active use
+
+**Boundary effect:**
+- this is a more truthful adapter seam: solver trace → packet, with only the minimum remaining beam segment mirror kept for compatibility
+- `beam_segments` now stands out more clearly as the last significant compatibility shadow rather than one member of a larger mirrored beam state bundle

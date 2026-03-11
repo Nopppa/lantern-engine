@@ -20,7 +20,6 @@ var surface_segments: Array = []
 var surface_patches: Array = []
 var prism_stations: Array = []
 var tree_trunks: Array = []
-var diffuse_zones: Array = []
 var secondary_light_segments: Array = []
 var secondary_light_zones: Array = []
 var secondary_debug_points: Array = []
@@ -45,7 +44,6 @@ var perf_snapshot := {
 	"tier_b_ms": 0.0,
 	"tier_c_ms": 0.0
 }
-var beam_debug_hits: Array = []
 var beam_debug_enabled := true
 var hp_overhead_enabled := true
 var cursor_probe_enabled := true
@@ -431,8 +429,6 @@ func _beam_packet_active() -> bool:
 
 func _clear_beam_compat_state() -> void:
 	beam_segments.clear()
-	beam_debug_hits.clear()
-	diffuse_zones.clear()
 
 func _light_world_patches() -> Array:
 	return light_world.material_patches if light_world else surface_patches

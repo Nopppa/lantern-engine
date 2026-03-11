@@ -61,9 +61,7 @@ static func cast_beam(lab, target: Vector2) -> void:
 	lab.beam_flash = 1.0
 	lab.beam_pulse_timer = lab.BEAM_PULSE_DURATION
 	lab.beam_segments.clear()
-	lab.diffuse_zones.clear()
 	lab.beam_render_packet = LightTypes.empty_render_packet("laser")
-	lab.beam_debug_hits.clear()
 	lab.hit_flashes.clear()
 	var trace_segments: Array = []
 	var trace_zones: Array = []
@@ -96,10 +94,10 @@ static func cast_beam(lab, target: Vector2) -> void:
 		processed += 1
 		_trace_ray(lab, queue.pop_front(), queue, trace_state)
 	lab.beam_segments = Array(trace_state.get("segments", [])).duplicate(true)
-	lab.diffuse_zones = Array(trace_state.get("zones", [])).duplicate(true)
-	lab.beam_debug_hits = Array(trace_state.get("debug_hits", [])).duplicate(true)
-	lab.beam_render_packet = LightTypes.light_render_packet("laser", source_spec, lab.beam_segments, [], [], lab.diffuse_zones, {
-		"debug_hits": lab.beam_debug_hits.duplicate(true),
+	var trace_zones_out: Array = Array(trace_state.get("zones", [])).duplicate(true)
+	var trace_debug_hits_out: Array = Array(trace_state.get("debug_hits", [])).duplicate(true)
+	lab.beam_render_packet = LightTypes.light_render_packet("laser", source_spec, lab.beam_segments, [], [], trace_zones_out, {
+		"debug_hits": trace_debug_hits_out,
 		"active": not lab.beam_segments.is_empty(),
 		"solver": "light_surface_resolver",
 		"world_type": String(lab.light_world.metadata.get("world_type", "unknown")) if lab.light_world else "none"
