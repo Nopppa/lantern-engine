@@ -347,10 +347,7 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array, trace_state: Dictiona
 		lab.last_event = "%s absorbed most of the beam" % label
 
 static func _append_segment(lab, trace_state: Dictionary, a: Vector2, b: Vector2, intensity: float, material_id: String, special: bool, layer: int, bounce_index: int, hit_kind: String) -> void:
-	trace_state["segments"].append({
-		"a": a,
-		"b": b,
-		"intensity": intensity,
+	var trace_entry := LightTypes.render_segment(a, b, intensity, {
 		"material_id": material_id,
 		"special": special,
 		"source_type": "laser",
@@ -358,7 +355,11 @@ static func _append_segment(lab, trace_state: Dictionary, a: Vector2, b: Vector2
 		"bounce_index": bounce_index,
 		"kind": hit_kind
 	})
-	BeamResolver.damage_enemies_along_segment(lab, a, b, lab.beam_damage * (0.55 + intensity * 0.45))
+	trace_state["segments"].append(trace_entry)
+	_apply_segment_damage(lab, trace_entry)
+
+static func _apply_segment_damage(lab, trace_entry: Dictionary) -> void:
+	BeamResolver.damage_enemies_along_segment(lab, Vector2(trace_entry["a"]), Vector2(trace_entry["b"]), lab.beam_damage * (0.55 + float(trace_entry.get("intensity", 1.0)) * 0.45))
 
 static func _closest_hit(lab, origin: Vector2, direction: Vector2, max_distance: float) -> Dictionary:
 	var best_t: float = max_distance
