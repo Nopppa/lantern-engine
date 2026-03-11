@@ -125,7 +125,6 @@ func _process(delta: float) -> void:
 	beam_pulse_timer = max(beam_pulse_timer - delta, 0.0)
 	_update_hit_flashes(delta)
 	if beam_pulse_timer <= 0.0 and _beam_packet_active():
-		_clear_beam_compat_state()
 		beam_render_packet = LightTypes.empty_render_packet("laser")
 	approx_refresh_timer += delta
 	_refresh_light_approximations_if_needed()
@@ -238,7 +237,6 @@ func _restart_lab() -> void:
 			enemy["node"].queue_free()
 	enemies.clear()
 	boss_projectiles.clear()
-	_clear_beam_compat_state()
 	beam_render_packet = LightTypes.empty_render_packet("laser")
 	flashlight_visual_segments.clear()
 	flashlight_visual_zones.clear()
@@ -426,12 +424,6 @@ func _beam_packet_debug_hits() -> Array:
 
 func _beam_packet_active() -> bool:
 	return bool(beam_render_packet.get("active", false)) and not _beam_packet_segments().is_empty()
-
-func _clear_beam_compat_state() -> void:
-	beam_segments.clear()
-
-func _sync_beam_segment_compat(packet: Dictionary) -> void:
-	beam_segments = _packet_segments(packet).duplicate(true)
 
 func _light_world_patches() -> Array:
 	return light_world.material_patches if light_world else surface_patches
