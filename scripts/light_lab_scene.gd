@@ -126,8 +126,9 @@ func _process(delta: float) -> void:
 	beam_flash = max(beam_flash - delta * 4.5, 0.0)
 	beam_pulse_timer = max(beam_pulse_timer - delta, 0.0)
 	_update_hit_flashes(delta)
-	if beam_pulse_timer <= 0.0 and not beam_segments.is_empty():
+	if beam_pulse_timer <= 0.0 and _beam_packet_active():
 		beam_segments.clear()
+		diffuse_zones.clear()
 		beam_render_packet = LightTypes.empty_render_packet("laser")
 		beam_debug_hits.clear()
 	approx_refresh_timer += delta
@@ -150,7 +151,8 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		"player_pos": player_pos.round(),
 		"facing": Vector2(snapped(facing.x, 0.02), snapped(facing.y, 0.02)),
 		"prism": prism_pos.round(),
-		"beam_count": beam_segments.size()
+		"beam_count": _beam_packet_segments().size(),
+		"beam_active": _beam_packet_active()
 	}
 	var tier_b_due := force or approx_state != state or LightApproximation.should_refresh(approx_refresh_timer, "flashlight")
 	var tier_c_due := force or approx_state != state or LightApproximation.should_refresh(approx_refresh_timer, "prism")
@@ -253,7 +255,6 @@ func _restart_lab() -> void:
 	prism_visual_debug_points.clear()
 	prism_visual_fills.clear()
 	secondary_render_packet = LightTypes.empty_render_packet("secondary")
-	beam_render_packet = LightTypes.empty_render_packet("laser")
 	player_hp = player_max_hp
 	energy = max_energy
 	player_pos = Vector2(228, 576)
@@ -425,6 +426,9 @@ func _beam_packet_segments() -> Array:
 
 func _beam_packet_zones() -> Array:
 	return _packet_zones(beam_render_packet)
+
+func _beam_packet_active() -> bool:
+	return bool(beam_render_packet.get("active", false)) and not _beam_packet_segments().is_empty()
 
 func _light_world_patches() -> Array:
 	return light_world.material_patches if light_world else surface_patches

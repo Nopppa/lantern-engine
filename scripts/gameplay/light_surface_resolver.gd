@@ -90,7 +90,8 @@ static func cast_beam(lab, target: Vector2) -> void:
 	lab.beam_render_packet = LightTypes.light_render_packet("laser", source_spec, lab.beam_segments, [], [], lab.diffuse_zones, {
 		"debug_hits": lab.beam_debug_hits.duplicate(true),
 		"active": not lab.beam_segments.is_empty(),
-		"solver": "light_surface_resolver"
+		"solver": "light_surface_resolver",
+		"world_type": String(lab.light_world.metadata.get("world_type", "unknown")) if lab.light_world else "none"
 	})
 	if lab.beam_segments.is_empty():
 		lab.last_event = "Beam fizzled"

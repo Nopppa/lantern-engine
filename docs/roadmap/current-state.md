@@ -227,3 +227,17 @@ They are no longer the primary design center.
 **Boundary effect:**
 - the current test field still preserves existing visible behavior, but laser is less special-case than before
 - legacy `beam_segments` still exist for compatibility and beam damage/debug flow, but packet consumption is now the primary render/intensity path inside Light Lab
+
+## Laser packet-state cleanup pass (2026-03-11)
+
+**More laser legacy dependency reduced:**
+- beam-active checks now prefer packet state through `_beam_packet_active()` instead of using raw `beam_segments` directly
+- approximation invalidation state now tracks packet segment count / packet-active state rather than reading `beam_segments` as the source of truth
+- duplicate laser packet reset in Light Lab restart flow was removed
+
+**Phase 3 cleanup effect:**
+- pulse expiry, packet lifetime, and approximation refresh triggers now line up more closely around `beam_render_packet`
+- the scene is doing a little less unnecessary mirroring between solver output and legacy beam state
+
+**Phase 2 direction kept aligned:**
+- laser packets now also record `world_type` from the current `LightWorld` when available, reinforcing the shared solver → packet → world-backed runtime direction on the authored field
