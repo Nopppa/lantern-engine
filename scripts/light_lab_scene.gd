@@ -31,6 +31,7 @@ var prism_visual_segments: Array = []
 var prism_visual_zones: Array = []
 var prism_visual_debug_points: Array = []
 var prism_visual_fills: Array = []
+var secondary_render_packet: Dictionary = LightTypes.empty_render_packet("secondary")
 var dead_alive_cells: Array = []
 var approx_refresh_timer := 999.0
 var approx_state := {}
@@ -83,6 +84,8 @@ func _build_light_lab() -> void:
 		prism_stations.append(prism_station.duplicate(true))
 	for trunk: Dictionary in layout.get("tree_trunks", []):
 		tree_trunks.append(trunk.duplicate(true))
+	approx_state = {}
+	light_world = LightWorldBuilder.from_light_lab_scene(self)
 	approx_state = {}
 	approx_flashlight_frontier = {}
 	approx_prism_frontiers = {}
@@ -156,8 +159,9 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 	if tier_c_due:
 		var t0 := Time.get_ticks_usec()
 		var secondary := LightSurfaceResolver.build_secondary_light(self)
-		secondary_light_segments = secondary.get("segments", [])
-		secondary_light_zones = secondary.get("zones", [])
+		secondary_render_packet = _build_secondary_render_packet(secondary)
+		secondary_light_segments = secondary_render_packet.get("segments", [])
+		secondary_light_zones = secondary_render_packet.get("zones", [])
 		secondary_debug_points = secondary.get("debug_points", [])
 		perf_snapshot["secondary"] = secondary.get("perf", {})
 		perf_snapshot["tier_c_ms"] = (Time.get_ticks_usec() - t0) / 1000.0
@@ -180,13 +184,18 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 			prism_visual_debug_points.append_array(station_vis.get("debug_points", []))
 			prism_visual_fills.append_array(station_vis.get("fills", []))
 			approx_prism_frontiers[station_key] = station_vis.get("frontier", {})
+		prism_render_packet = _build_combined_prism_render_packet()
+		prism_visual_segments = prism_render_packet.get("segments", [])
+		prism_visual_zones = prism_render_packet.get("zones", [])
+		prism_visual_fills = prism_render_packet.get("fills", [])
 	if tier_b_due:
 		var t1 := Time.get_ticks_usec()
 		var flashlight_visuals := FlashlightVisuals.build_visual_trace(self)
-		flashlight_visual_segments = flashlight_visuals.get("segments", [])
-		flashlight_visual_zones = flashlight_visuals.get("zones", [])
+		flashlight_render_packet = _build_visual_render_packet(flashlight_visuals, _flashlight_source_spec())
+		flashlight_visual_segments = flashlight_render_packet.get("segments", [])
+		flashlight_visual_zones = flashlight_render_packet.get("zones", [])
 		flashlight_visual_debug_points = flashlight_visuals.get("debug_points", [])
-		flashlight_visual_fills = flashlight_visuals.get("fills", [])
+		flashlight_visual_fills = flashlight_render_packet.get("fills", [])
 		approx_flashlight_frontier = flashlight_visuals.get("frontier", {})
 		perf_snapshot["flashlight"] = flashlight_visuals.get("perf", {})
 		perf_snapshot["tier_b_ms"] = (Time.get_ticks_usec() - t1) / 1000.0
@@ -243,6 +252,7 @@ func _restart_lab() -> void:
 	prism_visual_zones.clear()
 	prism_visual_debug_points.clear()
 	prism_visual_fills.clear()
+	secondary_render_packet = LightTypes.empty_render_packet("secondary")
 	player_hp = player_max_hp
 	energy = max_energy
 	player_pos = Vector2(228, 576)
@@ -255,6 +265,9 @@ func _restart_lab() -> void:
 	prism_surge_timer = 0.0
 	flashlight_on = true
 	_build_light_lab()
+	light_world = LightWorldBuilder.from_light_lab_scene(self)
+	approx_state = {}
+	light_world = LightWorldBuilder.from_light_lab_scene(self)
 	approx_state = {}
 	approx_flashlight_frontier = {}
 	approx_prism_frontiers = {}
@@ -284,6 +297,8 @@ func _place_prism(target: Vector2) -> void:
 	super._place_prism(valid)
 
 func _surface_patch_at(pos: Vector2) -> Dictionary:
+	if light_world:
+		return light_world.find_patch_at(pos)
 	for patch: Dictionary in surface_patches:
 		if Rect2(patch["rect"]).has_point(pos):
 			return patch
@@ -337,18 +352,24 @@ func _radial_intensity(origin: Vector2, point: Vector2, radius: float, strength:
 
 func _visibility_between(a: Vector2, b: Vector2) -> float:
 	var distance_to_target: float = a.distance_to(b)
-	for surface: Dictionary in surface_segments:
-		if not bool(surface.get("blocks_flashlight", true)):
+	var blockers: Array = light_world.all_blockers() if light_world else []
+	if blockers.is_empty():
+		blockers = surface_segments.duplicate(true)
+		for trunk: Dictionary in tree_trunks:
+			blockers.append({"kind": "circle", "pos": trunk["pos"], "radius": trunk["radius"], "material_id": "tree"})
+	for blocker: Dictionary in blockers:
+		if String(blocker.get("kind", "segment")) == "circle":
+			var trunk_hit := LightLabCollision.segment_intersects_circle(a, b, Vector2(blocker["pos"]), float(blocker["radius"]))
+			if not trunk_hit.is_empty() and float(trunk_hit["t"]) > 0.001 and float(trunk_hit["t"]) < 0.98:
+				return 0.0
 			continue
-		var hit := LightSurfaceResolver._ray_segment_intersection(a, (b - a).normalized(), Vector2(surface["a"]), Vector2(surface["b"]))
+		if not bool(blocker.get("blocks_flashlight", true)):
+			continue
+		var hit := LightSurfaceResolver._ray_segment_intersection(a, (b - a).normalized(), Vector2(blocker["a"]), Vector2(blocker["b"]))
 		if hit.is_empty():
 			continue
 		var t: float = float(hit["t"])
 		if t > 0.001 and t < distance_to_target - 1.0:
-			return 0.0
-	for trunk: Dictionary in tree_trunks:
-		var trunk_hit := LightLabCollision.segment_intersects_circle(a, b, Vector2(trunk["pos"]), float(trunk["radius"]))
-		if not trunk_hit.is_empty() and float(trunk_hit["t"]) > 0.001 and float(trunk_hit["t"]) < 0.98:
 			return 0.0
 	return 1.0
 
@@ -451,13 +472,48 @@ func _update_ui() -> void:
 	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] Permanent validation map (no auto encounters)\n[color=#a4b1cd]Goal:[/color] Behavioral light truth + cheaper approximation\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | unified beam fill | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s\n[color=#a4b1cd]Approx:[/color] T-B %.2fms / %d rays / %d fills | T-C %.2fms / %d samples / %d zones" % [LAB_LABEL, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text, tier_b_ms, int(flash_perf.get("guide_rays", 0)), int(flash_perf.get("fills", 0)), tier_c_ms, int(secondary_perf.get("samples", 0)), int(secondary_perf.get("zones", 0))]
 	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle\nF1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Approximation tiers[/b]\nTier A laser = precise beam logic\nTier B flashlight = guided beam fill from guide rays\nTier C prism/scatter = cheap material-aware secondary response\n\n[b]Readability legend[/b]\nWarm beam fill = main flashlight volume | faint lines = guide truth only\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nAqua dashed = glass continuation | Wood = soft scatter | Wet = glossy disturbance\n\n[b]Event[/b]\n%s" % last_event
 
+func _flashlight_source_spec() -> Dictionary:
+	return LightTypes.light_source_spec("flashlight", player_pos, facing, 1.0, flashlight_range, {
+		"half_angle_deg": flashlight_half_angle,
+		"guide_rays": int(LightApproximation.config_for_source("flashlight").get("guide_rays", 9))
+	})
+
+func _prism_source_spec(origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> Dictionary:
+	return LightTypes.light_source_spec("prism", origin, direction, 1.0, 118.0, {
+		"guide_rays": int(LightApproximation.config_for_source("prism").get("guide_rays", 40)),
+		"radial_emission": true
+	})
+
+func _build_visual_render_packet(visuals: Dictionary, source_spec: Dictionary) -> Dictionary:
+	return LightTypes.light_render_packet(String(source_spec.get("source_type", "light")), source_spec, visuals.get("segments", []), [], visuals.get("fills", []), visuals.get("zones", []), {
+		"guide_rays": source_spec.get("guide_rays", 0),
+		"radial_emission": source_spec.get("radial_emission", false)
+	})
+
+func _build_combined_prism_render_packet() -> Dictionary:
+	var segments: Array = prism_visual_segments.duplicate(true)
+	var fills: Array = prism_visual_fills.duplicate(true)
+	var zones: Array = prism_visual_zones.duplicate(true)
+	var origin := prism_node.position if prism_node else (Vector2(prism_stations[0]["pos"]) if not prism_stations.is_empty() else Vector2.ZERO)
+	return LightTypes.light_render_packet("prism", _prism_source_spec(origin), segments, [], fills, zones, {
+		"emitter_count": int(prism_stations.size()) + (1 if prism_node else 0)
+	})
+
+func _build_secondary_render_packet(secondary: Dictionary) -> Dictionary:
+	var source_spec := LightTypes.light_source_spec("secondary", player_pos, facing, 0.5, flashlight_range * 0.46, {
+		"tier": LightApproximation.TIER_SECONDARY
+	})
+	return LightTypes.light_render_packet("secondary", source_spec, secondary.get("segments", []), [], [], secondary.get("zones", []), {
+		"perf": secondary.get("perf", {})
+	})
+
 func _material_under_cursor(pos: Vector2) -> Dictionary:
-	for patch: Dictionary in surface_patches:
-		if Rect2(patch["rect"]).has_point(pos):
-			var mat := LightMaterials.get_definition(patch["material_id"])
-			mat["source_label"] = patch["label"]
-			mat["hint"] = patch.get("hint", "")
-			return mat
+	var patch := _surface_patch_at(pos)
+	if not patch.is_empty():
+		var mat := Dictionary(patch.get("material_spec", LightMaterials.get_definition(String(patch.get("material_id", "brick"))))).duplicate(true)
+		mat["source_label"] = patch.get("label", "")
+		mat["hint"] = patch.get("hint", "")
+		return mat
 	for trunk: Dictionary in tree_trunks:
 		if Vector2(trunk["pos"]).distance_to(pos) <= float(trunk["radius"]):
 			var tree_mat := LightMaterials.get_definition("wood")

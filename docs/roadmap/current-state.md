@@ -1,7 +1,7 @@
 # Current State
 
 Last updated: 2026-03-11
-Current shipped version target: `v0.5.6-alpha` (hybrid lighting architecture Phase 1)
+Current shipped version target: `v0.5.6-alpha` (hybrid lighting architecture Phase 2)
 
 ## Now shipped
 
@@ -68,10 +68,41 @@ They are no longer the primary design center.
 
 **Documentation:** See `docs/architecture-hybrid-lighting-phase1.md`
 
+## Phase 2 Hybrid Lighting Architecture (2026-03-11)
+
+**Strengthened LightWorld / LightWorldBuilder integration:**
+- Added practical query methods to `LightWorld`: `entity_list()`, `find_patch_at()`, `all_blockers()`
+- Enhanced `from_run_scene()` to emit arena boundary segments and normalized material patches
+- Enhanced `from_light_lab_scene()` to normalize all patches with `material_spec` using shared contracts
+- Both scenes now emit **concrete LightWorld data** suitable for shared solver/presentation
+
+**Light Lab migrated to packet-based flow:**
+- Added `secondary_render_packet`, `flashlight_render_packet`, `prism_render_packet` variables
+- Introduced source spec builders: `_flashlight_source_spec()`, `_prism_source_spec()`
+- Introduced packet builders: `_build_visual_render_packet()`, `_build_combined_prism_render_packet()`, `_build_secondary_render_packet()`
+- Migrated `_surface_patch_at()` to use `light_world.find_patch_at()` first
+- Migrated `_visibility_between()` to use `light_world.all_blockers()` for unified iteration
+- Migrated `_material_under_cursor()` to use LightWorld queries and respect `material_spec`
+- LightWorld now refreshed on scene state changes (`_build_light_lab()`, `_restart_lab()`)
+
+**Reduced legacy special-case wiring:**
+- Patch spatial lookups now flow through LightWorld contract when available
+- Blocker queries unified via `all_blockers()` instead of parallel segment/trunk iteration
+- Material metadata normalized via `material_spec` instead of direct dictionary lookups
+
+**Preserved for collision/layout:**
+- Raw `surface_segments`, `prism_stations`, `tree_trunks` arrays still exist (used by LightLabCollision)
+- FlashlightVisuals still returns raw dictionaries (not yet packet-native)
+- Solvers (BeamResolver, LightSurfaceResolver) still accept scene arrays (packet-native solver deferred)
+
+**Documentation:** See `docs/architecture-hybrid-lighting-phase2.md`
+
+
 ## Immediate next recommendation
 
-Do one more narrow extraction/perf pass only if testers still find the lab heavy:
+**Phase 3 (when ready for deeper solver migration):**
 
-- split generic blocker-query helpers farther out of `light_surface_resolver.gd`
-- cache per-source candidate surface sets for short windows during movement
-- keep Light Lab debug presentation as a thin consumer instead of adding more special-case fixes into the scene coordinator
+- Migrate BeamResolver + LightSurfaceResolver to accept `LightWorld` as primary input instead of raw scene arrays
+- Introduce first procedural test map that populates `LightWorld` from generation logic
+- Push more GPU light field rendering (reduce CPU-visible polygon drawing in `_draw()`)
+- Consider caching per-source candidate surface sets during movement for perf if testers report lab heaviness
