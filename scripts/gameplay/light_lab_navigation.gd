@@ -4,9 +4,8 @@ class_name LightLabNavigation
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 
 static func next_waypoint(run, start: Vector2, goal: Vector2, radius: float) -> Vector2:
-	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
-	var circles: Array = run.get("tree_trunks") if run.get("tree_trunks") != null else []
-	if _line_walkable(start, goal, radius, segments, circles):
+	var collision_space: Dictionary = run._collision_space() if run.has_method("_collision_space") else {"segments": run.get("surface_segments") if run.get("surface_segments") != null else [], "circles": run.get("tree_trunks") if run.get("tree_trunks") != null else []}
+	if _line_walkable(start, goal, radius, collision_space):
 		return goal
 	var cell_size := 48.0
 	var start_cell := _to_cell(start, run.ARENA_RECT, cell_size)
@@ -36,7 +35,7 @@ static func next_waypoint(run, start: Vector2, goal: Vector2, radius: float) -> 
 			best = current
 			break
 		for neighbor in _neighbors(current):
-			if not _cell_walkable(run, neighbor, radius, cell_size, segments, circles):
+			if not _cell_walkable(run, neighbor, radius, cell_size, collision_space):
 				continue
 			var tentative_g: float = float(g_score.get(_key(current), 999999.0)) + current.distance_to(neighbor)
 			if tentative_g >= float(g_score.get(_key(neighbor), 999999.0)):
@@ -58,22 +57,22 @@ static func next_waypoint(run, start: Vector2, goal: Vector2, radius: float) -> 
 	var next_point: Vector2 = _cell_center(next_cell, run.ARENA_RECT, cell_size)
 	return next_point.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
 
-static func _line_walkable(a: Vector2, b: Vector2, radius: float, segments: Array, circles: Array) -> bool:
+static func _line_walkable(a: Vector2, b: Vector2, radius: float, collision_space: Dictionary) -> bool:
 	var distance: float = a.distance_to(b)
 	var steps: int = max(2, int(distance / 18.0))
 	for i in range(steps + 1):
 		var point: Vector2 = a.lerp(b, float(i) / float(steps))
-		if LightLabCollision.is_circle_blocked(point, radius, segments, circles):
+		if LightLabCollision.is_circle_blocked_in_space(point, radius, collision_space):
 			return false
 	return true
 
-static func _cell_walkable(run, cell: Vector2i, radius: float, cell_size: float, segments: Array, circles: Array) -> bool:
+static func _cell_walkable(run, cell: Vector2i, radius: float, cell_size: float, collision_space: Dictionary) -> bool:
 	var cols := int(ceil(run.ARENA_RECT.size.x / cell_size))
 	var rows := int(ceil(run.ARENA_RECT.size.y / cell_size))
 	if cell.x < 0 or cell.y < 0 or cell.x >= cols or cell.y >= rows:
 		return false
 	var center := _cell_center(cell, run.ARENA_RECT, cell_size)
-	return not LightLabCollision.is_circle_blocked(center, radius, segments, circles)
+	return not LightLabCollision.is_circle_blocked_in_space(center, radius, collision_space)
 
 static func _neighbors(cell: Vector2i) -> Array:
 	return [

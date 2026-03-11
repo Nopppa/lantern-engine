@@ -68,23 +68,23 @@ static func _safe_direction_from_player(to_player: Vector2) -> Vector2:
 
 static func _resolve_motion(run: RunScene, enemy: Dictionary, motion: Vector2) -> void:
 	var radius := float(enemy.get("radius", 16.0)) + 4.0
-	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
-	var circles: Array = run.get("tree_trunks") if run.get("tree_trunks") != null else []
-	var next_pos := LightLabCollision.resolve_circle_motion(enemy["node"].position, radius, motion, segments, circles)
+	var collision_space: Dictionary = run._collision_space() if run.has_method("_collision_space") else {"segments": run.get("surface_segments") if run.get("surface_segments") != null else [], "circles": run.get("tree_trunks") if run.get("tree_trunks") != null else []}
+	var next_pos := LightLabCollision.resolve_circle_motion_in_space(enemy["node"].position, radius, motion, collision_space)
 	next_pos = next_pos.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
 	enemy["node"].position = next_pos
 
 static func _find_clear_position(run: RunScene, desired: Vector2, radius: float) -> Vector2:
 	var clamped := desired.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
-	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
-	var circles: Array = run.get("tree_trunks") if run.get("tree_trunks") != null else []
-	if segments.is_empty() or not LightLabCollision.is_circle_blocked(clamped, radius + 4.0, segments, circles):
+	var collision_space: Dictionary = run._collision_space() if run.has_method("_collision_space") else {"segments": run.get("surface_segments") if run.get("surface_segments") != null else [], "circles": run.get("tree_trunks") if run.get("tree_trunks") != null else []}
+	if collision_space.get("segments", []).is_empty() and collision_space.get("circles", []).is_empty():
+		return clamped
+	if not LightLabCollision.is_circle_blocked_in_space(clamped, radius + 4.0, collision_space):
 		return clamped
 	for ring in range(1, 5):
 		for step in range(12):
 			var probe := clamped + Vector2.RIGHT.rotated(TAU * float(step) / 12.0) * 18.0 * float(ring)
 			probe = probe.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
-			if not LightLabCollision.is_circle_blocked(probe, radius + 4.0, segments, circles):
+			if not LightLabCollision.is_circle_blocked_in_space(probe, radius + 4.0, collision_space):
 				return probe
 	return clamped
 

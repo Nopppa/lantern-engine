@@ -69,6 +69,41 @@ static func from_light_lab_scene(lab) -> LightWorld:
 		"note": "Procedural maps should emit the same occluder/material/entity boundary."
 	})
 
+static func build_light_lab_smoke_test(arena_rect: Rect2) -> LightWorld:
+	var segments: Array = _arena_boundary_segments(arena_rect)
+	segments.append_array([
+		{"a": Vector2(300, 176), "b": Vector2(300, 488), "normal": Vector2.LEFT, "material_id": "brick"},
+		{"a": Vector2(300, 488), "b": Vector2(560, 488), "normal": Vector2.UP, "material_id": "mirror"},
+		{"a": Vector2(560, 488), "b": Vector2(560, 260), "normal": Vector2.RIGHT, "material_id": "glass"},
+		{"a": Vector2(640, 220), "b": Vector2(860, 220), "normal": Vector2.DOWN, "material_id": "wood"}
+	])
+	var patches: Array = [
+		_normalized_patch(Rect2(arena_rect.position, arena_rect.size), "brick", "Generated floor"),
+		_normalized_patch(Rect2(Vector2(340, 220), Vector2(180, 110)), "wet", "Generated wet strip"),
+		_normalized_patch(Rect2(Vector2(618, 260), Vector2(170, 128)), "glass", "Generated glass lane")
+	]
+	var entities: Array = [
+		{"kind": "tree_trunk", "pos": Vector2(430, 380), "radius": 28.0, "material_id": "tree", "material_spec": LightTypes.light_material_spec("tree", {"label": "Tree Trunk"})},
+		{"kind": "tree_trunk", "pos": Vector2(720, 420), "radius": 24.0, "material_id": "tree", "material_spec": LightTypes.light_material_spec("tree", {"label": "Tree Trunk"})},
+		{"kind": "prism_station", "pos": Vector2(704, 316), "radius": 18.0, "material_id": "prism"}
+	]
+	return LightWorld.new(segments, patches, entities, {
+		"world_type": "generated_smoke_test",
+		"arena_rect": arena_rect,
+		"ready_for_randomgen": true,
+		"smoke_test": true,
+		"adapter": "light_world_builder.build_light_lab_smoke_test"
+	})
+
+static func _normalized_patch(rect: Rect2, material_id: String, label: String) -> Dictionary:
+	return {
+		"rect": rect,
+		"material_id": material_id,
+		"label": label,
+		"title": label,
+		"material_spec": LightTypes.light_material_spec(material_id, LightMaterials.get_definition(material_id))
+	}
+
 static func _arena_boundary_segments(rect: Rect2) -> Array:
 	return [
 		{"a": rect.position, "b": Vector2(rect.end.x, rect.position.y), "normal": Vector2.DOWN, "material_id": "brick"},

@@ -72,8 +72,8 @@ static func update_boss(run: RunScene, enemy: Dictionary, dir: Vector2, delta: f
 	else:
 		var radius := float(enemy.get("radius", 28.0)) + 5.0
 		var motion := dir * float(enemy["speed"]) * (0.62 if in_honest_light else 1.0) * delta
-		var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
-		var next_pos := LightLabCollision.resolve_circle_motion(enemy["node"].position, radius, motion, segments)
+		var collision_space: Dictionary = run._collision_space() if run.has_method("_collision_space") else {"segments": run.get("surface_segments") if run.get("surface_segments") != null else [], "circles": run.get("tree_trunks") if run.get("tree_trunks") != null else []}
+		var next_pos := LightLabCollision.resolve_circle_motion_in_space(enemy["node"].position, radius, motion, collision_space)
 		enemy["node"].position = next_pos.clamp(run.ARENA_RECT.position + Vector2(radius, radius), run.ARENA_RECT.end - Vector2(radius, radius))
 		var projectile_cooldown: float = float(enemy.get("projectile_cooldown", 0.0)) - delta
 		var special_cooldown: float = float(enemy.get("special_cooldown", 0.0)) - delta
@@ -178,9 +178,9 @@ static func _start_pounce(run: RunScene, enemy: Dictionary) -> void:
 	if bool(light_state.get("honest", false)):
 		target = enemy["node"].position + (run.player_pos - enemy["node"].position).normalized() * float(profile.get("range", 220.0)) * 0.42
 		target = target.clamp(run.ARENA_RECT.position + Vector2(32, 32), run.ARENA_RECT.end - Vector2(32, 32))
-	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
-	if not segments.is_empty():
-		target = LightLabCollision.resolve_circle_motion(target, float(enemy.get("radius", 28.0)) + 6.0, Vector2.ZERO, segments)
+	var collision_space: Dictionary = run._collision_space() if run.has_method("_collision_space") else {"segments": run.get("surface_segments") if run.get("surface_segments") != null else [], "circles": run.get("tree_trunks") if run.get("tree_trunks") != null else []}
+	if not collision_space.get("segments", []).is_empty() or not collision_space.get("circles", []).is_empty():
+		target = LightLabCollision.resolve_circle_motion_in_space(target, float(enemy.get("radius", 28.0)) + 6.0, Vector2.ZERO, collision_space)
 	enemy["special_target"] = target
 	run.last_event = "Hollow Matriarch compresses for Veil Pounce"
 
@@ -209,9 +209,9 @@ static func _update_pounce(run: RunScene, enemy: Dictionary, delta: float) -> vo
 	var remaining: float = max(float(enemy.get("special_timer", 0.0)) - delta, 0.0)
 	var progress := 1.0 - remaining / total_time
 	var desired := Vector2(enemy.get("special_start", enemy["node"].position)).lerp(Vector2(enemy.get("special_target", enemy["node"].position)), progress)
-	var segments: Array = run.get("surface_segments") if run.get("surface_segments") != null else []
-	if not segments.is_empty():
-		desired = LightLabCollision.resolve_circle_motion(desired, float(enemy.get("radius", 28.0)) + 6.0, Vector2.ZERO, segments)
+	var collision_space: Dictionary = run._collision_space() if run.has_method("_collision_space") else {"segments": run.get("surface_segments") if run.get("surface_segments") != null else [], "circles": run.get("tree_trunks") if run.get("tree_trunks") != null else []}
+	if not collision_space.get("segments", []).is_empty() or not collision_space.get("circles", []).is_empty():
+		desired = LightLabCollision.resolve_circle_motion_in_space(desired, float(enemy.get("radius", 28.0)) + 6.0, Vector2.ZERO, collision_space)
 	enemy["node"].position = desired
 	enemy["special_timer"] = remaining
 	if remaining > 0.0:

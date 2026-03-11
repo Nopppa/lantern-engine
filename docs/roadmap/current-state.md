@@ -181,3 +181,18 @@ They are no longer the primary design center.
 - `LightLabScene` now supports `generated_light_world_override`
 - `_inject_generated_light_world(world)` and `_clear_generated_light_world_override()` provide the first explicit hook for feeding a generated/shared `LightWorld` into the lab without rewriting the whole scene stack
 - `_build_light_lab()` now respects this override, making a first procedural test path credible
+
+## Generated-world smoke test + deeper collision-space cleanup (2026-03-11)
+
+**Generated-world hook is now exercised:**
+- `LightWorldBuilder.build_light_lab_smoke_test()` now creates a tiny generated `LightWorld` with its own occluders, patches, trunks, and a prism station
+- `LightLabScene` can toggle that override at runtime with `9`, giving a real smoke-test path for the generated-world seam instead of leaving the hook unused
+
+**Collision/helper cleanup moved farther toward world-space access:**
+- `LightLabNavigation` now path-checks through a collision-space dictionary rather than raw segment/circle arrays
+- `EnemyController` movement and clear-position probing now use `_collision_space()` / `resolve_circle_motion_in_space()` / `is_circle_blocked_in_space()` when available
+- `BossController` movement and pounce target resolution now use the same collision-space seam, reducing direct dependence on `surface_segments`
+
+**Legacy mirror state reduced in practice:**
+- scene-owned arrays still exist as compatibility fallback, but more runtime consumers now prefer world/collision adapter helpers first
+- this further narrows the set of systems that care whether the lab was authored from layout arrays or injected from a generated `LightWorld`
