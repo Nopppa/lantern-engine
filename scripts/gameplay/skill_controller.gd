@@ -58,7 +58,7 @@ static func cast_prism_surge(run: RunScene) -> void:
 	run.prism_surge_flash_origin = origin
 	run.prism_surge_flash_radius = run.prism_surge_radius
 	run.prism_surge_flash_strength = 1.0
-	run._add_hit_flash(origin, run.prism_surge_radius, Color(0.62, 0.94, 1.0, 0.9), 0.26)
+	run._add_hit_flash(origin, minf(run.prism_surge_radius * 0.24, 34.0), Color(0.62, 0.94, 1.0, 0.9), 0.20)
 	if run.prism_node:
 		run.prism_node.queue_free()
 		run.prism_node = null

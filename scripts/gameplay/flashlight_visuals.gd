@@ -160,7 +160,9 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 						"strength": 0.04 + intensity * 0.07,
 						"material_id": material_id,
 						"kind": "block",
-						"source_type": source_type
+						"source_type": source_type,
+						"normal": Vector2(hit["normal"]),
+						"incoming_dir": direction
 					})
 				break
 			var response: Dictionary = LightResponseModel.response(material_id, source_type, intensity, direction, Vector2(hit["normal"]))
@@ -171,7 +173,9 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 					"strength": float(response["diffusion"]) * intensity,
 					"material_id": material_id,
 					"kind": "diffuse",
-					"source_type": source_type
+					"source_type": source_type,
+					"normal": Vector2(hit["normal"]),
+					"incoming_dir": direction
 				})
 			if material_id == "wood":
 				var scatter_dir: Vector2 = Vector2(response["reflect_dir"]).lerp(direction, 0.68).normalized()

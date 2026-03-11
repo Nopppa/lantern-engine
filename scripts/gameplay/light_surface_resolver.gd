@@ -124,7 +124,9 @@ static func build_secondary_light(lab) -> Dictionary:
 					"material_id": material_id,
 					"source_type": source["source_type"],
 					"kind": "diffuse",
-					"source_index": source_index
+					"source_index": source_index,
+					"normal": Vector2(sample["normal"]),
+					"incoming_dir": Vector2(source["direction"])
 				})
 			if float(response["reflectivity"]) * float(sample["intensity"]) > float(response["branch_min"]):
 				var reflect_dir: Vector2 = Vector2(response["reflect_dir"])
@@ -327,7 +329,7 @@ static func _trace_ray(lab, ray: Dictionary, queue: Array, trace_state: Dictiona
 	var response := LightResponseModel.response(material_id, "laser", intensity, direction, Vector2(best["normal"]))
 	var remaining_after := remaining - travel
 	if float(response["diffusion"]) > 0.0:
-		trace_state["zones"].append({"pos": hit_point, "radius": response["diffuse_radius"], "strength": intensity * float(response["diffusion"]), "material_id": material_id, "source_type": "laser", "layer": layer + 1, "kind": "diffuse"})
+		trace_state["zones"].append({"pos": hit_point, "radius": response["diffuse_radius"], "strength": intensity * float(response["diffusion"]), "material_id": material_id, "source_type": "laser", "layer": layer + 1, "kind": "diffuse", "normal": Vector2(best["normal"]), "incoming_dir": direction})
 	if remaining_after <= 8.0:
 		return
 	if material_id == "tree":

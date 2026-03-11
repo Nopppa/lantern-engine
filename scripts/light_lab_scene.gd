@@ -185,36 +185,39 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		var accum_segments: Array = []
 		var accum_zones: Array = []
 		var accum_fills: Array = []
-		var energized_prism_keys: Array = []
-		if prism_node and _prism_emitter_energized(prism_node.position, current_prism_radius() + 8.0):
-			var prism_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_node.position, Vector2.RIGHT, approx_prism_frontiers.get("manual", {})))
-			accum_segments.append_array(prism_packet.get("segments", []))
-			accum_zones.append_array(prism_packet.get("zones", []))
-			accum_zones.append(LightTypes.render_zone(prism_node.position, max(28.0, current_prism_radius() * 1.45), 0.44, {
+		var active_prism_keys: Array = []
+		var prism_strengths: Dictionary = {}
+		if prism_node:
+			var manual_energized := _prism_emitter_energized(prism_node.position, current_prism_radius() + 8.0)
+			var manual_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_node.position, Vector2.RIGHT, approx_prism_frontiers.get("manual", {}), 118.0 if manual_energized else max(52.0, current_prism_radius() * 2.6), 0.78 if manual_energized else 0.18, 28 if manual_energized else 12))
+			accum_segments.append_array(manual_packet.get("segments", []))
+			accum_zones.append_array(manual_packet.get("zones", []))
+			accum_zones.append(LightTypes.render_zone(prism_node.position, max(24.0, current_prism_radius() * 1.35), 0.44 if manual_energized else 0.14, {
 				"kind": "emitter_core",
 				"source_type": "prism",
 				"emitter_key": "manual"
 			}))
-			accum_fills.append_array(prism_packet.get("fills", []))
-			approx_prism_frontiers["manual"] = prism_packet.get("frontier", {})
-			energized_prism_keys.append("manual")
+			accum_fills.append_array(manual_packet.get("fills", []))
+			approx_prism_frontiers["manual"] = manual_packet.get("frontier", {})
+			active_prism_keys.append("manual")
+			prism_strengths["manual"] = 1.0 if manual_energized else 0.32
 		for prism_entity: Dictionary in _light_world_prism_entities():
 			if String(prism_entity.get("kind", "")) != "prism_station":
 				continue
-			if not _prism_emitter_energized(Vector2(prism_entity["pos"]), float(prism_entity.get("radius", 18.0)) + 8.0):
-				continue
 			var station_key := "station_%d_%d" % [int(prism_entity["pos"].x), int(prism_entity["pos"].y)]
-			var station_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_entity["pos"], Vector2.RIGHT, approx_prism_frontiers.get(station_key, {})))
+			var station_energized := _prism_emitter_energized(Vector2(prism_entity["pos"]), float(prism_entity.get("radius", 18.0)) + 8.0)
+			var station_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_entity["pos"], Vector2.RIGHT, approx_prism_frontiers.get(station_key, {}), 104.0 if station_energized else 46.0, 0.72 if station_energized else 0.16, 24 if station_energized else 10))
 			accum_segments.append_array(station_packet.get("segments", []))
 			accum_zones.append_array(station_packet.get("zones", []))
-			accum_zones.append(LightTypes.render_zone(Vector2(prism_entity["pos"]), max(24.0, float(prism_entity.get("radius", 18.0)) * 1.75), 0.38, {
+			accum_zones.append(LightTypes.render_zone(Vector2(prism_entity["pos"]), max(22.0, float(prism_entity.get("radius", 18.0)) * 1.55), 0.38 if station_energized else 0.12, {
 				"kind": "emitter_core",
 				"source_type": "prism",
 				"emitter_key": station_key
 			}))
 			accum_fills.append_array(station_packet.get("fills", []))
 			approx_prism_frontiers[station_key] = station_packet.get("frontier", {})
-			energized_prism_keys.append(station_key)
+			active_prism_keys.append(station_key)
+			prism_strengths[station_key] = 1.0 if station_energized else 0.28
 		if prism_surge_flash_timer > 0.0:
 			var surge_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_surge_flash_origin, Vector2.RIGHT, approx_prism_frontiers.get("surge", {}), prism_surge_flash_radius, clampf(prism_surge_flash_strength, 0.72, 1.0), 56))
 			accum_segments.append_array(surge_packet.get("segments", []))
@@ -225,7 +228,7 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 			}))
 			accum_fills.append_array(surge_packet.get("fills", []))
 			approx_prism_frontiers["surge"] = surge_packet.get("frontier", {})
-		prism_render_packet = _build_combined_prism_packet(accum_segments, accum_zones, accum_fills, energized_prism_keys)
+		prism_render_packet = _build_combined_prism_packet(accum_segments, accum_zones, accum_fills, active_prism_keys, prism_strengths)
 	if tier_b_due:
 		var t1 := Time.get_ticks_usec()
 		flashlight_render_packet = FlashlightVisuals.build_render_packet(self, FlashlightVisuals.flashlight_source_options(self))
@@ -521,6 +524,24 @@ func _sample_gameplay_light(pos: Vector2) -> float:
 		return 0.0
 	return clampf(gameplay_light_field.sample_world(pos), 0.0, 1.0)
 
+func _zone_is_opaque_surface(zone: Dictionary) -> bool:
+	var material_id := String(zone.get("material_id", ""))
+	return material_id == "brick" or material_id == "wood" or material_id == "mirror" or material_id == "tree"
+
+func _zone_front_facing(zone: Dictionary) -> bool:
+	var normal: Vector2 = Vector2(zone.get("normal", Vector2.ZERO))
+	var incoming_dir: Vector2 = Vector2(zone.get("incoming_dir", Vector2.ZERO))
+	if normal == Vector2.ZERO or incoming_dir == Vector2.ZERO:
+		return true
+	return incoming_dir.normalized().dot(normal.normalized()) < -0.05
+
+func _zone_effective_pos(zone: Dictionary, offset_scale: float) -> Vector2:
+	var pos: Vector2 = Vector2(zone.get("pos", Vector2.ZERO))
+	var normal: Vector2 = Vector2(zone.get("normal", Vector2.ZERO))
+	if normal == Vector2.ZERO or not _zone_is_opaque_surface(zone):
+		return pos
+	return pos + normal.normalized() * float(zone.get("radius", 0.0)) * offset_scale
+
 func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, secondary_radius: float, primary_scale: float, secondary_scale: float) -> void:
 	if gameplay_light_field == null:
 		return
@@ -538,7 +559,15 @@ func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, sec
 			var energy: float = clampf(float(segment.get("intensity", 0.0)) * scale, 0.0, 1.0)
 			gameplay_light_field.add_splat_world(pos, radius, energy)
 	for zone: Dictionary in _packet_zones(packet):
-		gameplay_light_field.add_splat_world(zone["pos"], float(zone["radius"]), float(zone.get("strength", 0.0)))
+		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
+			continue
+		var zone_pos: Vector2 = _zone_effective_pos(zone, 0.24)
+		var zone_radius: float = float(zone.get("radius", 0.0))
+		if _zone_is_opaque_surface(zone):
+			zone_radius *= 0.78
+			if String(zone.get("kind", "")) == "block":
+				zone_radius *= 0.72
+		gameplay_light_field.add_splat_world(zone_pos, zone_radius, float(zone.get("strength", 0.0)))
 
 func _write_laser_packet_to_light_field(packet: Dictionary) -> void:
 	if gameplay_light_field == null:
@@ -612,7 +641,9 @@ func _build_lit_zones() -> Array:
 		var flashlight_zone_material := String(zone.get("material_id", ""))
 		if flashlight_zone_kind != "diffuse" and flashlight_zone_kind != "redirect" and flashlight_zone_material != "glass" and flashlight_zone_material != "wet":
 			continue
-		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.90, 0.68, 0.018 + 0.024 * float(zone["strength"])), "layer": 0})
+		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
+			continue
+		zones.append({"pos": _zone_effective_pos(zone, 0.30), "radius": float(zone["radius"]) * (0.74 if _zone_is_opaque_surface(zone) else 1.0), "color": Color(1.0, 0.90, 0.68, 0.016 + 0.020 * float(zone["strength"])), "layer": 0, "surface_highlight": _zone_is_opaque_surface(zone), "normal": zone.get("normal", Vector2.ZERO)})
 	for segment: Dictionary in _beam_packet_segments():
 		var beam_a: Vector2 = Vector2(segment["a"])
 		var beam_b: Vector2 = Vector2(segment["b"])
@@ -628,12 +659,16 @@ func _build_lit_zones() -> Array:
 		var seg_color: Color = _secondary_color(segment)
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.24, 42.0), "color": Color(seg_color.r, seg_color.g, seg_color.b, 0.05 * float(segment["intensity"]) + 0.018), "layer": int(segment.get("layer", 1))})
 	for zone: Dictionary in _packet_zones(secondary_render_packet):
+		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
+			continue
 		var zone_color: Color = _secondary_zone_color(zone)
-		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(zone_color.r, zone_color.g, zone_color.b, 0.038 * float(zone["strength"]) + 0.02), "layer": int(zone.get("layer", 1))})
+		zones.append({"pos": _zone_effective_pos(zone, 0.32), "radius": float(zone["radius"]) * (0.76 if _zone_is_opaque_surface(zone) else 1.0), "color": Color(zone_color.r, zone_color.g, zone_color.b, 0.032 * float(zone["strength"]) + 0.016), "layer": int(zone.get("layer", 1)), "surface_highlight": _zone_is_opaque_surface(zone), "normal": zone.get("normal", Vector2.ZERO)})
 	for segment: Dictionary in _packet_segments(prism_render_packet):
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.16, 22.0), "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.024 + 0.028 * float(segment["intensity"])), "layer": 0})
 	for zone: Dictionary in _packet_zones(prism_render_packet):
-		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.020 + 0.026 * float(zone["strength"])), "layer": 0})
+		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
+			continue
+		zones.append({"pos": _zone_effective_pos(zone, 0.30), "radius": float(zone["radius"]) * (0.78 if _zone_is_opaque_surface(zone) else 1.0), "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.018 + 0.022 * float(zone["strength"])), "layer": 0, "surface_highlight": _zone_is_opaque_surface(zone), "normal": zone.get("normal", Vector2.ZERO)})
 	return zones
 
 func _update_native_light_presentation() -> void:
@@ -697,12 +732,13 @@ func _prism_source_spec(origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> 
 		"radial_emission": true
 	})
 
-func _build_combined_prism_packet(segments: Array, zones: Array, fills: Array, emitter_keys: Array = []) -> Dictionary:
+func _build_combined_prism_packet(segments: Array, zones: Array, fills: Array, emitter_keys: Array = [], emitter_strengths: Dictionary = {}) -> Dictionary:
 	var prism_entities := _light_world_prism_entities()
 	var origin := Vector2(prism_entities[0]["pos"]) if not prism_entities.is_empty() else Vector2.ZERO
 	return LightTypes.light_render_packet("prism", _prism_source_spec(origin), segments, [], fills, zones, {
 		"emitter_count": prism_entities.size(),
 		"emitter_keys": emitter_keys.duplicate(),
+		"emitter_strengths": emitter_strengths.duplicate(true),
 		"active": not emitter_keys.is_empty() or not segments.is_empty() or not zones.is_empty()
 	})
 
@@ -742,6 +778,22 @@ func _material_under_cursor(pos: Vector2) -> Dictionary:
 			nearest = LightMaterials.get_definition(surface["material_id"])
 	return nearest
 
+func _draw_lit_zone(zone: Dictionary) -> void:
+	var pos: Vector2 = Vector2(zone.get("pos", Vector2.ZERO))
+	var radius: float = float(zone.get("radius", 0.0))
+	var color: Color = Color(zone.get("color", Color.WHITE))
+	if bool(zone.get("surface_highlight", false)):
+		var normal: Vector2 = Vector2(zone.get("normal", Vector2.UP)).normalized()
+		if normal == Vector2.ZERO:
+			normal = Vector2.UP
+		var tangent: Vector2 = Vector2(-normal.y, normal.x).normalized()
+		var half_len: float = max(10.0, radius * 0.42)
+		draw_line(pos - tangent * half_len, pos + tangent * half_len, Color(color.r, color.g, color.b, color.a * 0.22), max(8.0, radius * 0.42))
+		draw_line(pos - tangent * half_len * 0.78, pos + tangent * half_len * 0.78, Color(color.r, color.g, color.b, color.a * 0.34), max(4.0, radius * 0.20))
+		return
+	draw_circle(pos, radius, color)
+	draw_circle(pos, radius * 0.62, Color(color.r, color.g, color.b, color.a * 0.42))
+
 func _draw() -> void:
 	draw_rect(get_viewport_rect(), Color(0.05, 0.055, 0.075, 1.0), true)
 	draw_rect(ARENA_RECT.grow(28.0), Color(0.09, 0.10, 0.13, 0.94), true)
@@ -765,16 +817,12 @@ func _draw() -> void:
 		draw_rect(patch["rect"], patch_color, true)
 		draw_rect(patch["rect"], Color(1, 1, 1, 0.08), false, 2.0)
 	for zone: Dictionary in lit_zones:
-		draw_circle(zone["pos"], zone["radius"], zone["color"])
+		_draw_lit_zone(zone)
 	for flash: Dictionary in hit_flashes:
 		var flash_t := clampf(float(flash["timer"]) / float(flash["duration"]), 0.0, 1.0)
 		var flash_radius := lerpf(float(flash["radius"]) * 1.55, float(flash["radius"]) * 0.72, 1.0 - flash_t)
 		var flash_color: Color = flash["color"]
 		draw_circle(flash["pos"], flash_radius, Color(flash_color.r, flash_color.g, flash_color.b, 0.10 * flash_t))
-	if prism_surge_flash_timer > 0.0:
-		var burst_ratio: float = clampf(prism_surge_flash_timer / 0.34, 0.0, 1.0)
-		draw_circle(prism_surge_flash_origin, prism_surge_flash_radius * lerpf(0.55, 1.0, 1.0 - burst_ratio), Color(0.62, 0.94, 1.0, 0.08 * burst_ratio))
-		draw_arc(prism_surge_flash_origin, prism_surge_flash_radius * lerpf(0.42, 0.92, 1.0 - burst_ratio), 0.0, TAU, 42, Color(0.88, 0.98, 1.0, 0.42 * burst_ratio), 3.0)
 	for surface: Dictionary in _light_world_occluders():
 		var mat := LightMaterials.get_definition(surface["material_id"])
 		draw_line(surface["a"], surface["b"], mat["color"], 10.0)

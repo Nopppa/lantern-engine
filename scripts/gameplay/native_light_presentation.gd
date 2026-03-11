@@ -327,9 +327,13 @@ func _prism_packet_keys(packet: Dictionary) -> Dictionary:
 		keys[String(key)] = true
 	return keys
 
+func _prism_packet_strengths(packet: Dictionary) -> Dictionary:
+	return Dictionary(packet.get("emitter_strengths", {})).duplicate(true)
+
 func _update_prism_stations(entities: Array, prism_packet: Dictionary) -> void:
 	var active_keys: Dictionary = {}
-	var energized_keys := _prism_packet_keys(prism_packet)
+	var packet_keys := _prism_packet_keys(prism_packet)
+	var strengths := _prism_packet_strengths(prism_packet)
 	for entity: Dictionary in entities:
 		if String(entity.get("kind", "")) != "prism_station":
 			continue
@@ -345,10 +349,11 @@ func _update_prism_stations(entities: Array, prism_packet: Dictionary) -> void:
 			prism_station_lights[key] = light
 
 		var light: PointLight2D = prism_station_lights[key]
+		var strength: float = clampf(float(strengths.get(key, 0.0)), 0.0, 1.0)
 		light.position = pos
-		light.texture_scale = 0.70
-		light.energy = PRISM_ENERGY * 1.12
-		light.enabled = energized_keys.has(key)
+		light.texture_scale = lerpf(0.46, 0.70, strength)
+		light.energy = lerpf(PRISM_ENERGY * 0.36, PRISM_ENERGY * 1.12, strength)
+		light.enabled = packet_keys.has(key)
 
 	for key: String in prism_station_lights.keys():
 		if not active_keys.has(key):
@@ -362,13 +367,15 @@ func _update_prism_node(prism_ref, prism_packet: Dictionary) -> void:
 	if prism_ref == null or not is_instance_valid(prism_ref):
 		prism_node_light.enabled = false
 		return
-	var energized_keys := _prism_packet_keys(prism_packet)
-	prism_node_light.enabled = energized_keys.has("manual")
+	var packet_keys := _prism_packet_keys(prism_packet)
+	var strengths := _prism_packet_strengths(prism_packet)
+	prism_node_light.enabled = packet_keys.has("manual")
 	if not prism_node_light.enabled:
 		return
+	var strength: float = clampf(float(strengths.get("manual", 0.0)), 0.0, 1.0)
 	prism_node_light.position = prism_ref.position
-	prism_node_light.texture_scale = 0.84
-	prism_node_light.energy = PRISM_NODE_ENERGY * 1.18
+	prism_node_light.texture_scale = lerpf(0.48, 0.84, strength)
+	prism_node_light.energy = lerpf(PRISM_NODE_ENERGY * 0.34, PRISM_NODE_ENERGY * 1.18, strength)
 	prism_node_light.shadow_enabled = false
 
 # ---------------------------------------------------------------------------
