@@ -13,6 +13,7 @@ const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 const HudText = preload("res://scripts/ui/hud_text.gd")
 const LightFieldPresentation = preload("res://scripts/gameplay/light_field_presentation.gd")
+const NativeLightPresentation = preload("res://scripts/gameplay/native_light_presentation.gd")
 const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd")
 
@@ -108,6 +109,7 @@ var fx_layer: Node2D
 var player_node: Node2D
 var arena_node: Node2D
 var light_presentation: LightFieldPresentation
+var native_light_presentation: NativeLightPresentation
 var encounters := EncounterDefs.LIST.duplicate(true)
 var current_encounter_miniboss_spawned := false
 
@@ -133,6 +135,9 @@ func _setup_scene() -> void:
 	light_presentation = LightFieldPresentation.new()
 	light_presentation.name = "LightPresentation"
 	fx_layer.add_child(light_presentation)
+	native_light_presentation = NativeLightPresentation.new()
+	native_light_presentation.name = "NativeLightPresentation"
+	fx_layer.add_child(native_light_presentation)
 	var camera := Camera2D.new()
 	camera.enabled = true
 	camera.position = Vector2(640, 360)
@@ -533,6 +538,16 @@ func _refresh_environment_light_traces() -> void:
 		prism_render_packet = LightTypes.empty_render_packet("prism")
 		if light_presentation:
 			light_presentation.clear_prism()
+	if native_light_presentation:
+		native_light_presentation.update_from_packets(
+			flashlight_render_packet,
+			beam_render_packet,
+			[],  # RunScene does not use prism entities from LightWorld
+			prism_node,
+			flashlight_on,
+			player_pos,
+			facing
+		)
 
 func _trace_bounced_light_path(origin: Vector2, direction: Vector2, max_range: float, max_bounces: int) -> Dictionary:
 	var segments: Array = []

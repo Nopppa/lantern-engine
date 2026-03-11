@@ -105,6 +105,10 @@ func _input(event: InputEvent) -> void:
 				last_event = "Dead/alive base zones toggled"
 			KEY_9:
 				_toggle_generated_smoke_test()
+			KEY_0:
+				if native_light_presentation:
+					native_light_presentation.enabled = !native_light_presentation.enabled
+					last_event = "Native Light2D layer %s" % ("ON" if native_light_presentation.enabled else "OFF")
 
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("quick_refill"):
@@ -129,6 +133,7 @@ func _process(delta: float) -> void:
 	EnemyController.update_enemies(self, delta)
 	DeadAliveGrid.update(dead_alive_cells, delta, Callable(self, "_light_intensity_at"))
 	lit_zones = _build_lit_zones()
+	_update_native_light_presentation()
 	_update_ui()
 	queue_redraw()
 
@@ -478,6 +483,18 @@ func _build_lit_zones() -> Array:
 		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.020 + 0.026 * float(zone["strength"])), "layer": 0})
 	return zones
 
+func _update_native_light_presentation() -> void:
+	if native_light_presentation:
+		native_light_presentation.update_from_packets(
+			flashlight_render_packet,
+			beam_render_packet,
+			_light_world_prism_entities(),
+			prism_node,
+			flashlight_on,
+			player_pos,
+			facing
+		)
+
 func _update_ui() -> void:
 	if ui_overlays_hidden:
 		hud_label.visible = false
@@ -505,7 +522,7 @@ func _update_ui() -> void:
 	var secondary_perf: Dictionary = perf_snapshot.get("secondary", {})
 	var flash_perf: Dictionary = perf_snapshot.get("flashlight", {})
 	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] %s\n[color=#a4b1cd]Goal:[/color] Behavioral light truth + cheaper approximation\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | unified beam fill | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s\n[color=#a4b1cd]Approx:[/color] T-B %.2fms / %d rays / %d fills | T-C %.2fms / %d samples / %d zones" % [LAB_LABEL, world_mode, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text, tier_b_ms, int(flash_perf.get("guide_rays", 0)), int(flash_perf.get("fills", 0)), tier_c_ms, int(secondary_perf.get("samples", 0)), int(secondary_perf.get("zones", 0))]
-	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle | 9 generated smoke test\nF1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Approximation tiers[/b]\nTier A laser = precise beam logic\nTier B flashlight = guided beam fill from guide rays\nTier C prism/scatter = cheap material-aware secondary response\n\n[b]Readability legend[/b]\nWarm beam fill = main flashlight volume | faint lines = guide truth only\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nAqua dashed = glass continuation | Wood = soft scatter | Wet = glossy disturbance\n\n[b]Event[/b]\n%s" % last_event
+	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle | 9 generated smoke test | 0 native Light2D\nF1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Approximation tiers[/b]\nTier A laser = precise beam logic\nTier B flashlight = guided beam fill from guide rays\nTier C prism/scatter = cheap material-aware secondary response\n\n[b]Readability legend[/b]\nWarm beam fill = main flashlight volume | faint lines = guide truth only\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nAqua dashed = glass continuation | Wood = soft scatter | Wet = glossy disturbance\n\n[b]Event[/b]\n%s" % last_event
 
 func _flashlight_source_spec() -> Dictionary:
 	return LightTypes.light_source_spec("flashlight", player_pos, facing, 1.0, flashlight_range, {
