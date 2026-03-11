@@ -5,11 +5,15 @@ const LightApproximation = preload("res://scripts/gameplay/light_approximation.g
 const LightResponseModel = preload("res://scripts/gameplay/light_response_model.gd")
 const LightSurfaceResolver = preload("res://scripts/gameplay/light_surface_resolver.gd")
 const LightStability = preload("res://scripts/gameplay/light_stability.gd")
+const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 
 static func build_visual_trace(lab) -> Dictionary:
 	if not lab.flashlight_on:
 		return {"segments": [], "zones": [], "debug_points": [], "fills": [], "perf": {}}
-	return _build_source_trace(lab, {
+	return _build_source_trace(lab, flashlight_source_options(lab))
+
+static func flashlight_source_options(lab) -> Dictionary:
+	return {
 		"source_type": "flashlight",
 		"origin": lab.player_pos,
 		"direction": lab.facing,
@@ -22,10 +26,13 @@ static func build_visual_trace(lab) -> Dictionary:
 		"previous_frontier": lab.approx_flashlight_frontier,
 		"source_anchor": lab.player_pos,
 		"radial_emission": false
-	})
+	}
 
 static func build_prism_visual_trace(lab, source_origin: Vector2, source_direction: Vector2, previous_frontier: Dictionary = {}) -> Dictionary:
-	return _build_source_trace(lab, {
+	return _build_source_trace(lab, prism_source_options(source_origin, source_direction, previous_frontier))
+
+static func prism_source_options(source_origin: Vector2, source_direction: Vector2, previous_frontier: Dictionary = {}) -> Dictionary:
+	return {
 		"source_type": "prism",
 		"origin": source_origin,
 		"direction": source_direction,
@@ -37,6 +44,22 @@ static func build_prism_visual_trace(lab, source_origin: Vector2, source_directi
 		"previous_frontier": previous_frontier,
 		"source_anchor": source_origin,
 		"radial_emission": true
+	}
+
+static func build_render_packet(lab, options: Dictionary) -> Dictionary:
+	var trace := _build_source_trace(lab, options)
+	var origin := Vector2(options.get("origin", Vector2.ZERO))
+	var direction := Vector2(options.get("direction", Vector2.RIGHT))
+	var source_type := String(options.get("source_type", "light"))
+	var source_spec := LightTypes.light_source_spec(source_type, origin, direction, 1.0, float(options.get("range", 0.0)), {
+		"half_angle_deg": float(options.get("half_angle_deg", 0.0)),
+		"guide_rays": int(options.get("guide_rays", 0)),
+		"radial_emission": bool(options.get("radial_emission", false))
+	})
+	return LightTypes.light_render_packet(source_type, source_spec, trace.get("segments", []), [], trace.get("fills", []), trace.get("zones", []), {
+		"frontier": trace.get("frontier", {}),
+		"debug_points": trace.get("debug_points", []),
+		"perf": trace.get("perf", {})
 	})
 
 static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
@@ -280,7 +303,7 @@ static func _build_radial_fills(origin: Vector2, frontier: Array, config: Dictio
 	return fills
 
 static func _crosses_material_patch(lab, a: Vector2, b: Vector2, material_id: String) -> bool:
-	for patch: Dictionary in lab.surface_patches:
+	for patch: Dictionary in LightSurfaceResolver._world_patches(lab):
 		if String(patch.get("material_id", "")) != material_id:
 			continue
 		var rect: Rect2 = patch["rect"]

@@ -128,3 +128,20 @@ They are no longer the primary design center.
 - Introduce first procedural test map that populates `LightWorld` from generation logic
 - Push more GPU light field rendering (reduce CPU-visible polygon drawing in `_draw()`)
 - Consider caching per-source candidate surface sets during movement for perf if testers report lab heaviness
+
+
+## Producer / solver boundary follow-up (2026-03-11)
+
+**Producer-side migration completed:**
+- `FlashlightVisuals` now exposes source-option builders (`flashlight_source_options()`, `prism_source_options()`) and a packet-native producer entry point: `build_render_packet()`
+- Light Lab now requests flashlight/prism render packets directly from `FlashlightVisuals` instead of first building local visual dictionaries and only then wrapping them into packets
+- secondary light packet creation now also keeps debug/perf metadata attached to the packet boundary
+
+**Solver boundary movement completed:**
+- `LightSurfaceResolver` now has LightWorld-backed access helpers for occluders, patches, trees, and prism entities
+- secondary-light source enumeration now reads prism emitters through shared world/entity helpers
+- surface sampling and closest-hit queries now use LightWorld-backed occluder/patch/entity access first, with scene arrays effectively acting as adapter fallback
+
+**Procedural-readiness improved:**
+- producer and solver code now have clearer internal seams where a generated `LightWorld` can be supplied without rewriting every consumer first
+- scene-local arrays are less central in producer/query flow and more confined to fallback/layout/collision roles

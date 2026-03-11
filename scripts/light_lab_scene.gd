@@ -162,42 +162,41 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		secondary_render_packet = _build_secondary_render_packet(secondary)
 		secondary_light_segments = secondary_render_packet.get("segments", [])
 		secondary_light_zones = secondary_render_packet.get("zones", [])
-		secondary_debug_points = secondary.get("debug_points", [])
-		perf_snapshot["secondary"] = secondary.get("perf", {})
+		secondary_debug_points = secondary_render_packet.get("debug_points", [])
+		perf_snapshot["secondary"] = secondary_render_packet.get("perf", {})
 		perf_snapshot["tier_c_ms"] = (Time.get_ticks_usec() - t0) / 1000.0
 		prism_visual_segments = []
 		prism_visual_zones = []
 		prism_visual_debug_points = []
 		prism_visual_fills = []
 		if prism_node:
-			var prism_vis := FlashlightVisuals.build_prism_visual_trace(self, prism_node.position, Vector2.RIGHT, approx_prism_frontiers.get("manual", {}))
-			prism_visual_segments.append_array(prism_vis.get("segments", []))
-			prism_visual_zones.append_array(prism_vis.get("zones", []))
-			prism_visual_debug_points.append_array(prism_vis.get("debug_points", []))
-			prism_visual_fills.append_array(prism_vis.get("fills", []))
-			approx_prism_frontiers["manual"] = prism_vis.get("frontier", {})
+			var prism_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_node.position, Vector2.RIGHT, approx_prism_frontiers.get("manual", {})))
+			prism_visual_segments.append_array(prism_packet.get("segments", []))
+			prism_visual_zones.append_array(prism_packet.get("zones", []))
+			prism_visual_debug_points.append_array(prism_packet.get("debug_points", []))
+			prism_visual_fills.append_array(prism_packet.get("fills", []))
+			approx_prism_frontiers["manual"] = prism_packet.get("frontier", {})
 		for prism_station: Dictionary in prism_stations:
 			var station_key := "station_%d_%d" % [int(prism_station["pos"].x), int(prism_station["pos"].y)]
-			var station_vis := FlashlightVisuals.build_prism_visual_trace(self, prism_station["pos"], Vector2.LEFT, approx_prism_frontiers.get(station_key, {}))
-			prism_visual_segments.append_array(station_vis.get("segments", []))
-			prism_visual_zones.append_array(station_vis.get("zones", []))
-			prism_visual_debug_points.append_array(station_vis.get("debug_points", []))
-			prism_visual_fills.append_array(station_vis.get("fills", []))
-			approx_prism_frontiers[station_key] = station_vis.get("frontier", {})
+			var station_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_station["pos"], Vector2.LEFT, approx_prism_frontiers.get(station_key, {})))
+			prism_visual_segments.append_array(station_packet.get("segments", []))
+			prism_visual_zones.append_array(station_packet.get("zones", []))
+			prism_visual_debug_points.append_array(station_packet.get("debug_points", []))
+			prism_visual_fills.append_array(station_packet.get("fills", []))
+			approx_prism_frontiers[station_key] = station_packet.get("frontier", {})
 		prism_render_packet = _build_combined_prism_render_packet()
 		prism_visual_segments = prism_render_packet.get("segments", [])
 		prism_visual_zones = prism_render_packet.get("zones", [])
 		prism_visual_fills = prism_render_packet.get("fills", [])
 	if tier_b_due:
 		var t1 := Time.get_ticks_usec()
-		var flashlight_visuals := FlashlightVisuals.build_visual_trace(self)
-		flashlight_render_packet = _build_visual_render_packet(flashlight_visuals, _flashlight_source_spec())
+		flashlight_render_packet = FlashlightVisuals.build_render_packet(self, FlashlightVisuals.flashlight_source_options(self))
 		flashlight_visual_segments = flashlight_render_packet.get("segments", [])
 		flashlight_visual_zones = flashlight_render_packet.get("zones", [])
-		flashlight_visual_debug_points = flashlight_visuals.get("debug_points", [])
+		flashlight_visual_debug_points = flashlight_render_packet.get("debug_points", [])
 		flashlight_visual_fills = flashlight_render_packet.get("fills", [])
-		approx_flashlight_frontier = flashlight_visuals.get("frontier", {})
-		perf_snapshot["flashlight"] = flashlight_visuals.get("perf", {})
+		approx_flashlight_frontier = flashlight_render_packet.get("frontier", {})
+		perf_snapshot["flashlight"] = flashlight_render_packet.get("perf", {})
 		perf_snapshot["tier_b_ms"] = (Time.get_ticks_usec() - t1) / 1000.0
 	if tier_b_due or tier_c_due:
 		approx_state = state
@@ -509,12 +508,6 @@ func _prism_source_spec(origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> 
 		"radial_emission": true
 	})
 
-func _build_visual_render_packet(visuals: Dictionary, source_spec: Dictionary) -> Dictionary:
-	return LightTypes.light_render_packet(String(source_spec.get("source_type", "light")), source_spec, visuals.get("segments", []), [], visuals.get("fills", []), visuals.get("zones", []), {
-		"guide_rays": source_spec.get("guide_rays", 0),
-		"radial_emission": source_spec.get("radial_emission", false)
-	})
-
 func _build_combined_prism_render_packet() -> Dictionary:
 	var segments: Array = prism_visual_segments.duplicate(true)
 	var fills: Array = prism_visual_fills.duplicate(true)
@@ -530,7 +523,8 @@ func _build_secondary_render_packet(secondary: Dictionary) -> Dictionary:
 		"tier": LightApproximation.TIER_SECONDARY
 	})
 	return LightTypes.light_render_packet("secondary", source_spec, secondary.get("segments", []), [], [], secondary.get("zones", []), {
-		"perf": secondary.get("perf", {})
+		"perf": secondary.get("perf", {}),
+		"debug_points": secondary.get("debug_points", [])
 	})
 
 func _material_under_cursor(pos: Vector2) -> Dictionary:

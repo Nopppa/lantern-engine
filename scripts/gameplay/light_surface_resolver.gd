@@ -8,6 +8,40 @@ const LightQuery = preload("res://scripts/gameplay/light_query.gd")
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 const LightStability = preload("res://scripts/gameplay/light_stability.gd")
 
+static func _world_occluders(lab) -> Array:
+	if lab.get("light_world") != null and lab.light_world:
+		return lab.light_world.occluder_segments
+	return lab.surface_segments
+
+static func _world_patches(lab) -> Array:
+	if lab.get("light_world") != null and lab.light_world:
+		return lab.light_world.material_patches
+	return lab.surface_patches
+
+static func _world_tree_entities(lab) -> Array:
+	if lab.get("light_world") != null and lab.light_world:
+		return lab.light_world.entity_list("tree_trunk")
+	return lab.tree_trunks
+
+static func _world_prism_entities(lab) -> Array:
+	var entities: Array = []
+	if lab.get("light_world") != null and lab.light_world:
+		entities.append_array(lab.light_world.entity_list("prism_station"))
+		entities.append_array(lab.light_world.entity_list("prism_node"))
+		return entities
+	for prism_station: Dictionary in lab.prism_stations:
+		var entity := prism_station.duplicate(true)
+		entity["kind"] = "prism_station"
+		entities.append(entity)
+	if lab.prism_node:
+		entities.append({
+			"kind": "prism_node",
+			"pos": lab.prism_node.position,
+			"radius": lab.current_prism_radius(),
+			"material_id": "prism"
+		})
+	return entities
+
 static func cast_beam(lab, target: Vector2) -> void:
 	if lab.beam_timer > 0.0:
 		lab.last_event = "Beam on cooldown"
@@ -129,33 +163,25 @@ static func _environment_sources(lab) -> Array:
 			"half_angle": lab.flashlight_half_angle,
 			"intensity": 0.62
 		})
-	for prism_station: Dictionary in lab.prism_stations:
+	for prism_entity: Dictionary in _world_prism_entities(lab):
+		var kind := String(prism_entity.get("kind", "prism_station"))
 		sources.append({
 			"source_type": "prism",
-			"origin": prism_station["pos"],
-			"direction": Vector2.LEFT,
-			"range": 74.0,
+			"origin": prism_entity["pos"],
+			"direction": Vector2.RIGHT if kind == "prism_node" else Vector2.LEFT,
+			"range": 88.0 if kind == "prism_node" else 74.0,
 			"half_angle": 180.0,
-			"intensity": 0.40
-		})
-	if lab.prism_node:
-		sources.append({
-			"source_type": "prism",
-			"origin": lab.prism_node.position,
-			"direction": Vector2.RIGHT,
-			"range": 88.0,
-			"half_angle": 180.0,
-			"intensity": 0.50
+			"intensity": 0.50 if kind == "prism_node" else 0.40
 		})
 	return sources
 
 static func _surface_samples_for_source(lab, source: Dictionary, previous_keys: Dictionary) -> Array:
 	var candidates: Array = []
-	for surface: Dictionary in lab.surface_segments:
+	for surface: Dictionary in _world_occluders(lab):
 		var sample := _sample_segment_from_source(lab, source, surface)
 		if not sample.is_empty():
 			candidates.append(sample)
-	for patch: Dictionary in lab.surface_patches:
+	for patch: Dictionary in _world_patches(lab):
 		var patch_sample := _sample_patch_from_source(lab, source, patch)
 		if not patch_sample.is_empty():
 			candidates.append(patch_sample)
@@ -307,7 +333,7 @@ static func _append_segment(lab, a: Vector2, b: Vector2, intensity: float, mater
 static func _closest_hit(lab, origin: Vector2, direction: Vector2, max_distance: float) -> Dictionary:
 	var best_t: float = max_distance
 	var best: Dictionary = {}
-	for surface: Dictionary in lab.surface_segments:
+	for surface: Dictionary in _world_occluders(lab):
 		var hit := _ray_segment_intersection(origin, direction, Vector2(surface["a"]), Vector2(surface["b"]))
 		if hit.is_empty():
 			continue
@@ -324,7 +350,7 @@ static func _closest_hit(lab, origin: Vector2, direction: Vector2, max_distance:
 			"special": false,
 			"hit_kind": "bounce"
 		}
-	for trunk: Dictionary in lab.tree_trunks:
+	for trunk: Dictionary in _world_tree_entities(lab):
 		var trunk_hit := LightLabCollision.segment_intersects_circle(origin, origin + direction * max_distance, Vector2(trunk["pos"]), float(trunk["radius"]))
 		if trunk_hit.is_empty():
 			continue
@@ -334,8 +360,10 @@ static func _closest_hit(lab, origin: Vector2, direction: Vector2, max_distance:
 			continue
 		best_t = t_tree
 		best = {"point": point, "normal": (point - Vector2(trunk["pos"])).normalized(), "material_id": "tree", "material_label": "Tree Trunk", "special": false, "hit_kind": "block"}
-	for prism_station: Dictionary in lab.prism_stations:
-		var prism_hit := BeamResolver.segment_circle_hit(origin, origin + direction * max_distance, prism_station["pos"], prism_station["radius"])
+	for prism_entity: Dictionary in _world_prism_entities(lab):
+		if String(prism_entity.get("kind", "")) != "prism_station":
+			continue
+		var prism_hit := BeamResolver.segment_circle_hit(origin, origin + direction * max_distance, prism_entity["pos"], prism_entity["radius"])
 		if prism_hit.is_empty():
 			continue
 		var point2: Vector2 = prism_hit["point"]
