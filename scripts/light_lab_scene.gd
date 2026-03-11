@@ -11,7 +11,7 @@ const LightLabLayout = preload("res://scripts/data/light_lab_layout.gd")
 const FlashlightVisuals = preload("res://scripts/gameplay/flashlight_visuals.gd")
 const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
 
-const LAB_LABEL := "Light Lab v0.5.6"
+const LAB_LABEL := "Light Lab v0.5.7"
 const CELL_SIZE := 32.0
 const PROBE_RADIUS := 18.0
 
@@ -27,10 +27,15 @@ var flashlight_visual_segments: Array = []
 var flashlight_visual_zones: Array = []
 var flashlight_visual_debug_points: Array = []
 var flashlight_visual_fills: Array = []
+var prism_visual_segments: Array = []
+var prism_visual_zones: Array = []
+var prism_visual_debug_points: Array = []
+var prism_visual_fills: Array = []
 var dead_alive_cells: Array = []
 var approx_refresh_timer := 999.0
 var approx_state := {}
 var approx_flashlight_frontier := {}
+var approx_prism_frontiers := {}
 var approx_secondary_sample_order := {}
 var perf_snapshot := {
 	"secondary": {},
@@ -80,6 +85,7 @@ func _build_light_lab() -> void:
 		tree_trunks.append(trunk.duplicate(true))
 	approx_state = {}
 	approx_flashlight_frontier = {}
+	approx_prism_frontiers = {}
 	approx_secondary_sample_order = {}
 	approx_refresh_timer = 999.0
 
@@ -155,6 +161,25 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		secondary_debug_points = secondary.get("debug_points", [])
 		perf_snapshot["secondary"] = secondary.get("perf", {})
 		perf_snapshot["tier_c_ms"] = (Time.get_ticks_usec() - t0) / 1000.0
+		prism_visual_segments = []
+		prism_visual_zones = []
+		prism_visual_debug_points = []
+		prism_visual_fills = []
+		if prism_node:
+			var prism_vis := FlashlightVisuals.build_prism_visual_trace(self, prism_node.position, facing, approx_prism_frontiers.get("manual", {}))
+			prism_visual_segments.append_array(prism_vis.get("segments", []))
+			prism_visual_zones.append_array(prism_vis.get("zones", []))
+			prism_visual_debug_points.append_array(prism_vis.get("debug_points", []))
+			prism_visual_fills.append_array(prism_vis.get("fills", []))
+			approx_prism_frontiers["manual"] = prism_vis.get("frontier", {})
+		for prism_station: Dictionary in prism_stations:
+			var station_key := "station_%d_%d" % [int(prism_station["pos"].x), int(prism_station["pos"].y)]
+			var station_vis := FlashlightVisuals.build_prism_visual_trace(self, prism_station["pos"], Vector2.LEFT, approx_prism_frontiers.get(station_key, {}))
+			prism_visual_segments.append_array(station_vis.get("segments", []))
+			prism_visual_zones.append_array(station_vis.get("zones", []))
+			prism_visual_debug_points.append_array(station_vis.get("debug_points", []))
+			prism_visual_fills.append_array(station_vis.get("fills", []))
+			approx_prism_frontiers[station_key] = station_vis.get("frontier", {})
 	if tier_b_due:
 		var t1 := Time.get_ticks_usec()
 		var flashlight_visuals := FlashlightVisuals.build_visual_trace(self)
@@ -214,6 +239,10 @@ func _restart_lab() -> void:
 	flashlight_visual_zones.clear()
 	flashlight_visual_debug_points.clear()
 	flashlight_visual_fills.clear()
+	prism_visual_segments.clear()
+	prism_visual_zones.clear()
+	prism_visual_debug_points.clear()
+	prism_visual_fills.clear()
 	player_hp = player_max_hp
 	energy = max_energy
 	player_pos = Vector2(228, 576)
@@ -228,6 +257,7 @@ func _restart_lab() -> void:
 	_build_light_lab()
 	approx_state = {}
 	approx_flashlight_frontier = {}
+	approx_prism_frontiers = {}
 	approx_secondary_sample_order = {}
 	approx_refresh_timer = 999.0
 	last_event = "Light Lab reset"
@@ -328,6 +358,10 @@ func _light_intensity_at(pos: Vector2) -> float:
 		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 32.0 if String(segment.get("kind", "primary")) == "primary" else 26.0, float(segment["intensity"]) * (0.9 if String(segment.get("kind", "primary")) == "primary" else 0.7)))
 	for zone: Dictionary in flashlight_visual_zones:
 		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])))
+	for segment: Dictionary in prism_visual_segments:
+		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 28.0 if String(segment.get("kind", "primary")) == "primary" else 24.0, float(segment["intensity"]) * (0.85 if String(segment.get("kind", "primary")) == "primary" else 0.65)))
+	for zone: Dictionary in prism_visual_zones:
+		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])))
 	for segment: Dictionary in beam_segments:
 		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 42.0, float(segment["intensity"])))
 	for diffuse: Dictionary in diffuse_zones:
@@ -336,20 +370,17 @@ func _light_intensity_at(pos: Vector2) -> float:
 		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 38.0, float(segment["intensity"])))
 	for zone: Dictionary in secondary_light_zones:
 		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], zone["strength"]))
-	for prism_station: Dictionary in prism_stations:
-		intensity = max(intensity, _radial_intensity(prism_station["pos"], pos, 64.0, 0.42))
-	if prism_node:
-		intensity = max(intensity, _radial_intensity(prism_node.position, pos, 100.0, 0.66))
 	return clampf(intensity, 0.0, 1.0)
 
 func _is_in_flashlight_cone(pos: Vector2) -> bool:
 	return _light_intensity_at(pos) > 0.12 and flashlight_on
 
 func _is_in_prism_light(pos: Vector2) -> bool:
-	if prism_node and prism_node.position.distance_to(pos) <= 100.0:
-		return true
-	for prism_station: Dictionary in prism_stations:
-		if prism_station["pos"].distance_to(pos) <= 64.0:
+	for segment: Dictionary in prism_visual_segments:
+		if _segment_intensity(segment["a"], segment["b"], pos, 28.0, float(segment["intensity"])) > 0.12:
+			return true
+	for zone: Dictionary in prism_visual_zones:
+		if _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])) > 0.12:
 			return true
 	return false
 
@@ -371,8 +402,6 @@ func _light_state_for_position(pos: Vector2) -> Dictionary:
 
 func _build_lit_zones() -> Array:
 	var zones: Array = []
-	if flashlight_on:
-		zones.append({"pos": player_pos + facing * 116.0, "radius": 176.0, "color": Color(1.0, 0.95, 0.72, 0.06), "layer": 0})
 	for segment: Dictionary in flashlight_visual_segments:
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.18, 24.0), "color": Color(1.0, 0.92, 0.72, 0.028 + 0.035 * float(segment["intensity"])), "layer": 0})
 	for zone: Dictionary in flashlight_visual_zones:
@@ -388,10 +417,10 @@ func _build_lit_zones() -> Array:
 	for zone: Dictionary in secondary_light_zones:
 		var zone_color: Color = _secondary_zone_color(zone)
 		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(zone_color.r, zone_color.g, zone_color.b, 0.038 * float(zone["strength"]) + 0.02), "layer": int(zone.get("layer", 1))})
-	if prism_node:
-		zones.append({"pos": prism_node.position, "radius": 100.0, "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.08), "layer": 0})
-	for prism_station: Dictionary in prism_stations:
-		zones.append({"pos": prism_station["pos"], "radius": 64.0, "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.06), "layer": 0})
+	for segment: Dictionary in prism_visual_segments:
+		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.16, 22.0), "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.024 + 0.028 * float(segment["intensity"])), "layer": 0})
+	for zone: Dictionary in prism_visual_zones:
+		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.020 + 0.026 * float(zone["strength"])), "layer": 0})
 	return zones
 
 func _update_ui() -> void:
@@ -495,6 +524,7 @@ func _draw() -> void:
 	for patch: Dictionary in surface_patches:
 		_draw_sign_patch(patch)
 	_draw_flashlight_trace()
+	_draw_prism_trace()
 	_draw_primary_beam_segments()
 	_draw_secondary_overlays()
 	if beam_debug_enabled and not ui_overlays_hidden:
@@ -525,8 +555,8 @@ func _draw_flashlight_trace() -> void:
 	for fill: Dictionary in flashlight_visual_fills:
 		var points: PackedVector2Array = fill["points"]
 		var strength: float = float(fill.get("strength", 1.0))
-		draw_colored_polygon(points, Color(1.0, 0.94, 0.72, 0.060 * strength))
-		draw_polyline(points, Color(1.0, 0.98, 0.84, 0.11 * strength), 1.2, true)
+		draw_colored_polygon(points, Color(1.0, 0.94, 0.72, 0.024 * strength))
+		draw_polyline(points, Color(1.0, 0.98, 0.84, 0.048 * strength), 1.2, true)
 	for zone: Dictionary in flashlight_visual_zones:
 		var kind := String(zone.get("kind", "diffuse"))
 		var zone_color := Color(1.0, 0.90, 0.62, 0.08 * float(zone["strength"]))
@@ -580,6 +610,56 @@ func _draw_flashlight_trace() -> void:
 		if not ui_overlays_hidden and kind != "primary":
 			var label := "FX" if kind == "reflect" else ("TX" if kind == "transmit" else "SC")
 			draw_string(ThemeDB.fallback_font, a.lerp(b, 0.5) + Vector2(-8, -8), label, HORIZONTAL_ALIGNMENT_LEFT, 28.0, 9, Color(1, 1, 1, 0.65))
+
+func _draw_prism_trace() -> void:
+	for fill: Dictionary in prism_visual_fills:
+		var points: PackedVector2Array = fill["points"]
+		var strength: float = float(fill.get("strength", 1.0))
+		draw_colored_polygon(points, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.020 * strength))
+		draw_polyline(points, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.042 * strength), 1.2, true)
+	for zone: Dictionary in prism_visual_zones:
+		var kind := String(zone.get("kind", "diffuse"))
+		var zone_color := Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.06 * float(zone["strength"]))
+		if String(zone.get("material_id", "")) == "glass":
+			zone_color = Color(0.68, 0.94, 1.0, 0.05 * float(zone["strength"]))
+		elif String(zone.get("material_id", "")) == "wet":
+			zone_color = Color(0.72, 0.93, 1.0, 0.06 * float(zone["strength"]))
+		draw_circle(zone["pos"], zone["radius"], zone_color)
+		if kind != "block":
+			draw_arc(zone["pos"], float(zone["radius"]) * 0.56, 0.0, TAU, 20, Color(zone_color.r, zone_color.g, zone_color.b, 0.18 + 0.14 * float(zone["strength"])), 1.6)
+	for segment: Dictionary in prism_visual_segments:
+		var a: Vector2 = segment["a"]
+		var b: Vector2 = segment["b"]
+		var intensity: float = float(segment["intensity"])
+		var kind := String(segment.get("kind", "primary"))
+		var material_id := String(segment.get("material_id", "open"))
+		var tint := Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 1.0)
+		var width := 3.6
+		if kind == "transmit":
+			tint = Color(0.66, 0.94, 1.0, 1.0)
+			width = 2.8
+		elif kind == "reflect":
+			tint = Color(PRISM_COLOR.r * 1.05, PRISM_COLOR.g * 0.96, PRISM_COLOR.b, 1.0)
+			width = 3.2
+		elif kind == "scatter":
+			tint = Color(0.72, 0.88, 1.0, 1.0)
+			width = 2.4
+		elif kind == "disturb":
+			tint = Color(0.74, 0.94, 1.0, 1.0)
+			width = 2.2
+		var is_primary := kind == "primary"
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.028 if is_primary else 0.06) * intensity), 9.0 if is_primary else 10.0)
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.07 if is_primary else 0.16) * intensity), 4.8 if is_primary else 6.0)
+		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.20 if is_primary else 0.50) * intensity), 2.0 if is_primary else width)
+		if kind == "transmit":
+			var distance: float = a.distance_to(b)
+			var steps: int = max(2, int(distance / 24.0))
+			for i in range(steps):
+				if i % 2 == 0:
+					continue
+				var da: Vector2 = a.lerp(b, float(i) / float(steps))
+				var db: Vector2 = a.lerp(b, min(1.0, float(i) / float(steps) + 0.08))
+				draw_line(da, db, Color(1.0, 1.0, 1.0, 0.32 * intensity), 1.3)
 
 func _draw_sign_patch(patch: Dictionary) -> void:
 	var rect: Rect2 = patch["rect"]

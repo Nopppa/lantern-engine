@@ -592,8 +592,8 @@ func _draw() -> void:
 		draw_line(prism_node.position, prism_node.position + prism_preview_dir * 46.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.4), 2.0)
 	if flashlight_on:
 		for tri: PackedVector2Array in flashlight_visual_fill:
-			draw_colored_polygon(tri, Color(1.0, 0.96, 0.72, 0.10))
-			draw_polyline(tri, Color(1.0, 0.98, 0.84, 0.08), 1.2, true)
+			draw_colored_polygon(tri, Color(1.0, 0.96, 0.72, 0.024))
+			draw_polyline(tri, Color(1.0, 0.98, 0.84, 0.048), 1.2, true)
 		for trace: Dictionary in flashlight_visual_traces:
 			for segment: Array in trace.get("segments", []):
 				var a: Vector2 = segment[0]
