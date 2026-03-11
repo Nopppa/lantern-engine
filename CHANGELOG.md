@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 - 2026-03-11
+
+Lighting Overhaul architecture release:
+
+- completed the packet/world-first lighting overhaul across both `LightLabScene` and `RunScene`: solver output now flows through `LightRenderPacket` as the primary truth for rendering, queries, and runtime consumers
+- removed legacy visual mirror arrays and `beam_segments` compatibility state from the active lighting path, leaving render packets as the sole visual/runtime source of truth in both scenes
+- finished shared `LightWorld` / `LightWorldBuilder` integration so authored and generated layouts now flow through the same world-data model with shared occluders, patches, prism stations, tree trunks, dead/alive metadata, and spawn hints
+- added a cached procedural world path for Light Lab with seed-based generated layouts, reroll support, layout signatures, and static-world cache reuse plus lightweight runtime entity refresh
+- added a presentation-only native Godot lighting layer with `CanvasModulate`, `PointLight2D`, `LightOccluder2D`, decorative flashlight shadows, explicit native mask separation, and scene-integration toggles/debug parity without moving gameplay truth into Godot lights
+- preserved authored test-field validation while making the same pipeline credible for future randomgen / procedural content
+- validated with headless parse checks and produced a fresh Windows export/release target for the completed lighting overhaul
+
 ## 0.5.5 - 2026-03-10
 
 Light Stability & Surface Spill Fix patch:

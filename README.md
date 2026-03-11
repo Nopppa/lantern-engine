@@ -1,6 +1,6 @@
 # Lantern Engine — Light Lab Pivot
 
-Godot 4 prototype now centered on a permanent **Light Lab** instead of treating the old wave-survival arena as the main game direction. `v0.5.5` keeps the lab as default runtime and tightens the approximation system around stability, surface-truthful spill blocking, and lower-cost refresh work while preserving material/obstacle truth.
+Godot 4 prototype now centered on a permanent **Light Lab** with the lighting overhaul completed through a packet/world-first architecture. `v0.6.0` keeps the lab as the default runtime, preserves authored validation flow, and now runs authored + generated layouts through the same lighting pipeline.
 
 ## Current primary runtime
 
@@ -16,7 +16,7 @@ The project now boots straight into the **Light Lab**:
 
 The older wave-survival run still exists in the repo as temporary legacy scaffolding (`scenes/run_scene.tscn`, `scripts/run_scene.gd`, encounter data, reward flow), but it is no longer the primary target or default scene flow.
 
-## Light Lab content shipped in v0.5.4
+## Light Lab content shipped in v0.6.0
 
 - surrounding outer walls
 - several internal wall segments for routing / occlusion tests
@@ -82,6 +82,37 @@ The lab floor now uses a temporary rendering-side dead/alive blend grid:
 - authored base-alive zones remain restored
 - no destructive pixel rewriting
 
+## Lighting overhaul status (`v0.6.0`)
+
+The core lighting overhaul is now complete:
+
+- **Phases 1–5 done**
+- lighting architecture is **packet/world-first**
+- authored and generated layouts now use the **same pipeline shape**
+- `LightWorld` / `LightWorldBuilder` provide the reusable world-data boundary
+- solver output feeds `LightRenderPacket` directly in both `RunScene` and `LightLabScene`
+- native Godot lighting is now a **presentation-only** layer on top of solver/world truth
+- generated Light Lab layouts support seeded rerolls plus cached static world reuse
+
+### Native presentation layer
+
+Godot-native helpers now provide extra atmosphere without becoming gameplay truth:
+
+- ambient darkness via `CanvasModulate`
+- additive `PointLight2D` flashlight / beam-impact / prism glows
+- decorative `LightOccluder2D` shadows driven from world occluders and tree trunks
+- explicit light/shadow masks for cleaner native presentation isolation
+- parity toggles/debug visibility in both Light Lab and RunScene
+
+### Procedural-ready path
+
+The Light Lab now supports both authored and generated layouts through the same architecture:
+
+- shared layout-driven `LightWorld` construction
+- generated layout by seed + reroll support
+- cached static world data with runtime entity refresh
+- dead/alive + spawn-hint metadata carried through the same world path
+
 ## Controls
 
 ### Core
@@ -130,11 +161,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.5.5` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.6.0` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.5.5.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.6.0.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 

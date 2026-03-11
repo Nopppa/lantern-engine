@@ -1,5 +1,16 @@
 # Milestones
 
+## Done now: v0.6.0 Lighting Overhaul shipped
+
+Delivered in this repo now:
+
+- packet/world-first lighting architecture across both `LightLabScene` and `RunScene`
+- shared `LightWorld` / `LightWorldBuilder` path for authored and generated layouts
+- direct solver -> `LightRenderPacket` flow as the primary render/query/runtime truth
+- removal of legacy visual mirror arrays and old beam compatibility state from the active lighting path
+- presentation-only native Godot lighting layer with decorative occluder shadows, explicit masks, and scene parity controls
+- seeded generated Light Lab layouts with reroll support and cached static world reuse
+
 ## Done now: v0.5.3 Surface Optics & Navigation Truth patch shipped
 
 Delivered in this repo now:
