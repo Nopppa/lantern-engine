@@ -20,7 +20,8 @@ static func build_visual_trace(lab) -> Dictionary:
 		"edge_intensity": 0.42,
 		"use_frontier_smoothing": true,
 		"previous_frontier": lab.approx_flashlight_frontier,
-		"source_anchor": lab.player_pos
+		"source_anchor": lab.player_pos,
+		"radial_emission": false
 	})
 
 static func build_prism_visual_trace(lab, source_origin: Vector2, source_direction: Vector2, previous_frontier: Dictionary = {}) -> Dictionary:
@@ -29,21 +30,22 @@ static func build_prism_visual_trace(lab, source_origin: Vector2, source_directi
 		"origin": source_origin,
 		"direction": source_direction,
 		"range": 118.0,
-		"half_angle_deg": 32.0,
-		"guide_rays": 5,
+		"guide_rays": int(LightApproximation.config_for_source("prism").get("guide_rays", 40)),
 		"center_intensity": 0.78,
-		"edge_intensity": 0.54,
+		"edge_intensity": 0.78,
 		"use_frontier_smoothing": false,
 		"previous_frontier": previous_frontier,
-		"source_anchor": source_origin
+		"source_anchor": source_origin,
+		"radial_emission": true
 	})
 
 static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 	var source_type := String(options.get("source_type", "flashlight"))
 	var config := LightApproximation.config_for_source(source_type)
-	var ray_count: int = int(options.get("guide_rays", int(config.get("guide_rays", 9))))
+	var ray_count: int = max(1, int(options.get("guide_rays", int(config.get("guide_rays", 9)))))
 	var previous_frontier: Dictionary = options.get("previous_frontier", {})
 	var max_bounces: int = 1
+	var radial_emission: bool = bool(options.get("radial_emission", false))
 	var segments: Array = []
 	var zones: Array = []
 	var fills: Array = []
@@ -57,12 +59,17 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 	var center_intensity: float = float(options.get("center_intensity", 0.96))
 	var edge_intensity: float = float(options.get("edge_intensity", 0.42))
 	for i in range(ray_count):
-		var t: float = 0.5 if ray_count <= 1 else float(i) / float(ray_count - 1)
-		var angle: float = lerpf(base_angle - cone_angle, base_angle + cone_angle, t)
-		var edge_ratio: float = absf(t * 2.0 - 1.0)
+		var t: float = 0.0 if radial_emission and ray_count <= 0 else (0.5 if ray_count <= 1 else float(i) / float(ray_count - 1))
+		var angle: float = 0.0
+		var edge_ratio: float = 0.0
+		if radial_emission:
+			angle = base_angle + TAU * float(i) / float(ray_count)
+		else:
+			angle = lerpf(base_angle - cone_angle, base_angle + cone_angle, t)
+			edge_ratio = absf(t * 2.0 - 1.0)
 		var origin: Vector2 = trace_origin
 		var direction: Vector2 = Vector2.RIGHT.rotated(angle)
-		var intensity: float = lerpf(edge_intensity, center_intensity, pow(1.0 - edge_ratio, 1.18))
+		var intensity: float = center_intensity if radial_emission else lerpf(edge_intensity, center_intensity, pow(1.0 - edge_ratio, 1.18))
 		var remaining: float = float(options.get("range", lab.flashlight_range))
 		var bounce_index: int = 0
 		var frontier_point: Vector2 = origin + direction * min(remaining, 48.0)
@@ -79,7 +86,8 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 					"material_id": "open",
 					"bounce_index": bounce_index,
 					"sample": t,
-					"source_type": source_type
+					"source_type": source_type,
+					"visible": false
 				})
 				frontier_point = end_point
 				if _crosses_material_patch(lab, origin, end_point, "wood"):
@@ -104,7 +112,8 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 				"material_id": String(hit.get("material_id", "brick")),
 				"bounce_index": bounce_index,
 				"sample": t,
-				"source_type": source_type
+				"source_type": source_type,
+				"visible": false
 			})
 			debug_points.append({
 				"point": hit_point,
@@ -149,7 +158,8 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 						"material_id": material_id,
 						"bounce_index": bounce_index + 1,
 						"sample": t,
-						"source_type": source_type
+						"source_type": source_type,
+						"visible": true
 					})
 			elif material_id == "wet":
 				var wet_segment := LightSurfaceResolver._clip_secondary_branch(lab, hit_point, Vector2(response["reflect_dir"]), remaining * 0.20, material_id, false)
@@ -162,7 +172,8 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 						"material_id": material_id,
 						"bounce_index": bounce_index + 1,
 						"sample": t,
-						"source_type": source_type
+						"source_type": source_type,
+						"visible": true
 					})
 			elif material_id == "mirror":
 				var mirror_segment := LightSurfaceResolver._clip_secondary_branch(lab, hit_point, Vector2(response["reflect_dir"]), remaining * 0.26, material_id, false)
@@ -175,7 +186,8 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 						"material_id": material_id,
 						"bounce_index": bounce_index + 1,
 						"sample": t,
-						"source_type": source_type
+						"source_type": source_type,
+						"visible": true
 					})
 			var continued: bool = false
 			if float(response["transmission"]) * intensity > float(response["branch_min"]):
@@ -190,7 +202,8 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 						"bounce_index": bounce_index,
 						"sample": t,
 						"blocked": transmit_segment.get("blocked", false),
-						"source_type": source_type
+						"source_type": source_type,
+						"visible": true
 					})
 				direction = Vector2(response["transmit_dir"]).normalized()
 				origin = hit_point + direction * lab.BEAM_OFFSET
@@ -207,9 +220,9 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 			if not continued:
 				break
 		primary_frontier.append(frontier_point)
-	if bool(options.get("use_frontier_smoothing", true)):
+	if bool(options.get("use_frontier_smoothing", true)) and not radial_emission:
 		primary_frontier = LightStability.smooth_frontier(source_anchor, primary_frontier, previous_frontier, float(config.get("envelope_smoothing", 0.35)))
-	fills = _build_beam_fills(source_anchor, primary_frontier, config)
+	fills = _build_light_fills(source_anchor, primary_frontier, config, radial_emission)
 	var new_frontier: Dictionary = {}
 	for i in range(primary_frontier.size()):
 		new_frontier[LightStability.stable_frontier_key(Vector2(primary_frontier[i]), i)] = primary_frontier[i]
@@ -225,6 +238,11 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 		},
 		"frontier": new_frontier
 	}
+
+static func _build_light_fills(origin: Vector2, frontier: Array, config: Dictionary, radial_emission: bool) -> Array:
+	if radial_emission:
+		return _build_radial_fills(origin, frontier, config)
+	return _build_beam_fills(origin, frontier, config)
 
 static func _build_beam_fills(origin: Vector2, frontier: Array, config: Dictionary) -> Array:
 	if frontier.size() < 2:
@@ -244,6 +262,20 @@ static func _build_beam_fills(origin: Vector2, frontier: Array, config: Dictiona
 		fills.append({
 			"points": PackedVector2Array([points[0], points[i], points[i + 1]]),
 			"strength": 1.0 - (float(i - 1) / max(1.0, float(points.size() - 3))) * 0.22
+		})
+	return fills
+
+static func _build_radial_fills(origin: Vector2, frontier: Array, config: Dictionary) -> Array:
+	if frontier.size() < 3:
+		return []
+	var fills: Array = []
+	for i in range(frontier.size()):
+		var a: Vector2 = frontier[i]
+		var b: Vector2 = frontier[(i + 1) % frontier.size()]
+		var span_strength := clampf(1.0 - absf(a.distance_to(origin) - b.distance_to(origin)) / 120.0, 0.58, 1.0)
+		fills.append({
+			"points": PackedVector2Array([origin, a, b]),
+			"strength": span_strength
 		})
 	return fills
 

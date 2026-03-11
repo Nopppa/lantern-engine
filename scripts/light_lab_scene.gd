@@ -166,7 +166,7 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		prism_visual_debug_points = []
 		prism_visual_fills = []
 		if prism_node:
-			var prism_vis := FlashlightVisuals.build_prism_visual_trace(self, prism_node.position, facing, approx_prism_frontiers.get("manual", {}))
+			var prism_vis := FlashlightVisuals.build_prism_visual_trace(self, prism_node.position, Vector2.RIGHT, approx_prism_frontiers.get("manual", {}))
 			prism_visual_segments.append_array(prism_vis.get("segments", []))
 			prism_visual_zones.append_array(prism_vis.get("zones", []))
 			prism_visual_debug_points.append_array(prism_vis.get("debug_points", []))
@@ -568,10 +568,12 @@ func _draw_flashlight_trace() -> void:
 		if kind != "block":
 			draw_arc(zone["pos"], float(zone["radius"]) * 0.56, 0.0, TAU, 20, Color(zone_color.r, zone_color.g, zone_color.b, 0.22 + 0.18 * float(zone["strength"])), 1.8)
 	for segment: Dictionary in flashlight_visual_segments:
+		var kind := String(segment.get("kind", "primary"))
+		if kind == "primary" and not bool(segment.get("visible", true)):
+			continue
 		var a: Vector2 = segment["a"]
 		var b: Vector2 = segment["b"]
 		var intensity: float = float(segment["intensity"])
-		var kind := String(segment.get("kind", "primary"))
 		var material_id := String(segment.get("material_id", "open"))
 		var tint := Color(1.0, 0.95, 0.78, 1.0)
 		var width := 4.0
@@ -628,10 +630,12 @@ func _draw_prism_trace() -> void:
 		if kind != "block":
 			draw_arc(zone["pos"], float(zone["radius"]) * 0.56, 0.0, TAU, 20, Color(zone_color.r, zone_color.g, zone_color.b, 0.18 + 0.14 * float(zone["strength"])), 1.6)
 	for segment: Dictionary in prism_visual_segments:
+		var kind := String(segment.get("kind", "primary"))
+		if kind == "primary" and not bool(segment.get("visible", true)):
+			continue
 		var a: Vector2 = segment["a"]
 		var b: Vector2 = segment["b"]
 		var intensity: float = float(segment["intensity"])
-		var kind := String(segment.get("kind", "primary"))
 		var material_id := String(segment.get("material_id", "open"))
 		var tint := Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 1.0)
 		var width := 3.6

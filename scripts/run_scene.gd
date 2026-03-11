@@ -506,7 +506,7 @@ func _refresh_environment_light_traces() -> void:
 	flashlight_visual_fill.clear()
 	prism_light_traces.clear()
 	if flashlight_on:
-		var guide_count := 9
+		var guide_count := 25
 		var base_angle := facing.angle()
 		var cone_angle := deg_to_rad(flashlight_half_angle)
 		var frontier: Array = []
@@ -520,7 +520,7 @@ func _refresh_environment_light_traces() -> void:
 		for i in range(frontier.size() - 1):
 			flashlight_visual_fill.append(PackedVector2Array([player_pos, frontier[i], frontier[i + 1]]))
 	if prism_node:
-		var prism_rays := 6
+		var prism_rays := 32
 		for i in range(prism_rays):
 			var angle := TAU * float(i) / float(prism_rays)
 			var trace := _trace_bounced_light_path(prism_node.position, Vector2.RIGHT.rotated(angle), 128.0, 1)
@@ -586,32 +586,16 @@ func _draw() -> void:
 		draw_arc(prism_node.position, 18.0, 0.0, TAU, 32, Color(1.0, 1.0, 1.0, 0.45), 1.5)
 		draw_line(prism_node.position + Vector2(-24, 0), prism_node.position + Vector2(24, 0), Color(1.0, 1.0, 1.0, 0.16), 2.0)
 		draw_line(prism_node.position + Vector2(0, -24), prism_node.position + Vector2(0, 24), Color(1.0, 1.0, 1.0, 0.16), 2.0)
-		var prism_preview_dir := _redirected_prism_direction(facing)
 		draw_circle(prism_node.position, current_prism_radius(), Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.08))
 		draw_circle(prism_node.position, prism_surge_radius, Color(0.62, 0.94, 1.0, 0.035 if prism_surge_timer <= 0.0 else 0.02))
-		draw_line(prism_node.position, prism_node.position + prism_preview_dir * 46.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.4), 2.0)
 	if flashlight_on:
 		for tri: PackedVector2Array in flashlight_visual_fill:
 			draw_colored_polygon(tri, Color(1.0, 0.96, 0.72, 0.024))
 			draw_polyline(tri, Color(1.0, 0.98, 0.84, 0.048), 1.2, true)
-		for trace: Dictionary in flashlight_visual_traces:
-			for segment: Array in trace.get("segments", []):
-				var a: Vector2 = segment[0]
-				var b: Vector2 = segment[1]
-				draw_line(a, b, Color(1.0, 0.94, 0.72, 0.028), 18.0)
-				draw_line(a, b, Color(1.0, 0.97, 0.82, 0.055), 8.0)
-				draw_line(a, b, Color(1.0, 0.98, 0.88, 0.12), 2.2)
-				if b != trace.get("frontier"):
-					draw_circle(b, 10.0, Color(0.72, 0.96, 1.0, 0.10))
+		# Flashlight physics rays are now invisible - only the filled volume above is visible
 	if prism_node:
-		for trace: Dictionary in prism_light_traces:
-			for segment: Array in trace.get("segments", []):
-				var pa: Vector2 = segment[0]
-				var pb: Vector2 = segment[1]
-				draw_line(pa, pb, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.05), 12.0)
-				draw_line(pa, pb, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.13), 3.0)
-				if pb != trace.get("frontier"):
-					draw_circle(pb, 8.0, Color(0.72, 0.96, 1.0, 0.18))
+		# Prism physics rays are now invisible - rendering moved to filled radial volumes
+		pass
 
 	for projectile: Dictionary in boss_projectiles:
 		var projectile_pos: Vector2 = projectile["pos"]

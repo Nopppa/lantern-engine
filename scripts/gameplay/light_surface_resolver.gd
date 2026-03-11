@@ -142,7 +142,7 @@ static func _environment_sources(lab) -> Array:
 		sources.append({
 			"source_type": "prism",
 			"origin": lab.prism_node.position,
-			"direction": lab.facing,
+			"direction": Vector2.RIGHT,
 			"range": 88.0,
 			"half_angle": 180.0,
 			"intensity": 0.50
