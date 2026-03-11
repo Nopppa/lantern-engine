@@ -7,6 +7,7 @@ const LightResponseModel = preload("res://scripts/gameplay/light_response_model.
 const LightQuery = preload("res://scripts/gameplay/light_query.gd")
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 const LightStability = preload("res://scripts/gameplay/light_stability.gd")
+const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 
 static func _world_occluders(lab) -> Array:
 	if lab.has_method("_light_world_occluders"):
@@ -60,11 +61,17 @@ static func cast_beam(lab, target: Vector2) -> void:
 	lab.beam_flash = 1.0
 	lab.beam_pulse_timer = lab.BEAM_PULSE_DURATION
 	lab.beam_segments.clear()
+	lab.diffuse_zones.clear()
+	lab.beam_render_packet = LightTypes.empty_render_packet("laser")
 	lab.beam_debug_hits.clear()
 	lab.hit_flashes.clear()
 	var direction: Vector2 = (target - lab.player_pos).normalized()
 	if direction == Vector2.ZERO:
 		direction = lab.facing
+	var source_spec := LightTypes.light_source_spec("laser", lab.player_pos, direction, 1.0, lab.beam_range, {
+		"max_branches": lab.beam_bounces,
+		"truth_solver": "light_surface_resolver"
+	})
 	var queue: Array = [{
 		"origin": lab.player_pos,
 		"direction": direction,
@@ -80,6 +87,11 @@ static func cast_beam(lab, target: Vector2) -> void:
 	while not queue.is_empty() and processed < 16:
 		processed += 1
 		_trace_ray(lab, queue.pop_front(), queue)
+	lab.beam_render_packet = LightTypes.light_render_packet("laser", source_spec, lab.beam_segments, [], [], lab.diffuse_zones, {
+		"debug_hits": lab.beam_debug_hits.duplicate(true),
+		"active": not lab.beam_segments.is_empty(),
+		"solver": "light_surface_resolver"
+	})
 	if lab.beam_segments.is_empty():
 		lab.last_event = "Beam fizzled"
 

@@ -128,6 +128,7 @@ func _process(delta: float) -> void:
 	_update_hit_flashes(delta)
 	if beam_pulse_timer <= 0.0 and not beam_segments.is_empty():
 		beam_segments.clear()
+		beam_render_packet = LightTypes.empty_render_packet("laser")
 		beam_debug_hits.clear()
 	approx_refresh_timer += delta
 	_refresh_light_approximations_if_needed()
@@ -242,6 +243,7 @@ func _restart_lab() -> void:
 	beam_segments.clear()
 	beam_debug_hits.clear()
 	diffuse_zones.clear()
+	beam_render_packet = LightTypes.empty_render_packet("laser")
 	flashlight_visual_segments.clear()
 	flashlight_visual_zones.clear()
 	flashlight_visual_debug_points.clear()
@@ -251,6 +253,7 @@ func _restart_lab() -> void:
 	prism_visual_debug_points.clear()
 	prism_visual_fills.clear()
 	secondary_render_packet = LightTypes.empty_render_packet("secondary")
+	beam_render_packet = LightTypes.empty_render_packet("laser")
 	player_hp = player_max_hp
 	energy = max_energy
 	player_pos = Vector2(228, 576)
@@ -417,6 +420,12 @@ func _packet_zones(packet: Dictionary) -> Array:
 func _packet_fills(packet: Dictionary) -> Array:
 	return packet.get("fills", [])
 
+func _beam_packet_segments() -> Array:
+	return _packet_segments(beam_render_packet)
+
+func _beam_packet_zones() -> Array:
+	return _packet_zones(beam_render_packet)
+
 func _light_world_patches() -> Array:
 	return light_world.material_patches if light_world else surface_patches
 
@@ -451,10 +460,7 @@ func _light_intensity_at(pos: Vector2) -> float:
 	intensity = max(intensity, _packet_intensity_at(flashlight_render_packet, pos, 32.0, 26.0, 0.9, 0.7))
 	intensity = max(intensity, _packet_intensity_at(prism_render_packet, pos, 28.0, 24.0, 0.85, 0.65))
 	intensity = max(intensity, _packet_intensity_at(secondary_render_packet, pos, 38.0, 38.0, 1.0, 1.0))
-	for segment: Dictionary in beam_segments:
-		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 42.0, float(segment["intensity"])))
-	for diffuse: Dictionary in diffuse_zones:
-		intensity = max(intensity, _radial_intensity(diffuse["pos"], pos, diffuse["radius"], diffuse["strength"]))
+	intensity = max(intensity, _packet_intensity_at(beam_render_packet, pos, 42.0, 42.0, 1.0, 1.0))
 	return clampf(intensity, 0.0, 1.0)
 
 func _is_in_flashlight_cone(pos: Vector2) -> bool:
@@ -464,10 +470,7 @@ func _is_in_prism_light(pos: Vector2) -> bool:
 	return _packet_intensity_at(prism_render_packet, pos, 28.0, 24.0, 1.0, 1.0) > 0.12
 
 func _is_in_beam_light(pos: Vector2) -> bool:
-	for segment: Dictionary in beam_segments:
-		if _segment_intensity(segment["a"], segment["b"], pos, 34.0, float(segment["intensity"])) > 0.12:
-			return true
-	return false
+	return _packet_intensity_at(beam_render_packet, pos, 34.0, 34.0, 1.0, 1.0) > 0.12
 
 func _light_state_for_position(pos: Vector2) -> Dictionary:
 	var intensity := _light_intensity_at(pos)
@@ -485,11 +488,11 @@ func _build_lit_zones() -> Array:
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.18, 24.0), "color": Color(1.0, 0.92, 0.72, 0.028 + 0.035 * float(segment["intensity"])), "layer": 0})
 	for zone: Dictionary in _packet_zones(flashlight_render_packet):
 		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.90, 0.68, 0.022 + 0.032 * float(zone["strength"])), "layer": 0})
-	for segment: Dictionary in beam_segments:
+	for segment: Dictionary in _beam_packet_segments():
 		var layer_alpha: float = max(0.03, 0.08 - float(segment.get("layer", 0)) * 0.008)
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.32, 64.0), "color": Color(0.55, 0.92, 1.0, layer_alpha * float(segment["intensity"])), "layer": int(segment.get("layer", 0))})
-	for diffuse: Dictionary in diffuse_zones:
-		zones.append({"pos": diffuse["pos"], "radius": diffuse["radius"], "color": Color(1.0, 0.92, 0.72, 0.05 * float(diffuse["strength"]) + 0.02), "layer": int(diffuse.get("layer", 1))})
+	for zone: Dictionary in _beam_packet_zones():
+		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.92, 0.72, 0.05 * float(zone["strength"]) + 0.02), "layer": int(zone.get("layer", 1))})
 	for segment: Dictionary in _packet_segments(secondary_render_packet):
 		var seg_color: Color = _secondary_color(segment)
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.24, 42.0), "color": Color(seg_color.r, seg_color.g, seg_color.b, 0.05 * float(segment["intensity"]) + 0.018), "layer": int(segment.get("layer", 1))})
@@ -522,7 +525,7 @@ func _update_ui() -> void:
 	var surge_state := "[color=#8be9fd]READY[/color]" if prism_surge_timer <= 0.0 else "[color=#ffb86c]%.1fs[/color]" % prism_surge_timer
 	var immortal_text := "[color=#50fa7b]ON[/color]" if debug_immortal else "[color=#6272a4]OFF[/color]"
 	var beam_layers := 0
-	for segment: Dictionary in beam_segments:
+	for segment: Dictionary in _beam_packet_segments():
 		beam_layers = max(beam_layers, int(segment.get("layer", 0)) + 1)
 	var tier_b_ms := float(perf_snapshot.get("tier_b_ms", 0.0))
 	var tier_c_ms := float(perf_snapshot.get("tier_c_ms", 0.0))
@@ -788,7 +791,7 @@ func _draw_sign_patch(patch: Dictionary) -> void:
 	draw_string(ThemeDB.fallback_font, rect.position + Vector2(10, rect.size.y - 10), String(patch.get("hint", "")), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 16.0, 11, Color(1.0, 0.95, 0.72, 0.82))
 
 func _draw_primary_beam_segments() -> void:
-	for segment: Dictionary in beam_segments:
+	for segment: Dictionary in _beam_packet_segments():
 		var a: Vector2 = segment["a"]
 		var b: Vector2 = segment["b"]
 		var alpha := clampf(float(segment["intensity"]), 0.12, 1.0)

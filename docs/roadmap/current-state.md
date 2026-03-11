@@ -212,3 +212,18 @@ They are no longer the primary design center.
 **Additional scene-array leakage reduced:**
 - `LightSurfaceResolver` now prefers scene-provided world helper methods (`_light_world_occluders()`, `_light_world_patches()`, `_light_world_tree_entities()`, `_light_world_prism_entities()`) before touching raw fallback arrays
 - this keeps the solver/helper side more aligned with the shared world/adapter seam without forcing a broad rewrite
+
+## Laser packet-path consolidation on authored validation field (2026-03-11)
+
+**Shared interface movement (Phase 1):**
+- `LightSurfaceResolver.cast_beam()` now emits a proper `beam_render_packet` with shared source metadata instead of leaving laser output only in ad-hoc scene state
+- the packet records laser segments, zones, and debug metadata through the same `LightTypes.light_render_packet(...)` contract already used by flashlight/prism/secondary paths
+
+**Render/presentation separation moved forward on the current field (Phase 3):**
+- `LightLabScene` light-intensity queries now read laser contribution from `beam_render_packet`
+- beam lit-zone generation and beam-layer UI reporting now read packet segments/zones instead of direct `beam_segments`
+- pulse expiry/restart paths now reset `beam_render_packet`, keeping packet lifecycle aligned with the authored validation map runtime
+
+**Boundary effect:**
+- the current test field still preserves existing visible behavior, but laser is less special-case than before
+- legacy `beam_segments` still exist for compatibility and beam damage/debug flow, but packet consumption is now the primary render/intensity path inside Light Lab
