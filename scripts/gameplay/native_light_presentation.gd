@@ -19,6 +19,9 @@ class_name NativeLightPresentation
 
 const AMBIENT_COLOR := Color(0.06, 0.07, 0.10, 1.0)
 
+const NATIVE_LIGHT_ITEM_MASK := 1
+const NATIVE_SHADOW_MASK := 2
+
 const FLASH_ENERGY := 0.80
 const FLASH_COLOR := Color(1.0, 0.95, 0.78, 1.0)
 const FLASH_TEXTURE_SIZE := 512
@@ -28,11 +31,11 @@ const BEAM_GLOW_COLOR := Color(0.52, 0.94, 1.0, 1.0)
 const BEAM_GLOW_TEXTURE_SIZE := 128
 const BEAM_GLOW_POOL_SIZE := 12
 
-const PRISM_ENERGY := 0.45
+const PRISM_ENERGY := 0.34
 const PRISM_COLOR := Color(0.54, 0.93, 1.0, 1.0)
 const PRISM_TEXTURE_SIZE := 256
 
-const PRISM_NODE_ENERGY := 0.55
+const PRISM_NODE_ENERGY := 0.40
 const PRISM_NODE_COLOR := Color(0.58, 0.96, 1.0, 1.0)
 
 const OCCLUDER_SEGMENT_THICKNESS := 10.0
@@ -202,6 +205,7 @@ func _build_occluder_signature(world_occluders: Array, tree_entities: Array) -> 
 func _make_segment_occluder(name_hint: String, a: Vector2, b: Vector2, thickness: float) -> LightOccluder2D:
 	var occluder := LightOccluder2D.new()
 	occluder.name = name_hint
+	occluder.occluder_light_mask = NATIVE_SHADOW_MASK
 	_configure_segment_occluder(occluder, a, b, thickness)
 	return occluder
 
@@ -223,6 +227,7 @@ func _configure_segment_occluder(occluder: LightOccluder2D, a: Vector2, b: Vecto
 func _make_circle_occluder(name_hint: String, pos: Vector2, radius: float, point_count: int) -> LightOccluder2D:
 	var occluder := LightOccluder2D.new()
 	occluder.name = name_hint
+	occluder.occluder_light_mask = NATIVE_SHADOW_MASK
 	_configure_circle_occluder(occluder, pos, radius, point_count)
 	return occluder
 
@@ -249,7 +254,7 @@ func _update_flashlight(packet: Dictionary, on: bool, pos: Vector2, facing_dir: 
 	var source: Dictionary = packet.get("source", {})
 	var fl_range := float(source.get("range", 260.0))
 	flashlight_light.texture_scale = clampf(fl_range / 180.0, 0.6, 3.2)
-	flashlight_light.energy = FLASH_ENERGY
+	flashlight_light.energy = lerpf(FLASH_ENERGY * 0.72, FLASH_ENERGY, clampf(fl_range / 320.0, 0.0, 1.0))
 	flashlight_light.offset = facing_dir * (fl_range * 0.18)
 	flashlight_light.rotation = facing_dir.angle()
 
@@ -321,6 +326,8 @@ func _update_prism_stations(entities: Array) -> void:
 
 		var light: PointLight2D = prism_station_lights[key]
 		light.position = pos
+		light.texture_scale = 0.62
+		light.energy = PRISM_ENERGY
 		light.enabled = true
 
 	for key: String in prism_station_lights.keys():
@@ -337,7 +344,8 @@ func _update_prism_node(prism_ref) -> void:
 		return
 	prism_node_light.enabled = true
 	prism_node_light.position = prism_ref.position
-	prism_node_light.texture_scale = 0.85
+	prism_node_light.texture_scale = 0.72
+	prism_node_light.energy = PRISM_NODE_ENERGY
 	prism_node_light.shadow_enabled = false
 
 # ---------------------------------------------------------------------------
@@ -352,7 +360,8 @@ func _make_light(tex_size: int, color: Color, energy_val: float, scale: float) -
 	light.texture_scale = scale
 	light.blend_mode = Light2D.BLEND_MODE_ADD
 	light.shadow_enabled = false
-	light.range_item_cull_mask = 1
+	light.range_item_cull_mask = NATIVE_LIGHT_ITEM_MASK
+	light.shadow_item_cull_mask = NATIVE_SHADOW_MASK
 	light.z_as_relative = false
 	light.z_index = 2
 	return light
