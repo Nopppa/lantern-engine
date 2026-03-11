@@ -97,10 +97,7 @@ var end_panel: PanelContainer
 var end_title_label: Label
 var end_body_label: RichTextLabel
 var help_collapsed := false
-var flashlight_visual_traces: Array = []
-var flashlight_visual_frontier: Array = []
-var prism_light_traces: Array = []
-var prism_light_frontier: Array = []
+
 var flashlight_render_packet: Dictionary = LightTypes.empty_render_packet("flashlight")
 var prism_render_packet: Dictionary = LightTypes.empty_render_packet("prism")
 var beam_render_packet: Dictionary = LightTypes.empty_render_packet("laser")
@@ -421,10 +418,6 @@ func _restart_run() -> void:
 	reward_resolution_in_progress = false
 	reward_panel.visible = false
 	end_panel.visible = false
-	flashlight_visual_traces.clear()
-	flashlight_visual_frontier.clear()
-	prism_light_traces.clear()
-	prism_light_frontier.clear()
 	if light_presentation:
 		light_presentation.clear_flashlight()
 		light_presentation.clear_prism()
@@ -452,11 +445,12 @@ func _update_hit_flashes(delta: float) -> void:
 
 func _build_lit_zones() -> Array:
 	var zones: Array = []
-	if flashlight_on and flashlight_visual_frontier.size() >= 2:
-		var samples: int = max(4, flashlight_visual_frontier.size() - 1)
+	var fl_frontier: Array = flashlight_render_packet.get("frontier", [])
+	if flashlight_on and fl_frontier.size() >= 2:
+		var samples: int = max(4, fl_frontier.size() - 1)
 		for i in range(samples):
-			var a: Vector2 = player_pos if i == 0 else Vector2(flashlight_visual_frontier[max(i - 1, 0)])
-			var b: Vector2 = Vector2(flashlight_visual_frontier[min(i, flashlight_visual_frontier.size() - 1)])
+			var a: Vector2 = player_pos if i == 0 else Vector2(fl_frontier[max(i - 1, 0)])
+			var b: Vector2 = Vector2(fl_frontier[min(i, fl_frontier.size() - 1)])
 			var centroid: Vector2 = player_pos.lerp((a + b) * 0.5, 0.65)
 			var radius: float = max(42.0, player_pos.distance_to(centroid) * 0.34)
 			zones.append({"pos": centroid, "radius": radius, "color": Color(1.0, 0.94, 0.7, 0.05)})
@@ -518,18 +512,12 @@ func _update_ui() -> void:
 		end_panel.visible = false
 
 func _refresh_environment_light_traces() -> void:
-	flashlight_visual_traces.clear()
-	flashlight_visual_frontier.clear()
-	prism_light_traces.clear()
-	prism_light_frontier.clear()
 	if light_presentation:
 		light_presentation.clear_flashlight()
 		light_presentation.clear_prism()
 	if flashlight_on:
 		var flashlight_source := _build_light_source_spec("flashlight", player_pos, facing, flashlight_range, {"half_angle_deg": flashlight_half_angle, "guide_rays": 72})
 		flashlight_render_packet = _build_bounced_light_render_packet(flashlight_source, 1)
-		for point in flashlight_render_packet.get("frontier", []):
-			flashlight_visual_frontier.append(Vector2(point))
 		if light_presentation:
 			light_presentation.update_flashlight_packet(flashlight_render_packet)
 	else:
@@ -539,8 +527,6 @@ func _refresh_environment_light_traces() -> void:
 	if prism_node:
 		var prism_source := _build_light_source_spec("prism", prism_node.position, Vector2.RIGHT, 128.0)
 		prism_render_packet = _build_bounced_light_render_packet(prism_source, 1, 96)
-		for point in prism_render_packet.get("frontier", []):
-			prism_light_frontier.append(Vector2(point))
 		if light_presentation:
 			light_presentation.update_prism_packet(prism_render_packet)
 	else:
