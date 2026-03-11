@@ -255,6 +255,9 @@ func _handle_player(delta: float) -> void:
 	if prism_node:
 		prism_node.position = prism_node.position.clamp(ARENA_RECT.position + Vector2(24, 24), ARENA_RECT.end - Vector2(24, 24))
 
+func _refresh_runtime_light_world() -> void:
+	_refresh_light_world_runtime_entities()
+
 func _restart_lab() -> void:
 	for enemy: Dictionary in enemies:
 		if is_instance_valid(enemy.get("node", null)):
@@ -305,7 +308,6 @@ func _place_prism(target: Vector2) -> void:
 		last_event = "Prism placement blocked"
 		return
 	super._place_prism(valid)
-	_refresh_light_world_runtime_entities()
 	approx_state = {}
 	approx_prism_frontiers = {}
 	approx_refresh_timer = 999.0
@@ -572,8 +574,6 @@ func _light_state_for_position(pos: Vector2) -> Dictionary:
 
 func _build_lit_zones() -> Array:
 	var zones: Array = []
-	for segment: Dictionary in _packet_segments(flashlight_render_packet):
-		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.18, 24.0), "color": Color(1.0, 0.92, 0.72, 0.028 + 0.035 * float(segment["intensity"])), "layer": 0})
 	for zone: Dictionary in _packet_zones(flashlight_render_packet):
 		var flashlight_zone_kind := String(zone.get("kind", ""))
 		var flashlight_zone_material := String(zone.get("material_id", ""))

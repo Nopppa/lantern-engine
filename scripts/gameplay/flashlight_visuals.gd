@@ -60,6 +60,7 @@ static func build_render_packet(lab, options: Dictionary) -> Dictionary:
 	})
 	return LightTypes.light_render_packet(source_type, source_spec, trace.get("segments", []), [], trace.get("fills", []), trace.get("zones", []), {
 		"frontier": trace.get("frontier", {}),
+		"frontier_points": trace.get("frontier_points", []),
 		"debug_points": trace.get("debug_points", []),
 		"perf": trace.get("perf", {})
 	})
@@ -262,7 +263,8 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 			"traces": trace_count,
 			"fills": fills.size()
 		},
-		"frontier": new_frontier
+		"frontier": new_frontier,
+		"frontier_points": primary_frontier.duplicate()
 	}
 
 static func _build_light_fills(origin: Vector2, frontier: Array, config: Dictionary, radial_emission: bool) -> Array:

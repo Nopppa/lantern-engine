@@ -55,10 +55,21 @@ func clear_prism() -> void:
 		prism_light.enabled = false
 
 
+func _frontier_array_from_packet(packet: Dictionary) -> Array:
+	var frontier_points: Array = packet.get("frontier_points", [])
+	if not frontier_points.is_empty():
+		return frontier_points
+	var legacy_frontier = packet.get("frontier", [])
+	if legacy_frontier is Array:
+		return legacy_frontier
+	if legacy_frontier is Dictionary:
+		return Dictionary(legacy_frontier).values()
+	return []
+
 func update_flashlight_packet(packet: Dictionary) -> void:
 	update_flashlight(
 		Vector2(packet.get("source", {}).get("origin", Vector2.ZERO)),
-		packet.get("frontier", []),
+		_frontier_array_from_packet(packet),
 		float(packet.get("source", {}).get("range", 0.0)),
 		Vector2(packet.get("source", {}).get("direction", Vector2.RIGHT)),
 		float(packet.get("source", {}).get("half_angle_deg", 0.0))
@@ -67,7 +78,7 @@ func update_flashlight_packet(packet: Dictionary) -> void:
 func update_prism_packet(packet: Dictionary) -> void:
 	update_prism(
 		Vector2(packet.get("source", {}).get("origin", Vector2.ZERO)),
-		packet.get("frontier", []),
+		_frontier_array_from_packet(packet),
 		float(packet.get("source", {}).get("range", 0.0))
 	)
 

@@ -150,7 +150,7 @@ func _setup_scene() -> void:
 	add_child(ui_layer)
 	_build_hud()
 	SfxController.setup(self)
-	light_world = LightWorldBuilder.from_run_scene(self)
+	_refresh_runtime_light_world()
 	queue_redraw()
 
 func _apply_skill_defaults() -> void:
@@ -264,6 +264,7 @@ func _process(delta: float) -> void:
 	if prism_node and prism_timer <= 0.0:
 		prism_node.queue_free()
 		prism_node = null
+		_refresh_runtime_light_world()
 	_handle_player(delta)
 	_update_enemies(delta)
 	_check_encounter_complete()
@@ -334,6 +335,9 @@ func _place_prism(target: Vector2) -> void:
 	prism_timer = prism_duration
 	RunSummary.note_prism_placed(self)
 	last_event = "Prism Node deployed"
+	_refresh_runtime_light_world()
+
+func _refresh_runtime_light_world() -> void:
 	light_world = LightWorldBuilder.from_run_scene(self)
 
 func _toggle_flashlight() -> void:
@@ -438,7 +442,7 @@ func _restart_run() -> void:
 	if prism_node:
 		prism_node.queue_free()
 		prism_node = null
-	light_world = LightWorldBuilder.from_run_scene(self)
+	_refresh_runtime_light_world()
 	flashlight_on = false
 	run_over = false
 	reward_pending = false
@@ -472,15 +476,6 @@ func _update_hit_flashes(delta: float) -> void:
 
 func _build_lit_zones() -> Array:
 	var zones: Array = []
-	var fl_frontier: Array = flashlight_render_packet.get("frontier", [])
-	if flashlight_on and fl_frontier.size() >= 2:
-		var samples: int = max(4, fl_frontier.size() - 1)
-		for i in range(samples):
-			var a: Vector2 = player_pos if i == 0 else Vector2(fl_frontier[max(i - 1, 0)])
-			var b: Vector2 = Vector2(fl_frontier[min(i, fl_frontier.size() - 1)])
-			var centroid: Vector2 = player_pos.lerp((a + b) * 0.5, 0.65)
-			var radius: float = max(42.0, player_pos.distance_to(centroid) * 0.34)
-			zones.append({"pos": centroid, "radius": radius, "color": Color(1.0, 0.94, 0.7, 0.05)})
 	if prism_node:
 		zones.append({"pos": prism_node.position, "radius": 88.0, "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.05)})
 		for segment: Dictionary in prism_render_packet.get("segments", []):
