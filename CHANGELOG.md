@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1a - 2026-03-11
+
+Lighting behavior + restoration follow-up patch:
+
+- fixed the remaining flashlight cone blob artifact by removing visible per-sample circle stamping from the cone path and relying on continuous cone/fill presentation instead
+- fixed prism placement so adding a prism no longer replaces the authored Light Lab world or drops active occluders / walls
+- added the missing gameplay `LightField` cache layer for hot-path light sampling so restoration/gameplay queries no longer repeatedly scan render-packet geometry
+- tightened post-cache lighting behavior: reduced ordinary hit-orb spam, improved beam-path illumination continuity, corrected flashlight OFF presentation, and kept ambient light visual-only
+- made laser light contribute meaningfully to world restoration through a dedicated `LightField` write path
+- made prism surge/explosion follow the shared lighting model so it now propagates, interacts with materials/occlusion, and restores world life through the normal packet -> `LightField` flow
+- added subtle glass refraction and aligned laser/prism interaction more closely with the shared redirect / material-response rules
+- validated with headless Godot checks and produced a fresh Windows release artifact for the updated lighting behavior build
+
 ## 0.6.0 - 2026-03-11
 
 Lighting Overhaul architecture release:

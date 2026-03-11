@@ -1,6 +1,6 @@
 # Lantern Engine — Light Lab Pivot
 
-Godot 4 prototype now centered on a permanent **Light Lab** with the lighting overhaul completed through a packet/world-first architecture. `v0.6.0` keeps the lab as the default runtime, preserves authored validation flow, and now runs authored + generated layouts through the same lighting pipeline.
+Godot 4 prototype now centered on a permanent **Light Lab** with the lighting overhaul completed through a packet/world-first architecture. `v0.6.1a` keeps the lab as the default runtime, preserves authored validation flow, runs authored + generated layouts through the same lighting pipeline, and includes the follow-up restoration/behavior fixes on top of the performance cache work.
 
 ## Current primary runtime
 
@@ -16,7 +16,7 @@ The project now boots straight into the **Light Lab**:
 
 The older wave-survival run still exists in the repo as temporary legacy scaffolding (`scenes/run_scene.tscn`, `scripts/run_scene.gd`, encounter data, reward flow), but it is no longer the primary target or default scene flow.
 
-## Light Lab content shipped in v0.6.0
+## Light Lab content shipped in v0.6.1a
 
 - surrounding outer walls
 - several internal wall segments for routing / occlusion tests
@@ -82,7 +82,7 @@ The lab floor now uses a temporary rendering-side dead/alive blend grid:
 - authored base-alive zones remain restored
 - no destructive pixel rewriting
 
-## Lighting overhaul status (`v0.6.0`)
+## Lighting overhaul status (`v0.6.1a`)
 
 The core lighting overhaul is now complete:
 
@@ -161,11 +161,11 @@ godot --headless --path /opt/openclaw/projects/lantern_engine --quit
 
 ## Build artifacts
 
-Current project version is `v0.6.0` (see `VERSION`). Local export outputs and release archives are:
+Current project version is `v0.6.1a` (see `VERSION`). Local export outputs and release archives are:
 
 - Windows export output: `build/windows/lantern_engine.exe`
 - Windows data pack: `build/windows/lantern_engine.pck`
-- Windows release archive: `build/windows/lantern_engine-windows-v0.6.0.zip`
+- Windows release archive: `build/windows/lantern_engine-windows-v0.6.1a.zip`
 
 Windows builds are the default tester artifacts. Linux builds are not produced unless explicitly requested.
 
