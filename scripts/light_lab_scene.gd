@@ -11,6 +11,7 @@ const LightLabLayout = preload("res://scripts/data/light_lab_layout.gd")
 const LightLabWorldAdapter = preload("res://scripts/gameplay/light_lab_world_adapter.gd")
 const FlashlightVisuals = preload("res://scripts/gameplay/flashlight_visuals.gd")
 const LightApproximation = preload("res://scripts/gameplay/light_approximation.gd")
+const LightField = preload("res://scripts/gameplay/light_field.gd")
 
 const LAB_LABEL := "Light Lab v0.5.7"
 const CELL_SIZE := 32.0
@@ -25,6 +26,7 @@ var tree_trunks: Array = []
 
 
 var secondary_render_packet: Dictionary = LightTypes.empty_render_packet("secondary")
+var gameplay_light_field: LightField
 var dead_alive_cells: Array = []
 var approx_refresh_timer := 999.0
 var approx_state := {}
@@ -84,6 +86,8 @@ func _build_light_lab() -> void:
 		light_world_static_signature = String(light_world.metadata.get("static_signature", light_world.metadata.get("layout_signature", "")))
 		if bool(light_world.metadata.get("cache_hit", false)):
 			light_world_cache_hits += 1
+	if gameplay_light_field == null:
+		gameplay_light_field = LightField.new(ARENA_RECT, CELL_SIZE, 1.25)
 	dead_alive_cells = DeadAliveGrid.build(ARENA_RECT, CELL_SIZE, _dead_alive_zone_defs(layout))
 	approx_state = {}
 	approx_flashlight_frontier = {}
@@ -147,7 +151,10 @@ func _process(delta: float) -> void:
 		_refresh_light_world_runtime_entities()
 	_handle_player(delta)
 	EnemyController.update_enemies(self, delta)
-	DeadAliveGrid.update(dead_alive_cells, delta, Callable(self, "_light_intensity_at"))
+	_rebuild_gameplay_light_field()
+	if gameplay_light_field:
+		gameplay_light_field.process_field(delta)
+	DeadAliveGrid.update(dead_alive_cells, delta, Callable(self, "_sample_gameplay_light"))
 	lit_zones = _build_lit_zones()
 	_update_native_light_presentation()
 	_update_ui()
@@ -478,38 +485,58 @@ func _light_world_prism_entities() -> Array:
 		entities.append({"kind": "prism_node", "pos": prism_node.position, "radius": current_prism_radius(), "material_id": "prism"})
 	return entities
 
-func _packet_intensity_at(packet: Dictionary, pos: Vector2, primary_radius: float, secondary_radius: float, primary_scale: float, secondary_scale: float) -> float:
-	var intensity := 0.0
+func _sample_gameplay_light(pos: Vector2) -> float:
+	if gameplay_light_field == null:
+		return 0.0
+	return clampf(gameplay_light_field.sample_world(pos), 0.0, 1.0)
+
+func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, secondary_radius: float, primary_scale: float, secondary_scale: float) -> void:
+	if gameplay_light_field == null:
+		return
 	for segment: Dictionary in _packet_segments(packet):
 		var kind := String(segment.get("kind", "primary"))
-		var radius := primary_radius if kind == "primary" else secondary_radius
-		var scale := primary_scale if kind == "primary" else secondary_scale
-		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, radius, float(segment["intensity"]) * scale))
+		var radius: float = primary_radius if kind == "primary" else secondary_radius
+		var scale: float = primary_scale if kind == "primary" else secondary_scale
+		var a: Vector2 = segment["a"]
+		var b: Vector2 = segment["b"]
+		var length: float = a.distance_to(b)
+		var steps: int = max(1, int(ceil(length / max(gameplay_light_field.cell_size * 0.75, 8.0))))
+		for step in range(steps + 1):
+			var t: float = float(step) / float(steps)
+			var pos: Vector2 = a.lerp(b, t)
+			var energy: float = clampf(float(segment.get("intensity", 0.0)) * scale, 0.0, 1.0)
+			gameplay_light_field.add_splat_world(pos, radius, energy)
 	for zone: Dictionary in _packet_zones(packet):
-		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])))
-	return intensity
+		gameplay_light_field.add_splat_world(zone["pos"], float(zone["radius"]), float(zone.get("strength", 0.0)))
+
+func _rebuild_gameplay_light_field() -> void:
+	if gameplay_light_field == null:
+		return
+	gameplay_light_field.clear_dynamic_light()
+	if flashlight_on:
+		_write_packet_to_light_field(flashlight_render_packet, 32.0, 26.0, 0.9, 0.7)
+	_write_packet_to_light_field(prism_render_packet, 28.0, 24.0, 0.85, 0.65)
+	_write_packet_to_light_field(secondary_render_packet, 38.0, 38.0, 1.0, 1.0)
+	_write_packet_to_light_field(beam_render_packet, 42.0, 42.0, 1.0, 1.0)
 
 func _light_intensity_at(pos: Vector2) -> float:
-	var intensity := _flashlight_intensity(player_pos, facing, pos, flashlight_range, flashlight_half_angle, 1.0 if flashlight_on else 0.0)
-	intensity = max(intensity, _packet_intensity_at(flashlight_render_packet, pos, 32.0, 26.0, 0.9, 0.7))
-	intensity = max(intensity, _packet_intensity_at(prism_render_packet, pos, 28.0, 24.0, 0.85, 0.65))
-	intensity = max(intensity, _packet_intensity_at(secondary_render_packet, pos, 38.0, 38.0, 1.0, 1.0))
-	intensity = max(intensity, _packet_intensity_at(beam_render_packet, pos, 42.0, 42.0, 1.0, 1.0))
-	return clampf(intensity, 0.0, 1.0)
+	return _sample_gameplay_light(pos)
 
 func _is_in_flashlight_cone(pos: Vector2) -> bool:
-	return _light_intensity_at(pos) > 0.12 and flashlight_on
+	return _sample_gameplay_light(pos) > 0.12 and flashlight_on
 
 func _is_in_prism_light(pos: Vector2) -> bool:
-	return _packet_intensity_at(prism_render_packet, pos, 28.0, 24.0, 1.0, 1.0) > 0.12
+	var intensity := _sample_gameplay_light(pos)
+	return intensity > 0.12
 
 func _is_in_beam_light(pos: Vector2) -> bool:
-	return _packet_intensity_at(beam_render_packet, pos, 34.0, 34.0, 1.0, 1.0) > 0.12
+	var intensity := _sample_gameplay_light(pos)
+	return intensity > 0.12
 
 func _light_state_for_position(pos: Vector2) -> Dictionary:
-	var intensity := _light_intensity_at(pos)
+	var intensity := _sample_gameplay_light(pos)
 	return {
-		"flashlight": flashlight_on and _flashlight_intensity(player_pos, facing, pos, flashlight_range, flashlight_half_angle, 1.0) > 0.12,
+		"flashlight": flashlight_on and intensity > 0.12,
 		"prism": _is_in_prism_light(pos),
 		"beam": _is_in_beam_light(pos),
 		"honest": intensity > 0.12,
