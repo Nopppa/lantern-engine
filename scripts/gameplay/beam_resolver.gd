@@ -1,6 +1,7 @@
 extends RefCounted
 class_name BeamResolver
 
+const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
 
@@ -15,8 +16,8 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 	run.beam_timer = run.beam_cooldown
 	run.beam_flash = 1.0
 	run.beam_pulse_timer = run.BEAM_PULSE_DURATION
-	run.beam_segments.clear()
 	run.hit_flashes.clear()
+	var packet_segments: Array = []
 	RunSummary.note_beam_cast(run)
 	SfxController.play(run, "beam")
 	var direction := (target - run.player_pos).normalized()
@@ -41,7 +42,7 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 			prism_hit = segment_circle_hit(segment_start, segment_end, run.prism_node.position, run.current_prism_radius())
 		if prism_hit.size() > 0:
 			var hit_pos: Vector2 = prism_hit["point"]
-			run.beam_segments.append([segment_start, hit_pos])
+			packet_segments.append(LightTypes.render_segment(segment_start, hit_pos, 1.0, {"source_type": "laser"}))
 			damage_enemies_along_segment(run, segment_start, hit_pos, segment_damage)
 			remaining_range -= segment_start.distance_to(hit_pos)
 			if remaining_range <= 0.0:
@@ -56,7 +57,7 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 			any_hit = true
 			run.last_event = "Refraction Beam redirected through Prism Node"
 			continue
-		run.beam_segments.append([segment_start, segment_end])
+		packet_segments.append(LightTypes.render_segment(segment_start, segment_end, 1.0, {"source_type": "laser"}))
 		damage_enemies_along_segment(run, segment_start, segment_end, segment_damage)
 		remaining_range -= segment_start.distance_to(segment_end)
 		any_hit = true
@@ -71,6 +72,8 @@ static func cast_beam(run: RunScene, target: Vector2) -> void:
 		run.last_event = "Beam bounced off arena wall"
 	if not any_hit:
 		run.last_event = "Beam fizzled"
+	var source_spec := LightTypes.light_source_spec("laser", run.player_pos, direction, 1.0, run.beam_range, {})
+	run.beam_render_packet = LightTypes.light_render_packet("laser", source_spec, packet_segments, [], [], [])
 	run.lit_zones = run._build_lit_zones()
 
 static func redirected_prism_direction(run: RunScene, direction: Vector2) -> Vector2:

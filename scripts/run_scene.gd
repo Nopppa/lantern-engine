@@ -78,7 +78,6 @@ var debug_visible := true
 var debug_immortal := false
 var last_event := "Booted MVP-0 sandbox"
 var enemies: Array = []
-var beam_segments: Array = []
 var lit_zones: Array = []
 var boss_projectiles: Array = []
 var beam_flash := 0.0
@@ -245,8 +244,8 @@ func _process(delta: float) -> void:
 	beam_flash = max(beam_flash - delta * 4.5, 0.0)
 	beam_pulse_timer = max(beam_pulse_timer - delta, 0.0)
 	_update_hit_flashes(delta)
-	if beam_pulse_timer <= 0.0 and not beam_segments.is_empty():
-		beam_segments.clear()
+	if beam_pulse_timer <= 0.0 and not beam_render_packet.get("segments", []).is_empty():
+		beam_render_packet = LightTypes.empty_render_packet("laser")
 	_refresh_environment_light_traces()
 	lit_zones = _build_lit_zones()
 	energy = min(max_energy, energy + energy_regen * delta)
@@ -290,7 +289,6 @@ func _handle_player(delta: float) -> void:
 
 func _cast_refraction_beam(target: Vector2) -> void:
 	BeamResolver.cast_beam(self, target)
-	_sync_beam_render_packet()
 
 func _redirected_prism_direction(direction: Vector2) -> Vector2:
 	return BeamResolver.redirected_prism_direction(self, direction)
@@ -423,7 +421,6 @@ func _restart_run() -> void:
 	reward_resolution_in_progress = false
 	reward_panel.visible = false
 	end_panel.visible = false
-	beam_segments.clear()
 	flashlight_visual_traces.clear()
 	flashlight_visual_frontier.clear()
 	prism_light_traces.clear()
@@ -550,7 +547,6 @@ func _refresh_environment_light_traces() -> void:
 		prism_render_packet = LightTypes.empty_render_packet("prism")
 		if light_presentation:
 			light_presentation.clear_prism()
-	_sync_beam_render_packet()
 
 func _trace_bounced_light_path(origin: Vector2, direction: Vector2, max_range: float, max_bounces: int) -> Dictionary:
 	var segments: Array = []
@@ -599,12 +595,6 @@ func _build_bounced_light_render_packet(source_spec: Dictionary, max_bounces: in
 			segments.append_array(trace.get("segments", []))
 			frontier.append(Vector2(trace.get("frontier", source_spec["origin"] + direction * float(source_spec["range"]))))
 	return LightTypes.light_render_packet(String(source_spec.get("source_type", "light")), source_spec, segments, frontier, [], [])
-
-func _sync_beam_render_packet() -> void:
-	var beam_segments_packet: Array = []
-	for segment in beam_segments:
-		beam_segments_packet.append(LightTypes.render_segment(Vector2(segment[0]), Vector2(segment[1]), 1.0, {"source_type": "laser"}))
-	beam_render_packet = LightTypes.light_render_packet("laser", _build_light_source_spec("laser", player_pos, facing, beam_range), beam_segments_packet, [], [], [])
 
 func _alive_enemy_count() -> int:
 	var alive := 0
