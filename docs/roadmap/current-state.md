@@ -97,6 +97,28 @@ They are no longer the primary design center.
 
 **Documentation:** See `docs/architecture-hybrid-lighting-phase2.md`
 
+## Phase 2 follow-up integration (2026-03-11)
+
+**More Light Lab consumers now use shared contracts directly:**
+- Light-intensity queries now consume `flashlight_render_packet`, `prism_render_packet`, and `secondary_render_packet` via shared packet helpers instead of iterating scene-local arrays separately
+- Lit-zone construction now reads packet segments/zones for flashlight, prism, and secondary light
+- Flashlight/prism/secondary draw helpers now consume packet `fills` / `zones` / `segments` instead of bespoke local arrays
+- Cursor material lookup, patch rendering, sign rendering, occluder rendering, and tree/prism entity rendering now prefer LightWorld-backed helpers
+
+**New Light Lab helper boundary:**
+- `_packet_segments()` / `_packet_zones()` / `_packet_fills()`
+- `_packet_intensity_at()`
+- `_light_world_patches()` / `_light_world_occluders()` / `_light_world_tree_entities()` / `_light_world_prism_entities()`
+
+**What this reduced:**
+- Fewer direct reads from `flashlight_visual_*`, `prism_visual_*`, and `secondary_light_*` arrays in query/draw consumers
+- Fewer direct reads from `surface_patches`, `surface_segments`, `tree_trunks`, and `prism_stations` outside layout/collision/solver production code
+
+**Still intentionally raw-array based for now:**
+- LightSurfaceResolver and FlashlightVisuals internal production paths
+- LightLabCollision motion/blocking helpers
+- Prism-station production loop inside the approximation refresh pass
+
 
 ## Immediate next recommendation
 

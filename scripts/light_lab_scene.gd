@@ -299,7 +299,7 @@ func _place_prism(target: Vector2) -> void:
 func _surface_patch_at(pos: Vector2) -> Dictionary:
 	if light_world:
 		return light_world.find_patch_at(pos)
-	for patch: Dictionary in surface_patches:
+	for patch: Dictionary in _light_world_patches():
 		if Rect2(patch["rect"]).has_point(pos):
 			return patch
 	return {}
@@ -355,7 +355,7 @@ func _visibility_between(a: Vector2, b: Vector2) -> float:
 	var blockers: Array = light_world.all_blockers() if light_world else []
 	if blockers.is_empty():
 		blockers = surface_segments.duplicate(true)
-		for trunk: Dictionary in tree_trunks:
+		for trunk: Dictionary in _light_world_tree_entities():
 			blockers.append({"kind": "circle", "pos": trunk["pos"], "radius": trunk["radius"], "material_id": "tree"})
 	for blocker: Dictionary in blockers:
 		if String(blocker.get("kind", "segment")) == "circle":
@@ -373,37 +373,62 @@ func _visibility_between(a: Vector2, b: Vector2) -> float:
 			return 0.0
 	return 1.0
 
+func _packet_segments(packet: Dictionary) -> Array:
+	return packet.get("segments", [])
+
+func _packet_zones(packet: Dictionary) -> Array:
+	return packet.get("zones", [])
+
+func _packet_fills(packet: Dictionary) -> Array:
+	return packet.get("fills", [])
+
+func _light_world_patches() -> Array:
+	return light_world.material_patches if light_world else surface_patches
+
+func _light_world_occluders() -> Array:
+	return light_world.occluder_segments if light_world else surface_segments
+
+func _light_world_tree_entities() -> Array:
+	return light_world.entity_list("tree_trunk") if light_world else tree_trunks
+
+func _light_world_prism_entities() -> Array:
+	var entities: Array = []
+	if light_world:
+		entities.append_array(light_world.entity_list("prism_station"))
+		entities.append_array(light_world.entity_list("prism_node"))
+	else:
+		entities.append_array(prism_stations)
+		if prism_node:
+			entities.append({"kind": "prism_node", "pos": prism_node.position, "radius": current_prism_radius(), "material_id": "prism"})
+	return entities
+
+func _packet_intensity_at(packet: Dictionary, pos: Vector2, primary_radius: float, secondary_radius: float, primary_scale: float, secondary_scale: float) -> float:
+	var intensity := 0.0
+	for segment: Dictionary in _packet_segments(packet):
+		var kind := String(segment.get("kind", "primary"))
+		var radius := primary_radius if kind == "primary" else secondary_radius
+		var scale := primary_scale if kind == "primary" else secondary_scale
+		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, radius, float(segment["intensity"]) * scale))
+	for zone: Dictionary in _packet_zones(packet):
+		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])))
+	return intensity
+
 func _light_intensity_at(pos: Vector2) -> float:
 	var intensity := _flashlight_intensity(player_pos, facing, pos, flashlight_range, flashlight_half_angle, 1.0 if flashlight_on else 0.0)
-	for segment: Dictionary in flashlight_visual_segments:
-		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 32.0 if String(segment.get("kind", "primary")) == "primary" else 26.0, float(segment["intensity"]) * (0.9 if String(segment.get("kind", "primary")) == "primary" else 0.7)))
-	for zone: Dictionary in flashlight_visual_zones:
-		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])))
-	for segment: Dictionary in prism_visual_segments:
-		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 28.0 if String(segment.get("kind", "primary")) == "primary" else 24.0, float(segment["intensity"]) * (0.85 if String(segment.get("kind", "primary")) == "primary" else 0.65)))
-	for zone: Dictionary in prism_visual_zones:
-		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])))
+	intensity = max(intensity, _packet_intensity_at(flashlight_render_packet, pos, 32.0, 26.0, 0.9, 0.7))
+	intensity = max(intensity, _packet_intensity_at(prism_render_packet, pos, 28.0, 24.0, 0.85, 0.65))
+	intensity = max(intensity, _packet_intensity_at(secondary_render_packet, pos, 38.0, 38.0, 1.0, 1.0))
 	for segment: Dictionary in beam_segments:
 		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 42.0, float(segment["intensity"])))
 	for diffuse: Dictionary in diffuse_zones:
 		intensity = max(intensity, _radial_intensity(diffuse["pos"], pos, diffuse["radius"], diffuse["strength"]))
-	for segment: Dictionary in secondary_light_segments:
-		intensity = max(intensity, _segment_intensity(segment["a"], segment["b"], pos, 38.0, float(segment["intensity"])))
-	for zone: Dictionary in secondary_light_zones:
-		intensity = max(intensity, _radial_intensity(zone["pos"], pos, zone["radius"], zone["strength"]))
 	return clampf(intensity, 0.0, 1.0)
 
 func _is_in_flashlight_cone(pos: Vector2) -> bool:
 	return _light_intensity_at(pos) > 0.12 and flashlight_on
 
 func _is_in_prism_light(pos: Vector2) -> bool:
-	for segment: Dictionary in prism_visual_segments:
-		if _segment_intensity(segment["a"], segment["b"], pos, 28.0, float(segment["intensity"])) > 0.12:
-			return true
-	for zone: Dictionary in prism_visual_zones:
-		if _radial_intensity(zone["pos"], pos, zone["radius"], float(zone["strength"])) > 0.12:
-			return true
-	return false
+	return _packet_intensity_at(prism_render_packet, pos, 28.0, 24.0, 1.0, 1.0) > 0.12
 
 func _is_in_beam_light(pos: Vector2) -> bool:
 	for segment: Dictionary in beam_segments:
@@ -423,24 +448,24 @@ func _light_state_for_position(pos: Vector2) -> Dictionary:
 
 func _build_lit_zones() -> Array:
 	var zones: Array = []
-	for segment: Dictionary in flashlight_visual_segments:
+	for segment: Dictionary in _packet_segments(flashlight_render_packet):
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.18, 24.0), "color": Color(1.0, 0.92, 0.72, 0.028 + 0.035 * float(segment["intensity"])), "layer": 0})
-	for zone: Dictionary in flashlight_visual_zones:
+	for zone: Dictionary in _packet_zones(flashlight_render_packet):
 		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.90, 0.68, 0.022 + 0.032 * float(zone["strength"])), "layer": 0})
 	for segment: Dictionary in beam_segments:
 		var layer_alpha: float = max(0.03, 0.08 - float(segment.get("layer", 0)) * 0.008)
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.32, 64.0), "color": Color(0.55, 0.92, 1.0, layer_alpha * float(segment["intensity"])), "layer": int(segment.get("layer", 0))})
 	for diffuse: Dictionary in diffuse_zones:
 		zones.append({"pos": diffuse["pos"], "radius": diffuse["radius"], "color": Color(1.0, 0.92, 0.72, 0.05 * float(diffuse["strength"]) + 0.02), "layer": int(diffuse.get("layer", 1))})
-	for segment: Dictionary in secondary_light_segments:
+	for segment: Dictionary in _packet_segments(secondary_render_packet):
 		var seg_color: Color = _secondary_color(segment)
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.24, 42.0), "color": Color(seg_color.r, seg_color.g, seg_color.b, 0.05 * float(segment["intensity"]) + 0.018), "layer": int(segment.get("layer", 1))})
-	for zone: Dictionary in secondary_light_zones:
+	for zone: Dictionary in _packet_zones(secondary_render_packet):
 		var zone_color: Color = _secondary_zone_color(zone)
 		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(zone_color.r, zone_color.g, zone_color.b, 0.038 * float(zone["strength"]) + 0.02), "layer": int(zone.get("layer", 1))})
-	for segment: Dictionary in prism_visual_segments:
+	for segment: Dictionary in _packet_segments(prism_render_packet):
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.16, 22.0), "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.024 + 0.028 * float(segment["intensity"])), "layer": 0})
-	for zone: Dictionary in prism_visual_zones:
+	for zone: Dictionary in _packet_zones(prism_render_packet):
 		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.020 + 0.026 * float(zone["strength"])), "layer": 0})
 	return zones
 
@@ -494,9 +519,10 @@ func _build_combined_prism_render_packet() -> Dictionary:
 	var segments: Array = prism_visual_segments.duplicate(true)
 	var fills: Array = prism_visual_fills.duplicate(true)
 	var zones: Array = prism_visual_zones.duplicate(true)
-	var origin := prism_node.position if prism_node else (Vector2(prism_stations[0]["pos"]) if not prism_stations.is_empty() else Vector2.ZERO)
+	var prism_entities := _light_world_prism_entities()
+	var origin := Vector2(prism_entities[0]["pos"]) if not prism_entities.is_empty() else Vector2.ZERO
 	return LightTypes.light_render_packet("prism", _prism_source_spec(origin), segments, [], fills, zones, {
-		"emitter_count": int(prism_stations.size()) + (1 if prism_node else 0)
+		"emitter_count": prism_entities.size()
 	})
 
 func _build_secondary_render_packet(secondary: Dictionary) -> Dictionary:
@@ -514,7 +540,7 @@ func _material_under_cursor(pos: Vector2) -> Dictionary:
 		mat["source_label"] = patch.get("label", "")
 		mat["hint"] = patch.get("hint", "")
 		return mat
-	for trunk: Dictionary in tree_trunks:
+	for trunk: Dictionary in _light_world_tree_entities():
 		if Vector2(trunk["pos"]).distance_to(pos) <= float(trunk["radius"]):
 			var tree_mat := LightMaterials.get_definition("wood")
 			tree_mat["label"] = "Tree Trunk"
@@ -522,7 +548,7 @@ func _material_under_cursor(pos: Vector2) -> Dictionary:
 			return tree_mat
 	var nearest := {}
 	var nearest_dist := 20.0
-	for surface: Dictionary in surface_segments:
+	for surface: Dictionary in _light_world_occluders():
 		var a: Vector2 = surface["a"]
 		var b: Vector2 = surface["b"]
 		var ab := b - a
@@ -546,7 +572,7 @@ func _draw() -> void:
 		draw_rect(rect, dead_color, true)
 		if blend > 0.01:
 			draw_rect(rect, Color(alive_color.r, alive_color.g, alive_color.b, blend * 0.95), true)
-	for patch: Dictionary in surface_patches:
+	for patch: Dictionary in _light_world_patches():
 		var mat := LightMaterials.get_definition(patch["material_id"])
 		var patch_color := Color(mat["color"].r, mat["color"].g, mat["color"].b, 0.82)
 		var title := String(patch.get("title", patch.get("label", "")))
@@ -563,21 +589,23 @@ func _draw() -> void:
 		var flash_radius := lerpf(float(flash["radius"]) * 1.55, float(flash["radius"]) * 0.72, 1.0 - flash_t)
 		var flash_color: Color = flash["color"]
 		draw_circle(flash["pos"], flash_radius, Color(flash_color.r, flash_color.g, flash_color.b, 0.12 * flash_t))
-	for surface: Dictionary in surface_segments:
+	for surface: Dictionary in _light_world_occluders():
 		var mat := LightMaterials.get_definition(surface["material_id"])
 		draw_line(surface["a"], surface["b"], mat["color"], 10.0)
 		draw_line(surface["a"], surface["b"], Color(1, 1, 1, 0.12), 2.0)
-	for trunk: Dictionary in tree_trunks:
+	for trunk: Dictionary in _light_world_tree_entities():
 		var pos: Vector2 = trunk["pos"]
 		var radius: float = float(trunk["radius"])
 		draw_circle(pos, radius + 12.0, Color(0.12, 0.22, 0.12, 0.18))
 		draw_circle(pos, radius + 4.0, Color(0.22, 0.42, 0.24, 0.28))
 		draw_circle(pos, radius, Color(0.34, 0.22, 0.14, 1.0))
 		draw_arc(pos, radius + 2.0, 0.0, TAU, 22, Color(0.62, 0.44, 0.28, 0.65), 2.0)
-	for prism_station: Dictionary in prism_stations:
-		draw_circle(prism_station["pos"], 26.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.18))
-		draw_arc(prism_station["pos"], 26.0, 0.0, TAU, 24, PRISM_COLOR, 3.0)
-	for patch: Dictionary in surface_patches:
+	for prism_entity: Dictionary in _light_world_prism_entities():
+		if String(prism_entity.get("kind", "")) != "prism_station":
+			continue
+		draw_circle(prism_entity["pos"], 26.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.18))
+		draw_arc(prism_entity["pos"], 26.0, 0.0, TAU, 24, PRISM_COLOR, 3.0)
+	for patch: Dictionary in _light_world_patches():
 		_draw_sign_patch(patch)
 	_draw_flashlight_trace()
 	_draw_prism_trace()
@@ -608,12 +636,12 @@ func _draw() -> void:
 func _draw_flashlight_trace() -> void:
 	if not flashlight_on:
 		return
-	for fill: Dictionary in flashlight_visual_fills:
+	for fill: Dictionary in _packet_fills(flashlight_render_packet):
 		var points: PackedVector2Array = fill["points"]
 		var strength: float = float(fill.get("strength", 1.0))
 		draw_colored_polygon(points, Color(1.0, 0.94, 0.72, 0.024 * strength))
 		draw_polyline(points, Color(1.0, 0.98, 0.84, 0.048 * strength), 1.2, true)
-	for zone: Dictionary in flashlight_visual_zones:
+	for zone: Dictionary in _packet_zones(flashlight_render_packet):
 		var kind := String(zone.get("kind", "diffuse"))
 		var zone_color := Color(1.0, 0.90, 0.62, 0.08 * float(zone["strength"]))
 		if String(zone.get("material_id", "")) == "glass":
@@ -623,7 +651,7 @@ func _draw_flashlight_trace() -> void:
 		draw_circle(zone["pos"], zone["radius"], zone_color)
 		if kind != "block":
 			draw_arc(zone["pos"], float(zone["radius"]) * 0.56, 0.0, TAU, 20, Color(zone_color.r, zone_color.g, zone_color.b, 0.22 + 0.18 * float(zone["strength"])), 1.8)
-	for segment: Dictionary in flashlight_visual_segments:
+	for segment: Dictionary in _packet_segments(flashlight_render_packet):
 		var kind := String(segment.get("kind", "primary"))
 		if kind == "primary" and not bool(segment.get("visible", true)):
 			continue
@@ -670,12 +698,12 @@ func _draw_flashlight_trace() -> void:
 			draw_string(ThemeDB.fallback_font, a.lerp(b, 0.5) + Vector2(-8, -8), label, HORIZONTAL_ALIGNMENT_LEFT, 28.0, 9, Color(1, 1, 1, 0.65))
 
 func _draw_prism_trace() -> void:
-	for fill: Dictionary in prism_visual_fills:
+	for fill: Dictionary in _packet_fills(prism_render_packet):
 		var points: PackedVector2Array = fill["points"]
 		var strength: float = float(fill.get("strength", 1.0))
 		draw_colored_polygon(points, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.020 * strength))
 		draw_polyline(points, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.042 * strength), 1.2, true)
-	for zone: Dictionary in prism_visual_zones:
+	for zone: Dictionary in _packet_zones(prism_render_packet):
 		var kind := String(zone.get("kind", "diffuse"))
 		var zone_color := Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.06 * float(zone["strength"]))
 		if String(zone.get("material_id", "")) == "glass":
@@ -685,7 +713,7 @@ func _draw_prism_trace() -> void:
 		draw_circle(zone["pos"], zone["radius"], zone_color)
 		if kind != "block":
 			draw_arc(zone["pos"], float(zone["radius"]) * 0.56, 0.0, TAU, 20, Color(zone_color.r, zone_color.g, zone_color.b, 0.18 + 0.14 * float(zone["strength"])), 1.6)
-	for segment: Dictionary in prism_visual_segments:
+	for segment: Dictionary in _packet_segments(prism_render_packet):
 		var kind := String(segment.get("kind", "primary"))
 		if kind == "primary" and not bool(segment.get("visible", true)):
 			continue
@@ -755,12 +783,12 @@ func _draw_secondary_overlays() -> void:
 	for diffuse: Dictionary in diffuse_zones:
 		draw_circle(diffuse["pos"], diffuse["radius"], Color(1.0, 0.84, 0.48, 0.06 * float(diffuse["strength"])))
 		draw_arc(diffuse["pos"], diffuse["radius"] * 0.58, 0.0, TAU, 20, Color(1.0, 0.88, 0.54, 0.18 * float(diffuse["strength"])), 2.0)
-	for zone: Dictionary in secondary_light_zones:
+	for zone: Dictionary in _packet_zones(secondary_render_packet):
 		var zmat := LightMaterials.get_definition(zone["material_id"])
 		var zone_color: Color = _secondary_zone_color(zone)
 		draw_circle(zone["pos"], zone["radius"], Color(zone_color.r, zone_color.g, zone_color.b, 0.07 * float(zone["strength"])))
 		draw_arc(zone["pos"], zone["radius"] * 0.52, 0.0, TAU, 20, Color(zmat["alive_color"].r, zmat["alive_color"].g, zmat["alive_color"].b, 0.18 * float(zone["strength"])), 1.6)
-	for segment: Dictionary in secondary_light_segments:
+	for segment: Dictionary in _packet_segments(secondary_render_packet):
 		var sa: Vector2 = segment["a"]
 		var sb: Vector2 = segment["b"]
 		var tint: Color = _secondary_color(segment)
@@ -812,7 +840,7 @@ func _secondary_zone_color(zone: Dictionary) -> Color:
 	return Color(1.0, 0.86, 0.58, 1.0)
 
 func _segment_crosses_wet(a: Vector2, b: Vector2) -> bool:
-	for patch: Dictionary in surface_patches:
+	for patch: Dictionary in _light_world_patches():
 		if String(patch.get("material_id", "")) != "wet":
 			continue
 		var rect: Rect2 = patch["rect"]
