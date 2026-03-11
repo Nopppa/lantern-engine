@@ -46,6 +46,7 @@ var movement_surface_probe := {}
 var spawn_validation_enabled := true
 var generated_layout_override: Dictionary = {}
 var generated_smoke_test_enabled := false
+var generated_layout_seed := 1001
 var light_world_layout_cache_key := "authored_light_lab"
 var light_world_static_signature := ""
 var light_world_cache_hits := 0
@@ -117,6 +118,8 @@ func _input(event: InputEvent) -> void:
 				last_event = "Dead/alive base zones toggled"
 			KEY_9:
 				_toggle_generated_smoke_test()
+			KEY_EQUAL:
+				reroll_generated_layout()
 			KEY_0:
 				toggle_native_light_layer()
 			KEY_MINUS:
@@ -354,13 +357,22 @@ func _clear_generated_layout_override() -> void:
 func _toggle_generated_smoke_test() -> void:
 	generated_smoke_test_enabled = !generated_smoke_test_enabled
 	if generated_smoke_test_enabled:
-		_inject_generated_layout(LightWorldBuilder.build_light_lab_smoke_test_layout(ARENA_RECT), "generated_smoke_test")
-		last_event = "Generated LightWorld smoke test ON"
+		_inject_generated_layout(LightWorldBuilder.build_generated_light_lab_layout(ARENA_RECT, generated_layout_seed), "generated_smoke_test_%d" % generated_layout_seed)
+		last_event = "Generated LightWorld smoke test ON (seed %d)" % generated_layout_seed
 	else:
 		_clear_generated_layout_override()
 		last_event = "Generated LightWorld smoke test OFF"
 	_build_light_lab()
 	approx_refresh_timer = 999.0
+
+func reroll_generated_layout() -> void:
+	if not generated_smoke_test_enabled:
+		last_event = "Enable generated smoke test first"
+		return
+	generated_layout_seed += 1
+	_inject_generated_layout(LightWorldBuilder.build_generated_light_lab_layout(ARENA_RECT, generated_layout_seed), "generated_smoke_test_%d" % generated_layout_seed)
+	_build_light_lab()
+	last_event = "Generated LightWorld rerolled (seed %d)" % generated_layout_seed
 
 func _generated_spawn_hint() -> Vector2:
 	if light_world and generated_smoke_test_enabled:
@@ -547,7 +559,7 @@ func _update_ui() -> void:
 		hud_label.visible = false
 		status_label.visible = false
 		return
-	var world_mode := "generated smoke-test" if generated_smoke_test_enabled else "authored validation map"
+	var world_mode := ("generated smoke-test seed %d" % generated_layout_seed) if generated_smoke_test_enabled else "authored validation map"
 	var world_cache_text := "%s | cache hits %d" % [light_world_static_signature.left(18), light_world_cache_hits]
 	hud_label.visible = true
 	status_label.visible = true
@@ -573,7 +585,7 @@ func _update_ui() -> void:
 	var native_shadow_text := "[color=#8be9fd]ON[/color]" if native_light_presentation and native_light_presentation.shadows_enabled else "[color=#6272a4]OFF[/color]"
 	var native_mask_text := native_light_presentation.debug_state_summary() if native_light_presentation else "layer OFF"
 	hud_label.text = "[b]Lantern Engine — %s[/b]\n[color=#a4b1cd]Mode:[/color] %s\n[color=#a4b1cd]World cache:[/color] %s\n[color=#a4b1cd]Goal:[/color] Behavioral light truth + cheaper approximation\n\n[color=#ff6b6b]HP[/color] %.0f / %.0f %s\n[color=#8be9fd]EN[/color] %.0f / %.0f %s\n\n[color=#f1fa8c]Beam[/color] %.0f dmg | %.0f range | %d beam branches | [color=#a4b1cd]Trace layers:[/color] %d\n[color=#f1fa8c]Flashlight[/color] %.0f range | %d° half-angle | unified beam fill | [color=#a4b1cd]F[/color] %s\n[color=#f1fa8c]Prism[/color] station + manual node | [color=#a4b1cd]RMB[/color] %s | [color=#a4b1cd]Q[/color] %s\n[color=#a4b1cd]Cursor:[/color] %s | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Step:[/color] %s x%.2f | [color=#a4b1cd]Immortal:[/color] %s\n[color=#a4b1cd]Native:[/color] Layer %s | Flashlight shadows %s | %s\n[color=#a4b1cd]Approx:[/color] T-B %.2fms / %d rays / %d fills | T-C %.2fms / %d samples / %d zones" % [LAB_LABEL, world_mode, world_cache_text, player_hp, player_max_hp, HudText.bar(player_hp, player_max_hp), energy, max_energy, HudText.bar(energy, max_energy), beam_damage, beam_range, beam_bounces, beam_layers, flashlight_range, int(flashlight_half_angle), ("[color=#f1fa8c]ON[/color]" if flashlight_on else "[color=#6272a4]OFF[/color]"), prism_state, surge_state, mat_name, intensity, move_label, move_scale, immortal_text, native_layer_text, native_shadow_text, native_mask_text, tier_b_ms, int(flash_perf.get("guide_rays", 0)), int(flash_perf.get("fills", 0)), tier_c_ms, int(secondary_perf.get("samples", 0)), int(secondary_perf.get("zones", 0))]
-	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle | 9 generated smoke test | 0 native Light2D\n- native shadows | F1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Approximation tiers[/b]\nTier A laser = precise beam logic\nTier B flashlight = guided beam fill from guide rays\nTier C prism/scatter = cheap material-aware secondary response\n\n[b]Readability legend[/b]\nWarm beam fill = main flashlight volume | faint lines = guide truth only\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nAqua dashed = glass continuation | Wood = soft scatter | Wet = glossy disturbance\n\n[b]Event[/b]\n%s" % last_event
+	status_label.text = "[b]Light Lab controls[/b]\nWASD move | LMB beam | RMB prism | Q Prism Surge | F flashlight\n1 Moth | 2 Hollow | 3 Matriarch | 4 Prism at cursor\n5 cursor probe | 6 path debug | 7 HP labels | 8 base alive toggle | 9 generated smoke test | = reroll generated | 0 native Light2D\n- native shadows | F1 hide/show ALL overlays | F2 refill | F4 immortal\n\n[b]Approximation tiers[/b]\nTier A laser = precise beam logic\nTier B flashlight = guided beam fill from guide rays\nTier C prism/scatter = cheap material-aware secondary response\n\n[b]Readability legend[/b]\nWarm beam fill = main flashlight volume | faint lines = guide truth only\nBlue ring = bounce | Prism ring = redirect | Amber cloud = diffuse\nAqua dashed = glass continuation | Wood = soft scatter | Wet = glossy disturbance\n\n[b]Event[/b]\n%s" % last_event
 
 func _flashlight_source_spec() -> Dictionary:
 	return LightTypes.light_source_spec("flashlight", player_pos, facing, 1.0, flashlight_range, {

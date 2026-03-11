@@ -56,6 +56,57 @@ static func build_light_lab_smoke_test(arena_rect: Rect2) -> LightWorld:
 		"adapter": "light_world_builder.build_light_lab_smoke_test"
 	})
 
+static func build_generated_light_lab_layout(arena_rect: Rect2, seed: int) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var segments: Array = _arena_boundary_segments(arena_rect)
+	var materials := ["brick", "wood", "mirror", "glass", "wet"]
+	var patches: Array = [_normalized_patch(Rect2(arena_rect.position, arena_rect.size), "brick", "Generated floor")]
+	var dead_alive_cells: Array = []
+	var prism_stations: Array = []
+	var tree_trunks: Array = []
+	for i in range(3):
+		var patch_material := String(materials[rng.randi_range(0, materials.size() - 1)])
+		var patch_pos := Vector2(rng.randi_range(140, 930), rng.randi_range(120, 470))
+		var patch_size := Vector2(rng.randi_range(110, 190), rng.randi_range(80, 150))
+		patches.append(_normalized_patch(Rect2(patch_pos, patch_size), patch_material, "Generated %s bay" % patch_material.capitalize()))
+		dead_alive_cells.append({"rect": Rect2(patch_pos + Vector2(8, 8), patch_size * Vector2(0.72, 0.58)), "value": rng.randf_range(0.35, 1.0)})
+	for i in range(4):
+		var a := Vector2(rng.randi_range(180, 1080), rng.randi_range(150, 560))
+		var horizontal := rng.randf() < 0.5
+		var length := rng.randi_range(120, 250)
+		var b := a + (Vector2(length, 0) if horizontal else Vector2(0, length))
+		b.x = clampf(b.x, arena_rect.position.x + 48.0, arena_rect.end.x - 48.0)
+		b.y = clampf(b.y, arena_rect.position.y + 48.0, arena_rect.end.y - 48.0)
+		var material_id := String(materials[rng.randi_range(0, materials.size() - 1)])
+		segments.append({
+			"a": a,
+			"b": b,
+			"normal": (Vector2.DOWN if horizontal else Vector2.LEFT),
+			"material_id": material_id,
+			"blocks_flashlight": material_id != "wet" and material_id != "glass"
+		})
+	for i in range(2):
+		tree_trunks.append({
+			"pos": Vector2(rng.randi_range(220, 980), rng.randi_range(200, 540)),
+			"radius": rng.randi_range(20, 30),
+			"label": "Generated tree trunk"
+		})
+	prism_stations.append({
+		"pos": Vector2(rng.randi_range(760, 1120), rng.randi_range(240, 520)),
+		"radius": 24.0,
+		"label": "Generated prism station"
+	})
+	return {
+		"segments": segments,
+		"patches": patches,
+		"prism_stations": prism_stations,
+		"tree_trunks": tree_trunks,
+		"dead_alive_cells": dead_alive_cells,
+		"spawn_hint": Vector2(rng.randi_range(860, 1080), rng.randi_range(500, 600)),
+		"generated_seed": seed
+	}
+
 static func build_light_lab_smoke_test_layout(arena_rect: Rect2) -> Dictionary:
 	return {
 		"segments": _arena_boundary_segments(arena_rect) + [
