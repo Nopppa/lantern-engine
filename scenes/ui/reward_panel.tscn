@@ -1,0 +1,53 @@
+[gd_scene format=3]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_reward_panel"]
+bg_color = Color(0.0509804, 0.0705882, 0.109804, 0.968627)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.5, 0.780392, 1, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="RewardPanel" type="PanelContainer"]
+visible = false
+position = Vector2(334, 148)
+size = Vector2(612, 364)
+theme_override_styles/panel = SubResource("StyleBoxFlat_reward_panel")
+
+[node name="Margin" type="MarginContainer" parent="."]
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+theme_override_constants/separation = 10
+
+[node name="RewardTitleLabel" type="Label" parent="Margin/VBox"]
+unique_name_in_owner = true
+text = "Choose one Prism upgrade"
+
+[node name="RewardButton1" type="Button" parent="Margin/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+alignment = 0
+text_overrun_behavior = 0
+text = "[1] Reward"
+
+[node name="RewardButton2" type="Button" parent="Margin/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+alignment = 0
+text_overrun_behavior = 0
+text = "[2] Reward"
+
+[node name="RewardButton3" type="Button" parent="Margin/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+alignment = 0
+text_overrun_behavior = 0
+text = "[3] Reward"

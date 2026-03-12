@@ -4,34 +4,24 @@ class_name RewardController
 const UpgradeDefs = preload("res://scripts/data/upgrade_defs.gd")
 const SfxController = preload("res://scripts/gameplay/sfx_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
+const REWARD_PANEL_SCENE := preload("res://scenes/ui/reward_panel.tscn")
 
 static func build_panel(run: RunScene) -> void:
-	run.reward_panel = PanelContainer.new()
-	run.reward_panel.visible = false
-	run.reward_panel.position = Vector2(334, 148)
-	run.reward_panel.size = Vector2(612, 364)
-	run.reward_panel.add_theme_stylebox_override("panel", run._make_panel_style(Color(0.05, 0.07, 0.11, 0.97), Color(0.5, 0.78, 1.0, 1.0), 3, 12))
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 14)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_right", 14)
-	margin.add_theme_constant_override("margin_bottom", 12)
-	run.reward_panel.add_child(margin)
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
-	margin.add_child(vb)
-	run.reward_title_label = Label.new()
-	run.reward_title_label.text = "Choose one Prism upgrade"
-	vb.add_child(run.reward_title_label)
-	run.reward_buttons.clear()
-	for i in 3:
-		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(0, 84)
-		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
-		btn.pressed.connect(select_reward.bind(run, i))
-		vb.add_child(btn)
-		run.reward_buttons.append(btn)
+	run.reward_panel = REWARD_PANEL_SCENE.instantiate() as PanelContainer
+	run.reward_title_label = run.reward_panel.get_node("%RewardTitleLabel") as Label
+	run.reward_buttons = [
+		run.reward_panel.get_node("%RewardButton1") as Button,
+		run.reward_panel.get_node("%RewardButton2") as Button,
+		run.reward_panel.get_node("%RewardButton3") as Button,
+	]
+
+	for i in run.reward_buttons.size():
+		var btn := run.reward_buttons[i]
+		if btn == null:
+			continue
+		if not btn.pressed.is_connected(select_reward.bind(run, i)):
+			btn.pressed.connect(select_reward.bind(run, i))
+
 	run.ui_layer.add_child(run.reward_panel)
 
 static func show_rewards(run: RunScene) -> void:
