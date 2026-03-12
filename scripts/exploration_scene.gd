@@ -16,12 +16,18 @@ class_name ExplorationScene
 const GeneratedExplorationProvider = preload("res://scripts/world/generated_exploration_provider.gd")
 const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 const LightTypes = preload("res://scripts/gameplay/light_types.gd")
+const LightField = preload("res://scripts/gameplay/light_field.gd")
+const DeadAliveGrid = preload("res://scripts/gameplay/dead_alive_grid.gd")
+const NativeLightPresentation = preload("res://scripts/gameplay/native_light_presentation.gd")
 
 # Arena rect matching RunScene / Light Lab for pipeline compatibility.
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
 const SCENE_LABEL := "Exploration World v0.2-milestone2"
 const PLAYER_SPEED := 240.0
 const PLAYER_RADIUS := 14.0
+const LIGHT_CELL_SIZE := 32.0
+const FLASHLIGHT_RANGE := 420.0
+const FLASHLIGHT_HALF_ANGLE := 48.0
 
 ## Seed used for this scene instance.  Change to explore different worlds.
 @export var world_seed: int = 2001
@@ -33,6 +39,12 @@ var _camera: Camera2D = null
 var _hud_layer: CanvasLayer = null
 var _hud_label: Label = null
 var _player_pos: Vector2 = Vector2.ZERO
+var _facing: Vector2 = Vector2.RIGHT
+var _flashlight_on := true
+var _gameplay_light_field: LightField = null
+var _dead_alive_cells: Array = []
+var _flashlight_render_packet: Dictionary = LightTypes.empty_render_packet("flashlight")
+var _native_light_presentation: NativeLightPresentation = null
 
 # Material color palette for visualization
 const MATERIAL_COLORS := {
@@ -49,6 +61,7 @@ const MATERIAL_COLORS := {
 func _ready() -> void:
 	_boot_world()
 	_setup_scene()
+	_boot_shared_light_runtime()
 	queue_redraw()
 	print("[ExplorationScene] %s booted — world_type: %s  seed: %d  spawn: %s" % [
 		SCENE_LABEL,
@@ -59,15 +72,22 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_update_player(delta)
+	_rebuild_gameplay_light_field()
+	if _gameplay_light_field != null:
+		_gameplay_light_field.process_field(delta)
+	DeadAliveGrid.update(_dead_alive_cells, delta, Callable(self, "_sample_gameplay_light"))
+	_update_native_light_presentation()
 	_update_hud()
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed:
+	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_R:
 			reroll(world_seed + 1)
 		elif event.keycode == KEY_T:
 			reroll(randi())
+		elif event.keycode == KEY_F:
+			_flashlight_on = !_flashlight_on
 
 # --- World initialisation ---
 
@@ -84,6 +104,7 @@ func _on_world_ready() -> void:
 	else:
 		_player_pos = ARENA_RECT.get_center()
 	_player_pos = _find_valid_spawn(_player_pos)
+	_boot_shared_light_runtime()
 
 # --- Scene setup (Milestone 2) ---
 
@@ -94,6 +115,10 @@ func _setup_scene() -> void:
 		_player_node.name = "Player"
 		add_child(_player_node)
 	_player_node.position = _player_pos
+	
+	if _native_light_presentation == null:
+		_native_light_presentation = NativeLightPresentation.new()
+		add_child(_native_light_presentation)
 	
 	# Camera — attached to player so it follows movement
 	if _camera == null:
@@ -129,6 +154,10 @@ func _update_player(delta: float) -> void:
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		input_dir.x += 1.0
 	
+	var mouse_world := get_global_mouse_position()
+	if mouse_world.distance_to(_player_pos) > 8.0:
+		_facing = (mouse_world - _player_pos).normalized()
+	
 	if input_dir.length() > 0.0:
 		input_dir = input_dir.normalized()
 		var target_pos := LightLabCollision.resolve_circle_motion_in_space(
@@ -143,14 +172,17 @@ func _update_player(delta: float) -> void:
 func _update_hud() -> void:
 	if _hud_label == null:
 		return
-	_hud_label.text = "[%s]\nSeed: %d\nSegments: %d  |  Patches: %d  |  Entities: %d\nPlayer: (%.0f, %.0f)\n\nControls: WASD/Arrows = Move  |  R = Next Seed  |  T = Random Seed" % [
+	_hud_label.text = "[%s]\nSeed: %d\nSegments: %d  |  Patches: %d  |  Entities: %d\nPlayer: (%.0f, %.0f)\nFlashlight: %s  |  Light: %.2f\nGameplay-light cells: %d\n\nControls: WASD/Arrows = Move  |  Mouse = Aim  |  F = Flashlight  |  R = Next Seed  |  T = Random Seed" % [
 		SCENE_LABEL,
 		world_seed,
 		segment_count(),
 		patch_count(),
 		entity_count(),
 		_player_pos.x,
-		_player_pos.y
+		_player_pos.y,
+		("ON" if _flashlight_on else "OFF"),
+		_sample_gameplay_light(_player_pos),
+		_dead_alive_cells.size()
 	]
 
 # --- Public API ---
@@ -222,6 +254,77 @@ func _find_valid_spawn(target: Vector2) -> Vector2:
 			if not LightLabCollision.is_circle_blocked_in_space(probe, PLAYER_RADIUS, collision_space):
 				return probe
 	return _clamp_player_to_arena(ARENA_RECT.get_center())
+
+# --- Shared lighting runtime bootstrap (Milestone 3, minimal integration) ---
+
+func _boot_shared_light_runtime() -> void:
+	_gameplay_light_field = LightField.new(ARENA_RECT, LIGHT_CELL_SIZE, 1.25)
+	_dead_alive_cells = DeadAliveGrid.build(ARENA_RECT, LIGHT_CELL_SIZE, _light_world.metadata_array("dead_alive_zones") if _light_world != null else [])
+	_flashlight_render_packet = LightTypes.empty_render_packet("flashlight")
+
+func _flashlight_source_spec() -> Dictionary:
+	return LightTypes.light_source_spec("flashlight", _player_pos, _facing, 1.0 if _flashlight_on else 0.0, FLASHLIGHT_RANGE, {
+		"half_angle_deg": FLASHLIGHT_HALF_ANGLE
+	})
+
+func _rebuild_gameplay_light_field() -> void:
+	if _gameplay_light_field == null:
+		return
+	_gameplay_light_field.clear_dynamic_light()
+	_flashlight_render_packet = LightTypes.light_render_packet("flashlight", _flashlight_source_spec(), [], [], [], [], {
+		"active": _flashlight_on
+	})
+	if not _flashlight_on:
+		return
+	_write_flashlight_packet_to_light_field(_flashlight_render_packet)
+
+func _write_flashlight_packet_to_light_field(packet: Dictionary) -> void:
+	if _gameplay_light_field == null:
+		return
+	var source := Dictionary(packet.get("source", {}))
+	var origin: Vector2 = source.get("origin", _player_pos)
+	var direction: Vector2 = Vector2(source.get("direction", _facing))
+	if direction == Vector2.ZERO:
+		direction = Vector2.RIGHT
+	var max_range := float(source.get("range", FLASHLIGHT_RANGE))
+	var half_angle := deg_to_rad(float(source.get("half_angle_deg", FLASHLIGHT_HALF_ANGLE)))
+	var rays := 9
+	for ray_idx in range(rays):
+		var t := 0.5 if rays <= 1 else float(ray_idx) / float(rays - 1)
+		var angle := lerpf(-half_angle, half_angle, t)
+		var ray_dir := direction.rotated(angle).normalized()
+		var ray_end := origin + ray_dir * max_range
+		var steps := max(2, int(ceil(max_range / max(_gameplay_light_field.cell_size * 0.75, 12.0))))
+		for step in range(steps + 1):
+			var step_t := float(step) / float(steps)
+			var sample_pos := origin.lerp(ray_end, step_t)
+			var distance_ratio := origin.distance_to(sample_pos) / max(max_range, 0.001)
+			var energy := clampf(1.0 - distance_ratio, 0.0, 1.0)
+			if energy <= 0.0:
+				continue
+			_gameplay_light_field.add_splat_world(sample_pos, 26.0, 0.72 * energy)
+	_gameplay_light_field.add_splat_world(origin, 42.0, 1.0)
+
+func _sample_gameplay_light(pos: Vector2) -> float:
+	if _gameplay_light_field == null:
+		return 0.0
+	return clampf(_gameplay_light_field.sample_world(pos), 0.0, 1.0)
+
+func _update_native_light_presentation() -> void:
+	if _native_light_presentation == null:
+		return
+	_native_light_presentation.update_from_packets(
+		_flashlight_render_packet,
+		LightTypes.empty_render_packet("laser"),
+		LightTypes.empty_render_packet("prism"),
+		_light_world.prism_emitters() if _light_world != null else [],
+		null,
+		_flashlight_on,
+		_player_pos,
+		_facing,
+		_light_world,
+		[]
+	)
 
 # --- Rendering (Milestone 2) ---
 
