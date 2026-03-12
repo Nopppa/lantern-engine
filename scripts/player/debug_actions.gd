@@ -16,6 +16,11 @@ static func handle_key_input(run: RunScene, event: InputEvent) -> void:
 			KEY_F4:
 				toggle_immortal(run)
 				run.get_viewport().set_input_as_handled()
+			KEY_F5:
+				if "legends_hidden" in run:
+					run.legends_hidden = !run.legends_hidden
+					run.last_event = "HUD Legends %s" % ("hidden" if run.legends_hidden else "shown")
+				run.get_viewport().set_input_as_handled()
 
 static func handle_process_actions(run: RunScene) -> bool:
 	if Input.is_action_just_pressed("quick_refill"):

@@ -764,3 +764,8 @@ func _draw() -> void:
 		draw_arc(mouse_world, 10.0, 0.0, TAU, 20, Color(0.85, 0.95, 1.0, 0.45), 1.5)
 		draw_line(mouse_world + Vector2(-6, 0), mouse_world + Vector2(6, 0), Color(0.85, 0.95, 1.0, 0.25), 1.0)
 		draw_line(mouse_world + Vector2(0, -6), mouse_world + Vector2(0, 6), Color(0.85, 0.95, 1.0, 0.25), 1.0)
+
+	if native_light_presentation and not native_light_presentation._debug_r_hits.is_empty():
+		for hit in native_light_presentation._debug_r_hits:
+			draw_circle(Vector2(hit), 5.0, Color(1, 0, 0, 1))
+			draw_circle(Vector2(hit), 2.0, Color(1, 1, 1, 1))

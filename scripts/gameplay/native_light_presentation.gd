@@ -52,11 +52,16 @@ var canvas_modulate: CanvasModulate
 var flashlight_light: PointLight2D
 var inner_flashlight_light: PointLight2D
 var secondary_flashlight_pool: Array[PointLight2D] = []
+var reflected_beam_pool: Array[PointLight2D] = []  # 4 nodes spread along mirror hit segment
+var _reflected_beam_poly: Polygon2D  # visual fill for the reflected cone
 var beam_glow_pool: Array[PointLight2D] = []
 var prism_station_lights: Dictionary = {}
 var prism_node_light: PointLight2D
 
+var _debug_r_hits: Array = []
+
 const SECONDARY_FLASHLIGHT_POOL_SIZE := 8
+const REFLECTED_BEAM_NODES := 4  # number of PointLight2D spread along mirror segment
 var _texture_cache: Dictionary = {}
 
 var occluder_root: Node2D
@@ -114,6 +119,23 @@ func _ready() -> void:
 		sec_light.enabled = false
 		add_child(sec_light)
 		secondary_flashlight_pool.append(sec_light)
+
+	# Reflected beam: 4 nodes spread along the mirror hit segment
+	for i in range(REFLECTED_BEAM_NODES):
+		var rb := _make_cone_light(FLASH_TEXTURE_SIZE, FLASH_COLOR, FLASH_ENERGY / REFLECTED_BEAM_NODES, 1.0, 22.0)
+		rb.name = "ReflectedBeam_%d" % i
+		rb.enabled = false
+		add_child(rb)
+		reflected_beam_pool.append(rb)
+
+	# Visual polygon fill for the reflected cone (drawn under the lights)
+	_reflected_beam_poly = Polygon2D.new()
+	_reflected_beam_poly.name = "ReflectedBeamPoly"
+	_reflected_beam_poly.color = Color(FLASH_COLOR.r, FLASH_COLOR.g, FLASH_COLOR.b, 0.28)
+	_reflected_beam_poly.z_as_relative = false
+	_reflected_beam_poly.z_index = 1
+	_reflected_beam_poly.visible = false
+	add_child(_reflected_beam_poly)
 
 	for i in range(BEAM_GLOW_POOL_SIZE):
 		var glow := _make_light(BEAM_GLOW_TEXTURE_SIZE, BEAM_GLOW_COLOR, BEAM_GLOW_ENERGY, 0.5)
@@ -313,6 +335,13 @@ func _update_flashlight(packet: Dictionary, on: bool, pos: Vector2, facing_dir: 
 	if not on or not bool(packet.get("source", {}).get("intensity", 0)):
 		flashlight_light.enabled = false
 		inner_flashlight_light.enabled = false
+		for rb: PointLight2D in reflected_beam_pool:
+			rb.enabled = false
+		_reflected_beam_poly.visible = false
+		_debug_r_hits.clear()
+		queue_redraw()
+		for sec: PointLight2D in secondary_flashlight_pool:
+			sec.enabled = false
 		return
 	flashlight_light.enabled = true
 	flashlight_light.position = pos
@@ -343,49 +372,130 @@ func _update_flashlight(packet: Dictionary, on: bool, pos: Vector2, facing_dir: 
 	inner_flashlight_light.shadow_filter = Light2D.SHADOW_FILTER_NONE
 	inner_flashlight_light.shadow_filter_smooth = 0.0
 
+	# ---- Reflected beam: segment-emitter approach ----
+	var r_hits: Array = []
+	var r_ends: Array = []
+	var r_dirs: Array = []
+	var r_intensity_sum := 0.0
+	var r_max_range := 0.0
+
+	for seg in packet.get("segments", []):
+		if not seg is Dictionary:
+			continue
+		if seg.get("kind", "") != "reflect":
+			continue
+		var a := Vector2(seg.get("a", Vector2.ZERO))
+		var b := Vector2(seg.get("b", Vector2.ZERO))
+		var si := float(seg.get("intensity", 0.0))
+		if si < 0.03 or a.distance_to(b) < 4.0:
+			continue
+		r_hits.append(a)
+		r_ends.append(b)
+		r_dirs.append((b - a).normalized())
+		r_intensity_sum += si
+		r_max_range = max(r_max_range, a.distance_to(b))
+
+	if r_hits.size() >= 2:
+		# Average reflected direction
+		var dir_sum := Vector2.ZERO
+		for i in range(r_dirs.size()):
+			dir_sum += Vector2(r_dirs[i])
+		var avg_dir := dir_sum.normalized()
+		var avg_intensity := r_intensity_sum / float(r_hits.size())
+
+		# The rays in r_hits are perfectly sequential directly from the flashlight raycast sweep.
+		# Therefore, index 0 is one side of the sweep, and index -1 is the other side.
+		# We don't need any dot product projections to map them!
+		var left_idx := 0
+		var right_idx := r_hits.size() - 1
+
+		var p_left := Vector2(r_hits[left_idx])
+		var p_right := Vector2(r_hits[right_idx])
+		var e_left := Vector2(r_ends[left_idx])
+		var e_right := Vector2(r_ends[right_idx])
+		var angle_left := Vector2(r_dirs[left_idx]).angle()
+		var angle_right := Vector2(r_dirs[right_idx]).angle()
+
+		# Unwrap the right angle to prevent the interpolation from crossing over via the shortest path
+		var diff := wrapf(angle_right - angle_left, -PI, PI)
+		var angle_right_unwrapped := angle_left + diff
+
+		# Build visual polygon as a simple quadrilateral matching the sweep extremes
+		var frontier_pts := PackedVector2Array()
+		frontier_pts.append(p_left)
+		frontier_pts.append(e_left)
+		frontier_pts.append(e_right)
+		frontier_pts.append(p_right)
+
+		_reflected_beam_poly.polygon = frontier_pts
+		_reflected_beam_poly.color = Color(FLASH_COLOR.r, FLASH_COLOR.g, FLASH_COLOR.b,
+			clampf(avg_intensity * 0.25, 0.08, 0.35))
+		_reflected_beam_poly.visible = enabled
+
+		# Spread REFLECTED_BEAM_NODES evenly along the segment and interpolate angles
+		var energy_per := FLASH_ENERGY * clampf(avg_intensity * 0.88, 0.08, 1.4) / float(REFLECTED_BEAM_NODES)
+		var tex := _get_cone_texture(FLASH_TEXTURE_SIZE, Color.WHITE, half_angle * 0.95)
+		var tex_scale := clampf(r_max_range / (FLASH_TEXTURE_SIZE * 0.5), 0.5, 4.5)
+
+		# Offset slightly so the light origin is not trapped inside the mirror's Godot LightOccluder2D
+		var spawn_offset := avg_dir * (OCCLUDER_SEGMENT_THICKNESS * 0.5 + 2.0)
+
+		for i in range(REFLECTED_BEAM_NODES):
+			var t := float(i) / float(REFLECTED_BEAM_NODES - 1) if REFLECTED_BEAM_NODES > 1 else 0.5
+			var rb: PointLight2D = reflected_beam_pool[i]
+			rb.enabled = true
+			rb.position = p_left.lerp(p_right, t) + spawn_offset
+			rb.rotation = lerp(angle_left, angle_right_unwrapped, t)
+			rb.texture = tex
+			rb.texture_scale = tex_scale
+			rb.color = FLASH_COLOR
+			rb.energy = energy_per
+			rb.shadow_color = Color(0.01, 0.02, 0.03, 0.92)
+			rb.shadow_filter = Light2D.SHADOW_FILTER_NONE
+			rb.shadow_filter_smooth = 0.0
+	else:
+		for rb in reflected_beam_pool:
+			rb.enabled = false
+		_reflected_beam_poly.visible = false
+
+	_debug_r_hits = r_hits
+	queue_redraw()
+
+	# ---- Transmit (glass pass-through) secondary lights — keep one-per-segment ----
 	var sec_index := 0
 	for segment in packet.get("segments", []):
 		if sec_index >= SECONDARY_FLASHLIGHT_POOL_SIZE:
 			break
 		if not segment is Dictionary:
 			continue
-		var kind := String(segment.get("kind", ""))
-		if kind != "reflect" and kind != "transmit":
+		if String(segment.get("kind", "")) != "transmit":
 			continue
-		if kind == "transmit" and not bool(segment.get("visible", true)):
+		if not bool(segment.get("visible", true)):
 			continue
 		var a: Vector2 = segment.get("a", Vector2.ZERO)
 		var b: Vector2 = segment.get("b", Vector2.ZERO)
 		var intensity: float = float(segment.get("intensity", 0.0))
 		if intensity < 0.05 or a.distance_to(b) < 5.0:
 			continue
-
 		var out_dir := (b - a).normalized()
 		var bounce_range := a.distance_to(b)
-		var bounce_angle: float = half_angle * 1.2 if kind == "transmit" else half_angle * 0.9
-
 		var sec_light: PointLight2D = secondary_flashlight_pool[sec_index]
 		sec_light.enabled = true
 		sec_light.position = a
 		sec_light.rotation = out_dir.angle()
-		sec_light.texture = _get_cone_texture(FLASH_TEXTURE_SIZE, Color.WHITE, bounce_angle)
+		sec_light.texture = _get_cone_texture(FLASH_TEXTURE_SIZE, Color.WHITE, half_angle * 1.2)
 		sec_light.texture_scale = clampf(bounce_range / (FLASH_TEXTURE_SIZE * 0.5), 0.5, 4.5)
-
-		if kind == "transmit":
-			sec_light.color = Color(0.70, 0.96, 1.0, 1.0).lerp(FLASH_COLOR, 0.4)
-			sec_light.energy = FLASH_ENERGY * intensity * 0.9
-			sec_light.shadow_color = Color(0.01, 0.03, 0.06, 0.85)
-		else:
-			sec_light.color = Color(1.0, 0.98, 0.85, 1.0)
-			sec_light.energy = FLASH_ENERGY * intensity * 0.95
-			sec_light.shadow_color = Color(0.01, 0.02, 0.03, 0.92)
-
+		sec_light.color = Color(0.70, 0.96, 1.0, 1.0).lerp(FLASH_COLOR, 0.4)
+		sec_light.energy = FLASH_ENERGY * intensity * 0.9
+		sec_light.shadow_color = Color(0.01, 0.03, 0.06, 0.85)
 		sec_light.shadow_filter = Light2D.SHADOW_FILTER_NONE
 		sec_light.shadow_filter_smooth = 0.0
 		sec_index += 1
 
 	for i in range(sec_index, SECONDARY_FLASHLIGHT_POOL_SIZE):
 		secondary_flashlight_pool[i].enabled = false
+
+
 
 
 
@@ -598,6 +708,8 @@ func _apply_shadow_state() -> void:
 		inner_flashlight_light.shadow_enabled = shadows_enabled
 	for sec: PointLight2D in secondary_flashlight_pool:
 		sec.shadow_enabled = shadows_enabled
+	for rb: PointLight2D in reflected_beam_pool:
+		rb.shadow_enabled = shadows_enabled
 	for glow: PointLight2D in beam_glow_pool:
 		glow.shadow_enabled = false
 	if prism_node_light:
@@ -616,6 +728,10 @@ func _apply_visibility() -> void:
 		inner_flashlight_light.visible = enabled
 	for sec: PointLight2D in secondary_flashlight_pool:
 		sec.visible = enabled
+	for rb: PointLight2D in reflected_beam_pool:
+		rb.visible = enabled
+	if _reflected_beam_poly:
+		_reflected_beam_poly.visible = (enabled and _reflected_beam_poly.polygon.size() > 2)
 	for glow: PointLight2D in beam_glow_pool:
 		glow.visible = enabled
 	if prism_node_light:

@@ -43,6 +43,7 @@ var beam_debug_enabled := true
 var hp_overhead_enabled := true
 var cursor_probe_enabled := true
 var ui_overlays_hidden := false
+var legends_hidden := false
 var base_alive_flip := false
 var movement_surface_probe := {}
 var spawn_validation_enabled := true
@@ -774,7 +775,7 @@ func _update_native_light_presentation() -> void:
 func _update_ui() -> void:
 	if hud_label == null or status_label == null:
 		return
-	if ui_overlays_hidden:
+	if legends_hidden:
 		hud_label.visible = false
 		status_label.visible = false
 		return
@@ -971,6 +972,27 @@ func _draw() -> void:
 func _draw_flashlight_trace() -> void:
 	if not flashlight_on:
 		return
+
+	# --- DEBUG: paint the mirror's lit surface red while light hits it ---
+	var mirror_hits: Array = []
+	for seg: Dictionary in _packet_segments(flashlight_render_packet):
+		# The REAL contact point is 'b' of a primary segment that ends at the mirror
+		if String(seg.get("kind", "")) == "primary" and String(seg.get("material_id", "")) == "mirror":
+			mirror_hits.append(Vector2(seg["b"]))
+	if mirror_hits.size() >= 2:
+		# Sort by X so we can draw a clean line from leftmost to rightmost hit
+		mirror_hits.sort_custom(func(p: Vector2, q: Vector2) -> bool: return p.x < q.x)
+		var p0: Vector2 = mirror_hits[0]
+		var p1: Vector2 = mirror_hits[mirror_hits.size() - 1]
+		draw_line(p0, p1, Color(1, 0, 0, 1.0), 4.0)
+		for hp: Vector2 in mirror_hits:
+			draw_circle(hp, 4.0, Color(1, 0, 0, 1))
+			draw_circle(hp, 2.0, Color(1, 1, 1, 1))
+	elif mirror_hits.size() == 1:
+		draw_circle(mirror_hits[0], 5.0, Color(1, 0, 0, 1))
+		draw_circle(mirror_hits[0], 2.0, Color(1, 1, 1, 1))
+	# --- END DEBUG ---
+
 	if beam_debug_enabled and not ui_overlays_hidden:
 		for fill: Dictionary in _packet_fills(flashlight_render_packet):
 			var points: PackedVector2Array = fill["points"]
