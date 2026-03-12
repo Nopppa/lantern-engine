@@ -61,24 +61,25 @@ static func response(material_id: String, source_type: String, intensity: float,
 	var reflect_dir: Vector2 = incoming.bounce(normal).normalized()
 	if reflect_dir == Vector2.ZERO:
 		reflect_dir = incoming
-	var base_refraction: float = clampf(float(material.get("refraction_strength", 0.0)), 0.0, 0.35)
+	# Transmission direction: use Snell's law vector form when material has IOR, else straight-through.
+	# n1 * sin(theta_i) = n2 * sin(theta_t), entering from air (n1=1.0) into material (n2=ior).
 	var transmit_dir := incoming
-	if base_refraction > 0.0:
-		# Angle-dependent refraction: near-normal incidence bends less, grazing angles bend more.
-		# cos_theta = |incoming · normal|; angle_factor = 1 - cos_theta (0 at normal, 1 at grazing)
-		var cos_theta: float = absf(incoming.dot(normal.normalized()))
-		var angle_factor: float = clampf(1.0 - cos_theta, 0.0, 1.0)
-		# Apply Snell-like power curve so mid-angles have moderate bend
-		var refraction_strength: float = base_refraction * pow(angle_factor, 0.65)
-		var tangent := Vector2(-normal.y, normal.x).normalized()
-		if tangent == Vector2.ZERO:
-			tangent = Vector2.RIGHT
-		var bend_sign := signf(incoming.cross(normal))
-		if is_zero_approx(bend_sign):
-			bend_sign = 1.0
-		var bend_dir := (incoming + tangent * bend_sign * refraction_strength * 0.55).normalized()
-		if bend_dir != Vector2.ZERO:
-			transmit_dir = bend_dir
+	var ior: float = clampf(float(material.get("ior", 1.0)), 1.0, 2.8)
+	if ior > 1.01:
+		var n := normal.normalized()
+		# Orient normal to face the incoming ray (inward normal)
+		var dot_in := incoming.dot(n)
+		if dot_in > 0.0:
+			n = -n
+			dot_in = -dot_in
+		var n_ratio: float = 1.0 / ior  # n_air / n_material (entering glass)
+		var cos_i: float = -dot_in      # cos of angle of incidence (positive)
+		var sin2_t: float = n_ratio * n_ratio * (1.0 - cos_i * cos_i)
+		if sin2_t < 1.0:  # no total internal reflection
+			var cos_t: float = sqrt(1.0 - sin2_t)
+			var refracted := (n_ratio * incoming + (n_ratio * cos_i - cos_t) * n).normalized()
+			if refracted != Vector2.ZERO:
+				transmit_dir = refracted
 	var roughness: float = clampf(float(material.get("roughness", diffusion)) * float(profile.get("roughness_scale", 1.0)), 0.0, 1.0)
 	return {
 		"material_id": material_id,

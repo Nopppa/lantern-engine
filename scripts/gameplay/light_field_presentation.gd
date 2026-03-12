@@ -76,11 +76,23 @@ func update_flashlight_packet(packet: Dictionary) -> void:
 	)
 
 func update_prism_packet(packet: Dictionary) -> void:
-	update_prism(
-		Vector2(packet.get("source", {}).get("origin", Vector2.ZERO)),
-		_frontier_array_from_packet(packet),
-		float(packet.get("source", {}).get("range", 0.0))
-	)
+	var origin := Vector2(packet.get("source", {}).get("origin", Vector2.ZERO))
+	var frontier := _frontier_array_from_packet(packet)
+	var radius_hint := float(packet.get("source", {}).get("range", 0.0))
+	# Prism is a constant emitter: always show the PointLight2D ambient glow
+	# even when no frontier rays have been traced yet.
+	var has_active := bool(packet.get("active", false)) or not frontier.is_empty()
+	if has_active or (packet.get("emitter_count", 0) as int) > 0 or not (packet.get("emitter_keys", []) as Array).is_empty():
+		if not prism_light.enabled and origin != Vector2.ZERO:
+			prism_light.enabled = true
+			prism_light.position = origin
+			prism_light.texture_scale = max(0.65, radius_hint / 128.0)
+			prism_light.energy = 0.38  # soft constant ambient
+	if not frontier.is_empty():
+		update_prism(origin, frontier, radius_hint)
+	elif prism_light.enabled:
+		# Keep PointLight2D alive at last known position even with no frontier
+		pass
 
 func update_flashlight(origin: Vector2, frontier: Array, max_range: float, facing: Vector2, half_angle_deg: float) -> void:
 	if frontier.size() < 2:

@@ -56,7 +56,9 @@ const DEFINITIONS := {
 		"absorption": 0.08,
 		"roughness": 0.10,
 		"restoration_affinity": 0.90,
-		"refraction_strength": 0.10,
+		"refraction_strength": 0.10,  # legacy, kept for compat
+		"ior": 1.52,                   # index of refraction (standard borosilicate glass)
+		"thickness_hint": 0.0,         # optional future use: slab thickness in world units (0 = thin surface)
 		"color": Color(0.44, 0.68, 0.78, 0.95),
 		"alive_color": Color(0.68, 0.90, 0.98, 0.95)
 	},

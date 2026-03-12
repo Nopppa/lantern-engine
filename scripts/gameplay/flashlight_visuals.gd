@@ -241,6 +241,12 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 				intensity *= float(response["transmission"])
 				remaining *= float(response["branch_range_scale"])
 				continued = true
+				# Lock the cone-envelope frontier at the material boundary.
+				# Post-material light is shown through the transmit segment above.
+				# Allowing the frontier to follow the refracted ray scatters it in
+				# different directions per ray, causing polygon self-intersection.
+				frontier_point = hit_point
+				break
 			if not continued and float(response["reflectivity"]) * intensity > float(response["branch_min"]):
 				direction = Vector2(response["reflect_dir"]).normalized()
 				origin = hit_point + direction * lab.BEAM_OFFSET
@@ -248,6 +254,9 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 				remaining *= float(response["branch_range_scale"])
 				bounce_index += 1
 				continued = true
+				# Same: lock envelope frontier at mirror surface to prevent broken polygon.
+				frontier_point = hit_point
+				break
 			if not continued:
 				break
 		primary_frontier.append(frontier_point)

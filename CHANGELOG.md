@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.3 - 2026-03-12
+
+Glass Refraction, Beam Continuity, Prism Emission, Soft Glow & Life Visual patch:
+
+- **glass refraction — proper Snell's law**: replaced the approximate angle-dependent formula with the full Snell's law vector form (`n1*sin(θi) = n2*sin(θt)`) in `light_response_model.gd`; glass now has `ior: 1.52` (borosilicate); near-normal incidence produces minimal bend, oblique incidence produces physically correct stronger bend; `thickness_hint` added as optional reserved field for future slab behavior
+- **flashlight beam continuity after glass/mirror**: in `flashlight_visuals.gd`, the cone-envelope frontier now locks at the material boundary when a bending material (glass/mirror) is hit; prevents the polygon from following scattered post-material ray endpoints which caused self-intersecting fill artifacts (striped/fragmented cone); post-material light is preserved as the separately-rendered transmit/reflect segments
+- **transmit/reflect segments rendered as soft wide beams**: removed the dashed-line pattern from transmit/reflect segment drawing in both flashlight and prism trace renderers; replaced with three-pass soft wide line (outer glow + mid + bright core) so post-glass and post-mirror light reads as a coherent unified beam rather than patterned stripes
+- **prism constant ambient emission**: prism is now a permanent local light source; non-energized prism no longer fires a full 360° radial trace (which created the ring blob); instead emits only a constant ambient zone + always-enabled PointLight2D glow; `light_field_presentation.gd` updated so the PointLight2D activates as soon as a prism emitter is present, independently of frontier trace data
+- **prism energized hit behavior**: when hit by flashlight/laser, prism now emits a directed wide-cone fill (120° half-angle, 18 guide rays) aimed away from the player in the outgoing direction; this simulates prism-style light redirection/dispersion without producing a dense 360° ring; stations use the same directed-cone model
+- **soft player local glow**: replaced the two-circle hard-edged player indicator with a 5-layer concentric soft falloff (radii +40, +24, +12, +4, exact); each layer has lower alpha; result is a smooth ambient presence around the player with no visible circular boundary
+- **organic life/restoration presentation**: replaced the hard `draw_rect` alive-cell overlay with overlapping `draw_circle` at radius = 1.44× half-cell-size, so adjacent cells blend across seams; added a brighter inner core circle; gameplay logic and LightField query paths are completely unchanged — smoothing is presentation-only
+
 ## 0.6.2 - 2026-03-12
 
 Lighting Visual Quality & Physics patch:

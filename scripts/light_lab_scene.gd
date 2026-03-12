@@ -189,35 +189,87 @@ func _refresh_light_approximations_if_needed(force: bool = false) -> void:
 		var prism_strengths: Dictionary = {}
 		if prism_node:
 			var manual_energized := _prism_emitter_energized(prism_node.position, current_prism_radius() + 8.0)
-			var manual_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_node.position, Vector2.RIGHT, approx_prism_frontiers.get("manual", {}), 118.0 if manual_energized else max(52.0, current_prism_radius() * 2.6), 0.78 if manual_energized else 0.18, 28 if manual_energized else 12))
-			accum_segments.append_array(manual_packet.get("segments", []))
-			accum_zones.append_array(manual_packet.get("zones", []))
-			accum_zones.append(LightTypes.render_zone(prism_node.position, max(24.0, current_prism_radius() * 1.35), 0.44 if manual_energized else 0.14, {
-				"kind": "emitter_core",
+			# Always emit a constant ambient zone — prism is a permanent local light source.
+			accum_zones.append(LightTypes.render_zone(prism_node.position, max(28.0, current_prism_radius() * 1.6), 0.18, {
+				"kind": "emitter_ambient",
 				"source_type": "prism",
 				"emitter_key": "manual"
 			}))
-			accum_fills.append_array(manual_packet.get("fills", []))
-			approx_prism_frontiers["manual"] = manual_packet.get("frontier", {})
 			active_prism_keys.append("manual")
-			prism_strengths["manual"] = 1.0 if manual_energized else 0.32
+			if manual_energized:
+				# Energized: emit a directed wide cone away from the player (prism redirects light outward),
+				# not a full 360° ring. Direction = away from flashlight source, spread = 120° half-angle.
+				var outgoing_dir := (prism_node.position - player_pos).normalized()
+				if outgoing_dir == Vector2.ZERO:
+					outgoing_dir = Vector2.RIGHT
+				var manual_packet := FlashlightVisuals.build_render_packet(self, {
+					"source_type": "prism",
+					"origin": prism_node.position,
+					"direction": outgoing_dir,
+					"range": 118.0,
+					"half_angle_deg": 120.0,
+					"guide_rays": 18,
+					"center_intensity": 0.78,
+					"edge_intensity": 0.38,
+					"use_frontier_smoothing": true,
+					"previous_frontier": approx_prism_frontiers.get("manual", {}),
+					"source_anchor": prism_node.position,
+					"radial_emission": false
+				})
+				accum_segments.append_array(manual_packet.get("segments", []))
+				accum_zones.append_array(manual_packet.get("zones", []))
+				accum_fills.append_array(manual_packet.get("fills", []))
+				approx_prism_frontiers["manual"] = manual_packet.get("frontier", {})
+				accum_zones.append(LightTypes.render_zone(prism_node.position, max(24.0, current_prism_radius() * 1.35), 0.44, {
+					"kind": "emitter_core",
+					"source_type": "prism",
+					"emitter_key": "manual"
+				}))
+				prism_strengths["manual"] = 1.0
+			else:
+				prism_strengths["manual"] = 0.32
 		for prism_entity: Dictionary in _light_world_prism_entities():
 			if String(prism_entity.get("kind", "")) != "prism_station":
 				continue
 			var station_key := "station_%d_%d" % [int(prism_entity["pos"].x), int(prism_entity["pos"].y)]
 			var station_energized := _prism_emitter_energized(Vector2(prism_entity["pos"]), float(prism_entity.get("radius", 18.0)) + 8.0)
-			var station_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_entity["pos"], Vector2.RIGHT, approx_prism_frontiers.get(station_key, {}), 104.0 if station_energized else 46.0, 0.72 if station_energized else 0.16, 24 if station_energized else 10))
-			accum_segments.append_array(station_packet.get("segments", []))
-			accum_zones.append_array(station_packet.get("zones", []))
-			accum_zones.append(LightTypes.render_zone(Vector2(prism_entity["pos"]), max(22.0, float(prism_entity.get("radius", 18.0)) * 1.55), 0.38 if station_energized else 0.12, {
-				"kind": "emitter_core",
+			# Constant ambient zone always present for stations too.
+			accum_zones.append(LightTypes.render_zone(Vector2(prism_entity["pos"]), max(26.0, float(prism_entity.get("radius", 18.0)) * 1.8), 0.14, {
+				"kind": "emitter_ambient",
 				"source_type": "prism",
 				"emitter_key": station_key
 			}))
-			accum_fills.append_array(station_packet.get("fills", []))
-			approx_prism_frontiers[station_key] = station_packet.get("frontier", {})
 			active_prism_keys.append(station_key)
-			prism_strengths[station_key] = 1.0 if station_energized else 0.28
+			if station_energized:
+				var station_out_dir := (Vector2(prism_entity["pos"]) - player_pos).normalized()
+				if station_out_dir == Vector2.ZERO:
+					station_out_dir = Vector2.RIGHT
+				var station_packet := FlashlightVisuals.build_render_packet(self, {
+					"source_type": "prism",
+					"origin": prism_entity["pos"],
+					"direction": station_out_dir,
+					"range": 104.0,
+					"half_angle_deg": 110.0,
+					"guide_rays": 16,
+					"center_intensity": 0.72,
+					"edge_intensity": 0.34,
+					"use_frontier_smoothing": true,
+					"previous_frontier": approx_prism_frontiers.get(station_key, {}),
+					"source_anchor": prism_entity["pos"],
+					"radial_emission": false
+				})
+				accum_segments.append_array(station_packet.get("segments", []))
+				accum_zones.append_array(station_packet.get("zones", []))
+				accum_fills.append_array(station_packet.get("fills", []))
+				approx_prism_frontiers[station_key] = station_packet.get("frontier", {})
+				accum_zones.append(LightTypes.render_zone(Vector2(prism_entity["pos"]), max(22.0, float(prism_entity.get("radius", 18.0)) * 1.55), 0.38, {
+					"kind": "emitter_core",
+					"source_type": "prism",
+					"emitter_key": station_key
+				}))
+				prism_strengths[station_key] = 1.0
+			else:
+				prism_strengths[station_key] = 0.28
 		if prism_surge_flash_timer > 0.0:
 			var surge_packet := FlashlightVisuals.build_render_packet(self, FlashlightVisuals.prism_source_options(prism_surge_flash_origin, Vector2.RIGHT, approx_prism_frontiers.get("surge", {}), prism_surge_flash_radius, clampf(prism_surge_flash_strength, 0.72, 1.0), 56))
 			accum_segments.append_array(surge_packet.get("segments", []))
@@ -808,7 +860,13 @@ func _draw() -> void:
 		var alive_color := Color(0.28, 0.46, 0.31, 1.0)
 		draw_rect(rect, dead_color, true)
 		if blend > 0.01:
-			draw_rect(rect, Color(alive_color.r, alive_color.g, alive_color.b, blend * 0.95), true)
+			# Soft circular overlay instead of hard square — cells overlap neighbors,
+			# hiding the grid seams and making restoration look organic.
+			var center: Vector2 = rect.get_center()
+			var r: float = CELL_SIZE * 0.72  # radius > half-cell so circles overlap
+			draw_circle(center, r, Color(alive_color.r, alive_color.g, alive_color.b, blend * 0.82))
+			# Inner brighter core gives depth to the restoration effect
+			draw_circle(center, r * 0.44, Color(alive_color.r * 1.12, alive_color.g * 1.12, alive_color.b * 1.08, blend * 0.38))
 	for patch: Dictionary in _light_world_patches():
 		var mat := LightMaterials.get_definition(patch["material_id"])
 		var patch_color := Color(mat["color"].r, mat["color"].g, mat["color"].b, 0.82)
@@ -858,8 +916,12 @@ func _draw() -> void:
 		draw_circle(enemy["node"].position, enemy["radius"], color)
 		if hp_overhead_enabled and not ui_overlays_hidden:
 			draw_string(ThemeDB.fallback_font, enemy["node"].position + Vector2(-28, -24), "%d/%d" % [int(ceil(float(enemy["hp"]))), int(ceil(float(enemy.get("max_hp", enemy["hp"]))))], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1,1,1,0.9))
-	draw_circle(player_pos, PLAYER_RADIUS + 10.0, Color(1.0, 0.95, 0.72, 0.12))
-	draw_circle(player_pos, PLAYER_RADIUS, Color("f1fa8c"))
+	# Soft multi-layer player glow — no hard circle boundary
+	draw_circle(player_pos, PLAYER_RADIUS + 40.0, Color(1.0, 0.95, 0.72, 0.028))
+	draw_circle(player_pos, PLAYER_RADIUS + 24.0, Color(1.0, 0.95, 0.72, 0.055))
+	draw_circle(player_pos, PLAYER_RADIUS + 12.0, Color(1.0, 0.95, 0.72, 0.10))
+	draw_circle(player_pos, PLAYER_RADIUS + 4.0,  Color(1.0, 0.96, 0.78, 0.18))
+	draw_circle(player_pos, PLAYER_RADIUS,         Color("f1fa8c"))
 	draw_line(player_pos, player_pos + facing * 26.0, Color(0.14, 0.18, 0.24, 1.0), 2.0)
 	if cursor_probe_enabled and not ui_overlays_hidden and ARENA_RECT.has_point(get_global_mouse_position()):
 		var probe := get_global_mouse_position()
@@ -913,18 +975,16 @@ func _draw_flashlight_trace() -> void:
 			tint = Color(0.78, 0.96, 1.0, 1.0)
 			width = 2.6
 		var is_primary := kind == "primary"
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.035 if is_primary else 0.07) * intensity), 10.0 if is_primary else 12.0)
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.08 if is_primary else 0.18) * intensity), 5.5 if is_primary else 7.0)
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.22 if is_primary else 0.55) * intensity), 2.2 if is_primary else width)
-		if kind == "transmit":
-			var distance: float = a.distance_to(b)
-			var steps: int = max(2, int(distance / 24.0))
-			for i in range(steps):
-				if i % 2 == 0:
-					continue
-				var da: Vector2 = a.lerp(b, float(i) / float(steps))
-				var db: Vector2 = a.lerp(b, min(1.0, float(i) / float(steps) + 0.08))
-				draw_line(da, db, Color(1.0, 1.0, 1.0, 0.34 * intensity), 1.4)
+		# Transmit/reflect segments use wide soft glow (no dashed pattern — dashes created stripe bands)
+		if kind == "transmit" or kind == "reflect":
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.05 * intensity), 22.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.12 * intensity), 12.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.42 * intensity), 4.0)
+			draw_line(a, b, Color(1.0, 1.0, 1.0, 0.28 * intensity), 1.5)
+		else:
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.035 if is_primary else 0.07) * intensity), 10.0 if is_primary else 12.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.08 if is_primary else 0.18) * intensity), 5.5 if is_primary else 7.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.22 if is_primary else 0.55) * intensity), 2.2 if is_primary else width)
 		if material_id == "wood" and kind == "primary":
 			var wood_mid := a.lerp(b, 0.6)
 			draw_arc(wood_mid, 12.0, -0.45, 0.45, 10, Color(1.0, 0.88, 0.58, 0.25 * intensity), 1.4)
@@ -976,18 +1036,15 @@ func _draw_prism_trace() -> void:
 			tint = Color(0.74, 0.94, 1.0, 1.0)
 			width = 2.2
 		var is_primary := kind == "primary"
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.028 if is_primary else 0.06) * intensity), 9.0 if is_primary else 10.0)
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.07 if is_primary else 0.16) * intensity), 4.8 if is_primary else 6.0)
-		draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.20 if is_primary else 0.50) * intensity), 2.0 if is_primary else width)
-		if kind == "transmit":
-			var distance: float = a.distance_to(b)
-			var steps: int = max(2, int(distance / 24.0))
-			for i in range(steps):
-				if i % 2 == 0:
-					continue
-				var da: Vector2 = a.lerp(b, float(i) / float(steps))
-				var db: Vector2 = a.lerp(b, min(1.0, float(i) / float(steps) + 0.08))
-				draw_line(da, db, Color(1.0, 1.0, 1.0, 0.32 * intensity), 1.3)
+		if kind == "transmit" or kind == "reflect":
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.045 * intensity), 20.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.11 * intensity), 10.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.40 * intensity), 3.5)
+			draw_line(a, b, Color(1.0, 1.0, 1.0, 0.26 * intensity), 1.4)
+		else:
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.028 if is_primary else 0.06) * intensity), 9.0 if is_primary else 10.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.07 if is_primary else 0.16) * intensity), 4.8 if is_primary else 6.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.20 if is_primary else 0.50) * intensity), 2.0 if is_primary else width)
 
 func _draw_sign_patch(patch: Dictionary) -> void:
 	var rect: Rect2 = patch["rect"]
