@@ -54,6 +54,10 @@ var light_world_layout_cache_key := "authored_light_lab"
 var light_world_static_signature := ""
 var light_world_cache_hits := 0
 
+# ─── In-game menu overlay ─────────────────────────────────────
+const IngameMenu = preload("res://scripts/ui/ingame_menu.gd")
+var _ingame_menu: CanvasLayer = null
+
 func _ready() -> void:
 	randomize()
 	_apply_skill_defaults()
@@ -69,6 +73,12 @@ func _ready() -> void:
 	last_event = "Light Lab booted — readability + extraction pass active"
 	_build_light_lab()
 	_update_ui()
+	_setup_ingame_menu()
+
+func _setup_ingame_menu() -> void:
+	_ingame_menu = IngameMenu.new()
+	add_child(_ingame_menu)
+	_ingame_menu.return_to_main_menu_requested.connect(_on_ingame_menu_return_to_main_menu)
 
 func _build_light_lab() -> void:
 	var layout := _current_light_lab_layout()
@@ -96,7 +106,22 @@ func _build_light_lab() -> void:
 	approx_secondary_sample_order = {}
 	approx_refresh_timer = 999.0
 
+func _on_ingame_menu_return_to_main_menu() -> void:
+	# Delegate back to the bootstrap router (parent node).
+	var router := get_parent()
+	if router and router.has_method("show_main_menu"):
+		router.show_main_menu()
+
 func _input(event: InputEvent) -> void:
+	# ESC opens the in-game menu overlay; skip all other input when menu is open.
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_ESCAPE:
+			if _ingame_menu != null and not _ingame_menu.visible:
+				_ingame_menu.open()
+				get_viewport().set_input_as_handled()
+				return
+	if _ingame_menu != null and _ingame_menu.visible:
+		return  # let the overlay handle input while open
 	DebugActions.handle_key_input(self, event)
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
