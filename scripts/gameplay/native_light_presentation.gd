@@ -17,7 +17,8 @@ class_name NativeLightPresentation
 # Tunables  (all presentation-only)
 # ---------------------------------------------------------------------------
 
-const AMBIENT_COLOR := Color(0.24, 0.26, 0.32, 1.0)
+# Tässä säädetään taustavalon maskia, vaaleampi väri tekee valoisamman
+const AMBIENT_COLOR := Color(0.55, 0.52, 0.48, 1.0)
 
 const NATIVE_LIGHT_ITEM_MASK := 3
 const NATIVE_SHADOW_MASK := 3
