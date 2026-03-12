@@ -76,6 +76,9 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _pause_open:
 		_update_player(delta)
+		if Input.is_action_just_pressed("cast_beam") and _light_runtime != null:
+			_sync_light_runtime_state()
+			_light_runtime.cast_beam(get_global_mouse_position())
 		_sync_light_runtime_state()
 		_light_runtime.process_frame(delta)
 		_light_runtime.update_native_presentation(_native_light_presentation)
@@ -177,7 +180,12 @@ func _update_overlay_ui() -> void:
 		"energized_station_count": _light_runtime.active_prism_emitter_count() if _light_runtime != null else 0,
 		"light_cell_count": _light_runtime.dead_alive_cell_count() if _light_runtime != null else 0,
 		"pause_open": _pause_open,
-		"status_text": "[b]Exploration controls[/b]\nWASD / Arrows move | Mouse aim | [color=#8be9fd]F[/color] flashlight\n[color=#8be9fd]R[/color] next seed | [color=#8be9fd]T[/color] random seed | [color=#8be9fd]ESC[/color] pause/menu\n\n[b]Current mode goal[/b]\nTraverse the generated map, read material responses, and test shared light behavior in a playable shell.\n\n[b]Lighting status[/b]\nFlashlight uses shared render packets. Prism stations now react when energized by exploration light coverage."
+		"status_text": "[b]Exploration controls[/b]\nWASD / Arrows move | Mouse aim | [color=#8be9fd]F[/color] flashlight | [color=#8be9fd]LMB[/color] beam\n[color=#8be9fd]R[/color] next seed | [color=#8be9fd]T[/color] random seed | [color=#8be9fd]ESC[/color] pause/menu\n\n[b]Current mode goal[/b]\nTraverse the generated map, read material responses, and test shared light behavior in a playable shell.\n\n[b]Lighting status[/b]\nFlashlight uses shared render packets. Beam segments now reuse the shared resolver/presentation path, feed gameplay light, and can energize prism stations.\nBeam: %s | segments: %d | active: %s | event: %s" % [
+			("[color=#8be9fd]READY[/color]" if _light_runtime != null and _light_runtime.beam_ready() else "[color=#ffb86c]%.2fs[/color]" % (_light_runtime.beam_cooldown_remaining() if _light_runtime != null else 0.0)),
+			(_light_runtime.beam_segment_count() if _light_runtime != null else 0),
+			("yes" if _light_runtime != null and _light_runtime.beam_active() else "no"),
+			(_light_runtime.last_event if _light_runtime != null else "")
+		]
 	})
 
 # --- Public API ---
