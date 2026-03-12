@@ -10,11 +10,11 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `26e811e`
-- **Verification time:** 2026-03-12 14:50 Europe/Berlin
+- **Verified HEAD:** `0ea286f`
+- **Verification time:** 2026-03-12 14:58 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `26e811e`.
+- Current branch is pushed through commit `0ea286f`.
 - There are **no verified uncommitted RandomGEN code changes** at this moment.
 - Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
@@ -66,6 +66,14 @@
 - Gameplay light field now rebuilds every frame from a small exploration flashlight approximation.
 - HUD now reports flashlight state and sampled gameplay-light intensity.
 
+### Milestone 3.5 / Shared flashlight packet reuse
+**Commit:** `0ea286f`
+- Exploration scene now reuses `FlashlightVisuals.build_render_packet(...)` instead of the earlier ad-hoc local flashlight approximation.
+- Shared frontier smoothing state (`_approx_flashlight_frontier`) is now tracked in exploration scene.
+- Exploration gameplay-light writing now uses packet segments, zones, and fills with the same general packet-to-field approach used in Light Lab.
+- Mirror/glass/transmit/reflect continuations from the shared packet path now feed exploration gameplay light more truthfully.
+- Added small helper passthroughs (`_light_world_patches`, `_light_world_occluders`, `_light_world_tree_entities`) needed by the shared flashlight packet path.
+
 ---
 
 ## What Is Working Now
@@ -83,8 +91,9 @@ In `feature/randomgen-exploration-world`, the exploration shell currently has:
 - shared `LightField` boot
 - `DeadAliveGrid` boot/update
 - native light presentation boot/update
-- minimal gameplay-light sampling in exploration scene
 - flashlight toggle (`F`) and aim direction from mouse for exploration runtime
+- exploration flashlight now goes through the shared flashlight packet builder path instead of a purely local approximation
+- gameplay-light field is now fed from flashlight packet segments / zones / fills using the Light Lab-style packet-to-field write approach
 
 Light Lab remains untouched by these branch changes.
 
@@ -93,28 +102,26 @@ Light Lab remains untouched by these branch changes.
 ## What Is Still Missing
 
 ### Next likely milestone
-Move from minimal shared-light boot toward a more truthful reuse of the Light Lab light path.
+Extend exploration beyond flashlight-only integration.
 
 ### Missing pieces
-- exploration flashlight packet is still a **minimal local approximation**, not yet using the full Light Lab flashlight render/solver path
 - no secondary/prism/laser integration yet in exploration scene
 - no in-scene return-to-menu / pause overlay yet
 - no enemies/runtime gameplay loop yet
 - no deeper generated-world variety beyond current scaffold path
 - no explicit validation build/report has been attached to this milestone yet
+- exploration currently has only the smallest helper surface needed for flashlight packet reuse, not the full Light Lab runtime feature set
 
 ---
 
 ## Next Recommended Step
 
 **Highest-value next increment:**
-Replace or upgrade the minimal exploration flashlight packet path with a more direct reuse of existing shared flashlight/render packet logic, while still keeping the diff small.
+Add the next smallest shared-light feature after flashlight reuse.
 
-### Explicit target
-Prefer reusing existing project systems rather than inventing new ones:
-- `FlashlightVisuals` or the smallest shared flashlight packet builder path
-- existing packet-to-field write approach where practical
-- continue to keep Light Lab intact
+### Best candidates
+1. add a simple in-scene pause/menu return path for exploration usability, **or**
+2. add one more shared-light system step (secondary/prism support) if you want to keep pushing lighting parity first.
 
 ### Constraints
 - Do **not** fork lighting/material logic.
@@ -142,9 +149,9 @@ Read these first:
 - `docs/randomgen-live-handoff.md`
 - `scripts/exploration_scene.gd`
 - `scripts/light_lab_scene.gd`
+- `scripts/gameplay/flashlight_visuals.gd`
 - `scripts/gameplay/light_field.gd`
 - `scripts/gameplay/native_light_presentation.gd`
 - `scripts/gameplay/light_types.gd`
-- `scripts/gameplay/light_surface_resolver.gd`
 
 Do not trust prior timeout summaries unless they match the verified branch state.
