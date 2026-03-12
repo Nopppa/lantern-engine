@@ -1,0 +1,39 @@
+[gd_scene format=3 uid="uid://shrub_v1"]
+
+[node name="Shrub" type="Node2D"]
+
+[node name="Shadow" type="Polygon2D" parent="."]
+color = Color(0.05, 0.09, 0.08, 0.18)
+polygon = PackedVector2Array(-34, 14, -18, 8, 0, 10, 18, 8, 34, 14, 24, 22, 2, 24, -22, 22)
+
+[node name="LeafMassBackLeft" type="Polygon2D" parent="."]
+color = Color(0.18, 0.36, 0.13, 1.0)
+polygon = PackedVector2Array(-30, 8, -24, -8, -10, -16, 2, -6, -4, 12, -18, 18)
+
+[node name="LeafMassBackRight" type="Polygon2D" parent="."]
+color = Color(0.20, 0.39, 0.15, 1.0)
+polygon = PackedVector2Array(-2, 10, 6, -10, 20, -14, 30, 0, 24, 16, 8, 18)
+
+[node name="LeafMassFrontLeft" type="Polygon2D" parent="."]
+color = Color(0.25, 0.48, 0.18, 1.0)
+polygon = PackedVector2Array(-24, 16, -18, 0, -4, -4, 8, 8, 4, 22, -12, 24)
+
+[node name="LeafMassFrontRight" type="Polygon2D" parent="."]
+color = Color(0.29, 0.53, 0.20, 1.0)
+polygon = PackedVector2Array(0, 18, 8, 0, 24, -2, 34, 12, 28, 24, 12, 26)
+
+[node name="TwigLeft" type="Polygon2D" parent="."]
+color = Color(0.33, 0.23, 0.14, 1.0)
+polygon = PackedVector2Array(-8, 16, -4, 16, -2, 26, -10, 26)
+
+[node name="TwigRight" type="Polygon2D" parent="."]
+color = Color(0.33, 0.23, 0.14, 1.0)
+polygon = PackedVector2Array(6, 16, 10, 16, 12, 26, 4, 26)
+
+[node name="HighlightLeft" type="Polygon2D" parent="."]
+color = Color(0.39, 0.63, 0.29, 0.75)
+polygon = PackedVector2Array(-14, 2, -8, -4, 0, -4, 2, 2, -6, 6)
+
+[node name="HighlightRight" type="Polygon2D" parent="."]
+color = Color(0.42, 0.66, 0.31, 0.72)
+polygon = PackedVector2Array(10, 4, 16, -2, 24, -2, 26, 4, 18, 8)
