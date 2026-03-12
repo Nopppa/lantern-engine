@@ -1,10 +1,22 @@
 ## GeneratedExplorationProvider
 ##
-## Produces procedurally-generated layouts for the exploration world.
-## RandomGEN Layout v2 moves away from loose arena scatter toward a deterministic
-## graph of playable zones connected by corridors, with deliberate material
-## themes, prism placement, and route blockers that still compile into the
-## shared LightWorld pipeline.
+## Produces procedurally-generated exploration layouts for the world.
+##
+## Layout v3 transitions from "material themed zones" to **biome driven zones**.
+## A biome represents a believable place in the world:
+##
+##   forest
+##   meadow
+##   street
+##   housing
+##   industrial
+##
+## Materials (wood, glass, wet, mirror, brick etc) remain important for
+## the light engine but are now distributed *inside* a biome instead of
+## defining the biome itself.
+##
+## The generator still builds a deterministic graph of exploration zones
+## connected by corridors so the world remains structured and navigable.
 ##
 class_name GeneratedExplorationProvider
 extends WorldLayoutProvider
@@ -14,7 +26,15 @@ const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd
 const CONNECTOR_HALF_WIDTH := 46.0
 const MIN_ZONE_COUNT := 3
 const MAX_ZONE_COUNT := 7
-const ZONE_ARCHETYPES := ["mirror", "glass", "wet", "wood", "wet"]
+
+## Biome types for exploration zones
+const BIOMES := [
+	"forest",
+	"meadow",
+	"street",
+	"housing",
+	"industrial"
+]
 
 var _seed: int
 var _arena_rect: Rect2
@@ -55,7 +75,7 @@ func metadata() -> Dictionary:
 	return {
 		"world_type": "generated_exploration",
 		"provider": "GeneratedExplorationProvider",
-		"generator_version": "layout_v2",
+		"generator_version": "biome_layout_v3",
 		"seed": _seed,
 		"arena_rect": _arena_rect,
 		"ready_for_randomgen": true
@@ -68,7 +88,8 @@ func _base_options() -> Dictionary:
 		"ready_for_randomgen": true,
 		"adapter": "generated_exploration_provider",
 		"generated_seed": _seed,
-		"generator_version": "layout_v2"
+		"generator_version": "biome_layout_v3",
+		"generation_model": "biome_layout"
 	}
 
 # --- Convenience API ---
@@ -84,12 +105,16 @@ func build_world() -> LightWorld:
 func current_seed() -> int:
 	return _seed
 
-# --- Layout v2 implementation ---
+# --- Layout v3 implementation ---
 
 func _build_graph_layout(rng: RandomNumberGenerator) -> Dictionary:
 	var segments: Array = LightWorldBuilder._arena_boundary_segments(_arena_rect)
 	var patches: Array = [
-		LightWorldBuilder._normalized_patch(Rect2(_arena_rect.position, _arena_rect.size), "brick", "Generated world floor")
+		LightWorldBuilder._normalized_patch(
+			Rect2(_arena_rect.position, _arena_rect.size),
+			"brick",
+			"Generated world floor"
+		)
 	]
 	var prism_stations: Array = []
 	var tree_trunks: Array = []
@@ -101,20 +126,31 @@ func _build_graph_layout(rng: RandomNumberGenerator) -> Dictionary:
 
 	var spawn_size := Vector2(176, 148)
 	var spawn_rect := Rect2(
-		Vector2(_arena_rect.position.x + 86.0, _arena_rect.position.y + _arena_rect.size.y * 0.5 - spawn_size.y * 0.5),
+		Vector2(
+			_arena_rect.position.x + 86.0,
+			_arena_rect.position.y + _arena_rect.size.y * 0.5 - spawn_size.y * 0.5
+		),
 		spawn_size
 	)
+
 	var spawn_node := {
 		"id": "spawn",
 		"kind": "spawn",
 		"depth": 0,
-		"theme": "calm",
+		"biome": "meadow",
 		"rect": spawn_rect,
 		"center": spawn_rect.get_center()
 	}
 	layout_nodes.append(spawn_node)
 	used_rects.append(spawn_rect)
-	patches.append(LightWorldBuilder._normalized_patch(spawn_rect.grow(18.0), "wood", "Calm spawn grove"))
+
+	patches.append(
+		LightWorldBuilder._normalized_patch(
+			spawn_rect.grow(18.0),
+			"wood",
+			"Calm spawn grove"
+		)
+	)
 	dead_alive_cells.append(_zone_energy(spawn_rect.grow(12.0), 0.92, "wood", "spawn"))
 
 	var zone_count := rng.randi_range(MIN_ZONE_COUNT, MAX_ZONE_COUNT)
@@ -122,38 +158,57 @@ func _build_graph_layout(rng: RandomNumberGenerator) -> Dictionary:
 	var lane_count := max(2, mini(3, zone_count))
 	var lane_y := [0.28, 0.54, 0.76]
 	var previous_zone_centers := {}
-	var node_id_order: Array = ["spawn"]
 	var last_zone_center := spawn_rect.get_center()
 
 	for i in range(zone_count):
 		var lane_index := i % lane_count
 		var depth := i + 1
-		var theme := _zone_theme_for_index(i)
-		var zone_size := _zone_size_for_theme(theme, rng)
+		var biome := _biome_for_index(i)
+		var zone_size := _zone_size_for_biome(biome, rng)
 		var progress := float(i + 1) / float(zone_count + 1)
 		var zone_rect := _place_zone_rect(rng, zone_size, progress, lane_y[lane_index], used_rects)
+
 		used_rects.append(zone_rect)
+
 		var node_kind := "progression" if i == progression_index else "zone"
 		var node_id := ("exit" if node_kind == "progression" else "zone_%d" % (i + 1))
 		var node := {
 			"id": node_id,
 			"kind": node_kind,
 			"depth": depth,
-			"theme": theme,
+			"biome": biome,
 			"rect": zone_rect,
 			"center": zone_rect.get_center(),
 			"lane": lane_index
 		}
 		layout_nodes.append(node)
-		node_id_order.append(node_id)
+
 		var previous_center := spawn_rect.get_center() if i == 0 else last_zone_center
-		layout_links.append(_build_link(segments, previous_center, zone_rect.get_center(), i == progression_index, "main"))
+		layout_links.append(
+			_build_link(
+				segments,
+				previous_center,
+				zone_rect.get_center(),
+				i == progression_index,
+				"main"
+			)
+		)
+
 		if previous_zone_centers.has(lane_index):
-			layout_links.append(_build_link(segments, previous_zone_centers[lane_index], zone_rect.get_center(), false, "branch"))
+			layout_links.append(
+				_build_link(
+					segments,
+					previous_zone_centers[lane_index],
+					zone_rect.get_center(),
+					false,
+					"branch"
+				)
+			)
+
 		previous_zone_centers[lane_index] = zone_rect.get_center()
 		last_zone_center = zone_rect.get_center()
 
-		var zone_result := _decorate_zone(theme, node, depth, i == progression_index, rng)
+		var zone_result := _decorate_biome(biome, node, depth, i == progression_index, rng)
 		patches.append_array(zone_result.get("patches", []))
 		segments.append_array(zone_result.get("segments", []))
 		prism_stations.append_array(zone_result.get("prism_stations", []))
@@ -185,21 +240,43 @@ func _build_graph_layout(rng: RandomNumberGenerator) -> Dictionary:
 		"zone_summaries": zone_summaries
 	}
 
-func _zone_theme_for_index(index: int) -> String:
-	if index < ZONE_ARCHETYPES.size():
-		return ZONE_ARCHETYPES[index]
-	return "wood" if index % 2 == 0 else "wet"
+func _biome_for_index(index: int) -> String:
+	if index < BIOMES.size():
+		return BIOMES[index]
+	return BIOMES[index % BIOMES.size()]
 
-func _zone_size_for_theme(theme: String, rng: RandomNumberGenerator) -> Vector2:
-	match theme:
-		"mirror":
-			return Vector2(rng.randi_range(184, 228), rng.randi_range(152, 196))
-		"glass":
-			return Vector2(rng.randi_range(204, 250), rng.randi_range(148, 184))
-		"wet":
-			return Vector2(rng.randi_range(196, 238), rng.randi_range(168, 214))
+func _zone_size_for_biome(biome: String, rng: RandomNumberGenerator) -> Vector2:
+	match biome:
+		"forest":
+			return Vector2(
+				rng.randi_range(220, 300),
+				rng.randi_range(180, 260)
+			)
+		"meadow":
+			return Vector2(
+				rng.randi_range(260, 340),
+				rng.randi_range(200, 300)
+			)
+		"street":
+			return Vector2(
+				rng.randi_range(220, 280),
+				rng.randi_range(180, 220)
+			)
+		"housing":
+			return Vector2(
+				rng.randi_range(200, 260),
+				rng.randi_range(180, 240)
+			)
+		"industrial":
+			return Vector2(
+				rng.randi_range(260, 360),
+				rng.randi_range(220, 320)
+			)
 		_:
-			return Vector2(rng.randi_range(172, 214), rng.randi_range(144, 182))
+			return Vector2(
+				rng.randi_range(200, 260),
+				rng.randi_range(180, 240)
+			)
 
 func _place_zone_rect(rng: RandomNumberGenerator, size: Vector2, progress: float, lane_ratio: float, used_rects: Array) -> Rect2:
 	var min_x := _arena_rect.position.x + 240.0
@@ -208,6 +285,7 @@ func _place_zone_rect(rng: RandomNumberGenerator, size: Vector2, progress: float
 	var min_y := _arena_rect.position.y + 58.0
 	var max_y := _arena_rect.end.y - size.y - 58.0
 	var base_y := lerpf(min_y, max_y, clampf(lane_ratio, 0.0, 1.0))
+
 	for _attempt in range(20):
 		var rect := Rect2(
 			Vector2(
@@ -216,25 +294,43 @@ func _place_zone_rect(rng: RandomNumberGenerator, size: Vector2, progress: float
 			),
 			size
 		)
+
 		var overlaps := false
 		for existing: Rect2 in used_rects:
 			if rect.grow(34.0).intersects(existing):
 				overlaps = true
 				break
+
 		if not overlaps:
 			return rect
-	return Rect2(Vector2(clampf(base_x, min_x, max_x), clampf(base_y, min_y, max_y)), size)
+
+	return Rect2(
+		Vector2(
+			clampf(base_x, min_x, max_x),
+			clampf(base_y, min_y, max_y)
+		),
+		size
+	)
 
 func _build_link(segments: Array, from_center: Vector2, to_center: Vector2, progression_link: bool, route_kind: String) -> Dictionary:
 	var horizontal_first := absf(to_center.x - from_center.x) >= absf(to_center.y - from_center.y)
 	var corridor_points := [from_center]
+
 	if horizontal_first:
 		corridor_points.append(Vector2(to_center.x, from_center.y))
 	else:
 		corridor_points.append(Vector2(from_center.x, to_center.y))
+
 	corridor_points.append(to_center)
+
 	for i in range(corridor_points.size() - 1):
-		_add_corridor_segment(segments, corridor_points[i], corridor_points[i + 1], progression_link and i == corridor_points.size() - 2)
+		_add_corridor_segment(
+			segments,
+			corridor_points[i],
+			corridor_points[i + 1],
+			progression_link and i == corridor_points.size() - 2
+		)
+
 	return {
 		"from": from_center,
 		"to": to_center,
@@ -246,108 +342,418 @@ func _build_link(segments: Array, from_center: Vector2, to_center: Vector2, prog
 func _add_corridor_segment(segments: Array, a: Vector2, b: Vector2, add_gate: bool) -> void:
 	if a.distance_to(b) < 8.0:
 		return
+
 	var horizontal := absf(a.x - b.x) > absf(a.y - b.y)
 	var min_x := minf(a.x, b.x)
 	var max_x := maxf(a.x, b.x)
 	var min_y := minf(a.y, b.y)
 	var max_y := maxf(a.y, b.y)
+
 	if horizontal:
-		segments.append(_segment(Vector2(min_x, a.y - CONNECTOR_HALF_WIDTH), Vector2(max_x, a.y - CONNECTOR_HALF_WIDTH), Vector2.DOWN, "wood"))
-		segments.append(_segment(Vector2(min_x, a.y + CONNECTOR_HALF_WIDTH), Vector2(max_x, a.y + CONNECTOR_HALF_WIDTH), Vector2.UP, "wood"))
+		segments.append(
+			_segment(
+				Vector2(min_x, a.y - CONNECTOR_HALF_WIDTH),
+				Vector2(max_x, a.y - CONNECTOR_HALF_WIDTH),
+				Vector2.DOWN,
+				"wood"
+			)
+		)
+		segments.append(
+			_segment(
+				Vector2(min_x, a.y + CONNECTOR_HALF_WIDTH),
+				Vector2(max_x, a.y + CONNECTOR_HALF_WIDTH),
+				Vector2.UP,
+				"wood"
+			)
+		)
+
 		if add_gate:
 			var gate_x := lerpf(min_x, max_x, 0.72)
-			segments.append(_segment(Vector2(gate_x, a.y - CONNECTOR_HALF_WIDTH + 6.0), Vector2(gate_x, a.y + CONNECTOR_HALF_WIDTH - 6.0), Vector2.LEFT, "glass"))
+			segments.append(
+				_segment(
+					Vector2(gate_x, a.y - CONNECTOR_HALF_WIDTH + 6.0),
+					Vector2(gate_x, a.y + CONNECTOR_HALF_WIDTH - 6.0),
+					Vector2.LEFT,
+					"glass"
+				)
+			)
 	else:
-		segments.append(_segment(Vector2(a.x - CONNECTOR_HALF_WIDTH, min_y), Vector2(a.x - CONNECTOR_HALF_WIDTH, max_y), Vector2.RIGHT, "wood"))
-		segments.append(_segment(Vector2(a.x + CONNECTOR_HALF_WIDTH, min_y), Vector2(a.x + CONNECTOR_HALF_WIDTH, max_y), Vector2.LEFT, "wood"))
+		segments.append(
+			_segment(
+				Vector2(a.x - CONNECTOR_HALF_WIDTH, min_y),
+				Vector2(a.x - CONNECTOR_HALF_WIDTH, max_y),
+				Vector2.RIGHT,
+				"wood"
+			)
+		)
+		segments.append(
+			_segment(
+				Vector2(a.x + CONNECTOR_HALF_WIDTH, min_y),
+				Vector2(a.x + CONNECTOR_HALF_WIDTH, max_y),
+				Vector2.LEFT,
+				"wood"
+			)
+		)
+
 		if add_gate:
 			var gate_y := lerpf(min_y, max_y, 0.68)
-			segments.append(_segment(Vector2(a.x - CONNECTOR_HALF_WIDTH + 6.0, gate_y), Vector2(a.x + CONNECTOR_HALF_WIDTH - 6.0, gate_y), Vector2.DOWN, "glass"))
+			segments.append(
+				_segment(
+					Vector2(a.x - CONNECTOR_HALF_WIDTH + 6.0, gate_y),
+					Vector2(a.x + CONNECTOR_HALF_WIDTH - 6.0, gate_y),
+					Vector2.DOWN,
+					"glass"
+				)
+			)
 
-func _decorate_zone(theme: String, node: Dictionary, depth: int, is_progression: bool, rng: RandomNumberGenerator) -> Dictionary:
+func _decorate_biome(biome: String, node: Dictionary, depth: int, is_progression: bool, rng: RandomNumberGenerator) -> Dictionary:
 	var rect: Rect2 = node.get("rect", Rect2())
 	var patches: Array = []
 	var segments: Array = []
 	var prism_stations: Array = []
 	var tree_trunks: Array = []
 	var dead_alive_cells: Array = []
-	var label_prefix := ("Exit " if is_progression else "") + theme.capitalize()
-	match theme:
-		"mirror":
-			patches.append(LightWorldBuilder._normalized_patch(rect.grow(14.0), "mirror", "%s gallery" % label_prefix))
-			var x_left := rect.position.x + 28.0
-			var x_right := rect.end.x - 28.0
-			var mid_y := rect.get_center().y
-			segments.append(_segment(Vector2(x_left, mid_y - 18.0), Vector2(x_right, mid_y - 18.0), Vector2.DOWN, "mirror"))
-			segments.append(_segment(Vector2(x_left + 20.0, mid_y + 30.0), Vector2(x_right - 34.0, mid_y + 30.0), Vector2.UP, "mirror"))
-			segments.append(_segment(Vector2(rect.end.x - 44.0, rect.position.y + 30.0), Vector2(rect.end.x - 44.0, rect.end.y - 30.0), Vector2.LEFT, "mirror"))
-			prism_stations.append({
-				"pos": Vector2(rect.position.x + rect.size.x * 0.34, rect.position.y + rect.size.y * 0.38),
-				"radius": 22.0,
-				"label": "%s redirect prism" % label_prefix
-			})
-			dead_alive_cells.append(_zone_energy(rect.grow(-12.0), 0.64 + minf(float(depth) * 0.03, 0.16), "mirror", "mirror_core"))
-		"glass":
-			patches.append(LightWorldBuilder._normalized_patch(rect.grow(16.0), "glass", "%s conservatory" % label_prefix))
-			patches.append(LightWorldBuilder._normalized_patch(Rect2(rect.position + Vector2(14.0, 16.0), Vector2(rect.size.x - 28.0, rect.size.y * 0.28)), "wet", "%s dew strip" % label_prefix))
-			var lane_x := rect.get_center().x
-			segments.append(_segment(Vector2(lane_x, rect.position.y + 20.0), Vector2(lane_x, rect.end.y - 20.0), Vector2.LEFT, "glass"))
-			segments.append(_segment(Vector2(rect.position.x + 26.0, rect.get_center().y + 18.0), Vector2(rect.end.x - 42.0, rect.get_center().y + 18.0), Vector2.UP, "glass"))
-			segments.append(_segment(Vector2(rect.position.x + 34.0, rect.position.y + 42.0), Vector2(rect.position.x + 34.0, rect.end.y - 42.0), Vector2.RIGHT, "wood"))
-			prism_stations.append({
-				"pos": Vector2(rect.end.x - 46.0, rect.position.y + rect.size.y * 0.36),
-				"radius": 22.0,
-				"label": "%s transmission prism" % label_prefix
-			})
-			dead_alive_cells.append(_zone_energy(rect.grow(-8.0), 0.58 + minf(float(depth) * 0.04, 0.18), "glass", "glass_lane"))
-		"wet":
-			patches.append(LightWorldBuilder._normalized_patch(rect.grow(14.0), "wet", "%s basin" % label_prefix))
-			patches.append(LightWorldBuilder._normalized_patch(Rect2(rect.position + Vector2(18.0, 22.0), Vector2(rect.size.x - 36.0, rect.size.y * 0.36)), "wood", "%s boardwalk" % label_prefix))
-			var y1 := rect.position.y + rect.size.y * 0.34
-			var y2 := rect.position.y + rect.size.y * 0.67
-			segments.append(_segment(Vector2(rect.position.x + 18.0, y1), Vector2(rect.end.x - 18.0, y1), Vector2.DOWN, "wet"))
-			segments.append(_segment(Vector2(rect.position.x + 34.0, y2), Vector2(rect.end.x - 34.0, y2), Vector2.UP, "wood"))
-			segments.append(_segment(Vector2(rect.position.x + rect.size.x * 0.72, rect.position.y + 24.0), Vector2(rect.position.x + rect.size.x * 0.72, rect.end.y - 24.0), Vector2.LEFT, "mirror" if is_progression else "wet"))
-			prism_stations.append({
-				"pos": Vector2(rect.position.x + rect.size.x * 0.24, rect.end.y - 42.0),
-				"radius": 20.0,
-				"label": "%s pool prism" % label_prefix
-			})
+
+	var label_prefix := ("Exit " if is_progression else "") + biome.capitalize()
+
+	match biome:
+
+		"forest":
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					rect.grow(14.0),
+					"wet",
+					"%s forest floor" % label_prefix
+				)
+			)
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					Rect2(
+						rect.position + Vector2(18.0, 18.0),
+						rect.size - Vector2(36.0, 36.0)
+					),
+					"wood",
+					"%s roots and mulch" % label_prefix
+				)
+			)
+
+			for _i in range(rng.randi_range(4, 7)):
+				tree_trunks.append({
+					"pos": rect.position + Vector2(
+						rng.randf_range(34.0, rect.size.x - 34.0),
+						rng.randf_range(30.0, rect.size.y - 30.0)
+					),
+					"radius": rng.randf_range(18.0, 24.0),
+					"label": "%s tree trunk" % label_prefix
+				})
+
+			if rng.randf() < 0.7:
+				prism_stations.append({
+					"pos": rect.get_center() + Vector2(
+						rng.randf_range(-24.0, 24.0),
+						rng.randf_range(-18.0, 18.0)
+					),
+					"radius": 20.0,
+					"label": "%s clearing prism" % label_prefix
+				})
+
+			dead_alive_cells.append(
+				_zone_energy(
+					rect.grow(-10.0),
+					0.54 + minf(float(depth) * 0.04, 0.20),
+					"wet",
+					"forest_core"
+				)
+			)
+
+		"meadow":
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					rect.grow(14.0),
+					"wood",
+					"%s meadow" % label_prefix
+				)
+			)
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					Rect2(
+						rect.position + Vector2(14.0, rect.size.y * 0.18),
+						Vector2(rect.size.x - 28.0, rect.size.y * 0.22)
+					),
+					"wet",
+					"%s damp grass strip" % label_prefix
+				)
+			)
+
 			if rng.randf() < 0.55:
 				tree_trunks.append({
-					"pos": Vector2(rect.position.x + rect.size.x * 0.54, rect.position.y + rect.size.y * 0.56),
+					"pos": rect.position + Vector2(
+						rect.size.x * 0.72,
+						rect.size.y * 0.42
+					),
 					"radius": 22.0,
-					"label": "%s trunk" % label_prefix
+					"label": "%s lone tree" % label_prefix
 				})
-			dead_alive_cells.append(_zone_energy(rect.grow(-10.0), 0.52 + minf(float(depth) * 0.05, 0.22), "wet", "wet_pool"))
-		_:
-			patches.append(LightWorldBuilder._normalized_patch(rect.grow(12.0), "wood", "%s hall" % label_prefix))
-			patches.append(LightWorldBuilder._normalized_patch(Rect2(rect.position + Vector2(12.0, 14.0), Vector2(rect.size.x - 24.0, rect.size.y * 0.24)), "brick", "%s footing" % label_prefix))
-			segments.append(_segment(Vector2(rect.position.x + 24.0, rect.get_center().y), Vector2(rect.end.x - 24.0, rect.get_center().y), Vector2.UP, "wood"))
-			segments.append(_segment(Vector2(rect.position.x + rect.size.x * 0.36, rect.position.y + 20.0), Vector2(rect.position.x + rect.size.x * 0.36, rect.end.y - 26.0), Vector2.RIGHT, "brick"))
+
 			prism_stations.append({
-				"pos": Vector2(rect.end.x - 42.0, rect.end.y - 38.0),
-				"radius": 20.0,
-				"label": "%s routing prism" % label_prefix
+				"pos": rect.get_center() + Vector2(rect.size.x * 0.18, -rect.size.y * 0.10),
+				"radius": 18.0,
+				"label": "%s field prism" % label_prefix
 			})
-			if rng.randf() < 0.85:
-				tree_trunks.append({
-					"pos": Vector2(rect.position.x + rect.size.x * 0.68, rect.position.y + rect.size.y * 0.34),
-					"radius": 24.0,
-					"label": "%s rooted blocker" % label_prefix
+
+			dead_alive_cells.append(
+				_zone_energy(
+					rect.grow(-12.0),
+					0.66 + minf(float(depth) * 0.03, 0.14),
+					"wood",
+					"meadow_field"
+				)
+			)
+
+		"street":
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					rect.grow(12.0),
+					"brick",
+					"%s street" % label_prefix
+				)
+			)
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					Rect2(
+						rect.position + Vector2(0.0, rect.size.y * 0.32),
+						Vector2(rect.size.x, rect.size.y * 0.24)
+					),
+					"wet",
+					"%s road strip" % label_prefix
+				)
+			)
+
+			segments.append(
+				_segment(
+					Vector2(rect.position.x + 28.0, rect.position.y + 28.0),
+					Vector2(rect.position.x + 28.0, rect.end.y - 28.0),
+					Vector2.RIGHT,
+					"brick"
+				)
+			)
+			segments.append(
+				_segment(
+					Vector2(rect.end.x - 28.0, rect.position.y + 28.0),
+					Vector2(rect.end.x - 28.0, rect.end.y - 28.0),
+					Vector2.LEFT,
+					"brick"
+				)
+			)
+			segments.append(
+				_segment(
+					Vector2(rect.position.x + 44.0, rect.get_center().y),
+					Vector2(rect.end.x - 44.0, rect.get_center().y),
+					Vector2.UP,
+					"wet"
+				)
+			)
+
+			if rng.randf() < 0.7:
+				prism_stations.append({
+					"pos": rect.get_center() + Vector2(-22.0, -26.0),
+					"radius": 20.0,
+					"label": "%s crossing prism" % label_prefix
 				})
-			dead_alive_cells.append(_zone_energy(rect.grow(-12.0), 0.46 + minf(float(depth) * 0.05, 0.25), "wood", "wood_hall"))
+
+			dead_alive_cells.append(
+				_zone_energy(
+					rect.grow(-10.0),
+					0.50 + minf(float(depth) * 0.04, 0.18),
+					"brick",
+					"street_core"
+				)
+			)
+
+		"housing":
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					rect.grow(12.0),
+					"wood",
+					"%s housing block" % label_prefix
+				)
+			)
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					Rect2(
+						rect.position + Vector2(18.0, 18.0),
+						Vector2(rect.size.x * 0.34, rect.size.y - 36.0)
+					),
+					"brick",
+					"%s house shell A" % label_prefix
+				)
+			)
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					Rect2(
+						Vector2(rect.end.x - rect.size.x * 0.34 - 18.0, rect.position.y + 18.0),
+						Vector2(rect.size.x * 0.34, rect.size.y - 36.0)
+					),
+					"brick",
+					"%s house shell B" % label_prefix
+				)
+			)
+
+			segments.append(
+				_segment(
+					Vector2(rect.get_center().x, rect.position.y + 22.0),
+					Vector2(rect.get_center().x, rect.end.y - 22.0),
+					Vector2.LEFT,
+					"glass"
+				)
+			)
+
+			prism_stations.append({
+				"pos": rect.get_center() + Vector2(0.0, rect.size.y * 0.20),
+				"radius": 18.0,
+				"label": "%s courtyard prism" % label_prefix
+			})
+
+			dead_alive_cells.append(
+				_zone_energy(
+					rect.grow(-12.0),
+					0.48 + minf(float(depth) * 0.04, 0.18),
+					"brick",
+					"housing_core"
+				)
+			)
+
+		"industrial":
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					rect.grow(16.0),
+					"brick",
+					"%s industrial yard" % label_prefix
+				)
+			)
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					Rect2(
+						rect.position + Vector2(20.0, 20.0),
+						rect.size - Vector2(40.0, 40.0)
+					),
+					"glass",
+					"%s hall glazing" % label_prefix
+				)
+			)
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					Rect2(
+						rect.position + Vector2(24.0, rect.size.y * 0.58),
+						Vector2(rect.size.x - 48.0, rect.size.y * 0.18)
+					),
+					"wet",
+					"%s floor runoff" % label_prefix
+				)
+			)
+
+			segments.append(
+				_segment(
+					Vector2(rect.position.x + rect.size.x * 0.34, rect.position.y + 22.0),
+					Vector2(rect.position.x + rect.size.x * 0.34, rect.end.y - 22.0),
+					Vector2.RIGHT,
+					"brick"
+				)
+			)
+			segments.append(
+				_segment(
+					Vector2(rect.position.x + rect.size.x * 0.68, rect.position.y + 22.0),
+					Vector2(rect.position.x + rect.size.x * 0.68, rect.end.y - 22.0),
+					Vector2.LEFT,
+					"glass"
+				)
+			)
+			segments.append(
+				_segment(
+					Vector2(rect.position.x + 28.0, rect.position.y + rect.size.y * 0.34),
+					Vector2(rect.end.x - 28.0, rect.position.y + rect.size.y * 0.34),
+					Vector2.DOWN,
+					"mirror"
+				)
+			)
+
+			prism_stations.append({
+				"pos": rect.get_center() + Vector2(rect.size.x * 0.14, -rect.size.y * 0.16),
+				"radius": 22.0,
+				"label": "%s hall prism" % label_prefix
+			})
+
+			dead_alive_cells.append(
+				_zone_energy(
+					rect.grow(-10.0),
+					0.44 + minf(float(depth) * 0.05, 0.22),
+					"glass",
+					"industrial_core"
+				)
+			)
+
+		_:
+			patches.append(
+				LightWorldBuilder._normalized_patch(
+					rect.grow(12.0),
+					"wood",
+					"%s fallback biome" % label_prefix
+				)
+			)
+
+			dead_alive_cells.append(
+				_zone_energy(
+					rect.grow(-12.0),
+					0.45,
+					"wood",
+					"fallback"
+				)
+			)
 
 	if is_progression:
-		patches.append(LightWorldBuilder._normalized_patch(Rect2(rect.position + Vector2(rect.size.x * 0.58, 18.0), Vector2(rect.size.x * 0.28, rect.size.y - 36.0)), "glass", "%s gate channel" % label_prefix))
-		segments.append(_segment(Vector2(rect.end.x - 26.0, rect.position.y + 20.0), Vector2(rect.end.x - 26.0, rect.end.y - 20.0), Vector2.LEFT, "mirror"))
-		segments.append(_segment(Vector2(rect.position.x + 18.0, rect.position.y + 24.0), Vector2(rect.position.x + 18.0, rect.end.y - 24.0), Vector2.RIGHT, "glass"))
+		patches.append(
+			LightWorldBuilder._normalized_patch(
+				Rect2(
+					rect.position + Vector2(rect.size.x * 0.58, 18.0),
+					Vector2(rect.size.x * 0.28, rect.size.y - 36.0)
+				),
+				"glass",
+				"%s gate channel" % label_prefix
+			)
+		)
+
+		segments.append(
+			_segment(
+				Vector2(rect.end.x - 26.0, rect.position.y + 20.0),
+				Vector2(rect.end.x - 26.0, rect.end.y - 20.0),
+				Vector2.LEFT,
+				"mirror"
+			)
+		)
+		segments.append(
+			_segment(
+				Vector2(rect.position.x + 18.0, rect.position.y + 24.0),
+				Vector2(rect.position.x + 18.0, rect.end.y - 24.0),
+				Vector2.RIGHT,
+				"glass"
+			)
+		)
 		prism_stations.append({
 			"pos": rect.get_center() + Vector2(rect.size.x * 0.18, 0.0),
 			"radius": 24.0,
 			"label": "Exit gate prism"
 		})
-		dead_alive_cells.append(_zone_energy(Rect2(rect.position + Vector2(18.0, 18.0), rect.size - Vector2(36.0, 36.0)), 0.78, "glass", "exit_gate"))
+		dead_alive_cells.append(
+			_zone_energy(
+				Rect2(
+					rect.position + Vector2(18.0, 18.0),
+					rect.size - Vector2(36.0, 36.0)
+				),
+				0.78,
+				"glass",
+				"exit_gate"
+			)
+		)
 
 	return {
 		"patches": patches,
@@ -358,7 +764,7 @@ func _decorate_zone(theme: String, node: Dictionary, depth: int, is_progression:
 		"summary": {
 			"id": String(node.get("id", "")),
 			"kind": String(node.get("kind", "zone")),
-			"theme": theme,
+			"biome": biome,
 			"depth": depth,
 			"prism_count": prism_stations.size(),
 			"blocker_count": segments.size() + tree_trunks.size(),
