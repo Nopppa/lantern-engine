@@ -526,7 +526,7 @@ func _sample_gameplay_light(pos: Vector2) -> float:
 
 func _zone_is_opaque_surface(zone: Dictionary) -> bool:
 	var material_id := String(zone.get("material_id", ""))
-	return material_id == "brick" or material_id == "wood" or material_id == "mirror" or material_id == "tree"
+	return material_id == "brick" or material_id == "wood" or material_id == "mirror" or material_id == "tree" or material_id == "stone" or material_id == "metal"
 
 func _zone_front_facing(zone: Dictionary) -> bool:
 	var normal: Vector2 = Vector2(zone.get("normal", Vector2.ZERO))
@@ -654,7 +654,10 @@ func _build_lit_zones() -> Array:
 			var t0: float = (float(step) + 0.5) / float(beam_steps)
 			zones.append({"pos": beam_a.lerp(beam_b, t0), "radius": max(beam_distance / float(beam_steps) * 0.84, 52.0), "color": Color(0.55, 0.92, 1.0, layer_alpha * float(segment["intensity"])), "layer": int(segment.get("layer", 0))})
 	for zone: Dictionary in _beam_packet_zones():
-		zones.append({"pos": zone["pos"], "radius": zone["radius"], "color": Color(1.0, 0.92, 0.72, 0.05 * float(zone["strength"]) + 0.02), "layer": int(zone.get("layer", 1))})
+		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
+			continue
+		var beam_zone_pos: Vector2 = _zone_effective_pos(zone, 0.28) if _zone_is_opaque_surface(zone) else Vector2(zone["pos"])
+		zones.append({"pos": beam_zone_pos, "radius": zone["radius"], "color": Color(1.0, 0.92, 0.72, 0.05 * float(zone["strength"]) + 0.02), "layer": int(zone.get("layer", 1)), "surface_highlight": _zone_is_opaque_surface(zone), "normal": zone.get("normal", Vector2.ZERO)})
 	for segment: Dictionary in _packet_segments(secondary_render_packet):
 		var seg_color: Color = _secondary_color(segment)
 		zones.append({"pos": Vector2(segment["a"]).lerp(Vector2(segment["b"]), 0.5), "radius": max(Vector2(segment["a"]).distance_to(Vector2(segment["b"])) * 0.24, 42.0), "color": Color(seg_color.r, seg_color.g, seg_color.b, 0.05 * float(segment["intensity"]) + 0.018), "layer": int(segment.get("layer", 1))})
@@ -874,17 +877,19 @@ func _draw_flashlight_trace() -> void:
 		var points: PackedVector2Array = fill["points"]
 		var strength: float = float(fill.get("strength", 1.0))
 		draw_colored_polygon(points, Color(1.0, 0.94, 0.72, 0.024 * strength))
-		draw_polyline(points, Color(1.0, 0.98, 0.84, 0.048 * strength), 1.2, true)
+		# No draw_polyline here — polyline outlines each fill triangle, creating visible ray bands
 	for zone: Dictionary in _packet_zones(flashlight_render_packet):
 		var material_id := String(zone.get("material_id", ""))
 		if material_id != "glass" and material_id != "wet" and String(zone.get("kind", "diffuse")) != "redirect":
 			continue
-		var zone_color := Color(1.0, 0.90, 0.62, 0.04 * float(zone["strength"]))
 		if material_id == "glass":
-			zone_color = Color(0.72, 0.96, 1.0, 0.06 * float(zone["strength"]))
+			# Soft radial glow — no ring stroke outline
+			draw_circle(zone["pos"], float(zone["radius"]) * 0.56, Color(0.72, 0.96, 1.0, 0.08 * float(zone["strength"])))
+			draw_circle(zone["pos"], float(zone["radius"]) * 0.28, Color(0.88, 1.0, 1.0, 0.14 * float(zone["strength"])))
 		elif material_id == "wet":
-			zone_color = Color(0.76, 0.95, 1.0, 0.05 * float(zone["strength"]))
-		draw_arc(zone["pos"], float(zone["radius"]) * 0.52, 0.0, TAU, 20, Color(zone_color.r, zone_color.g, zone_color.b, 0.16 + 0.10 * float(zone["strength"])), 1.6)
+			draw_circle(zone["pos"], float(zone["radius"]) * 0.52, Color(0.76, 0.95, 1.0, 0.10 * float(zone["strength"])))
+		else:
+			draw_circle(zone["pos"], float(zone["radius"]) * 0.52, Color(1.0, 0.90, 0.62, 0.12 * float(zone["strength"])))
 	for segment: Dictionary in _packet_segments(flashlight_render_packet):
 		var kind := String(segment.get("kind", "primary"))
 		if kind == "primary" and not bool(segment.get("visible", true)):
@@ -936,17 +941,18 @@ func _draw_prism_trace() -> void:
 		var points: PackedVector2Array = fill["points"]
 		var strength: float = float(fill.get("strength", 1.0))
 		draw_colored_polygon(points, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.020 * strength))
-		draw_polyline(points, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.042 * strength), 1.2, true)
+		# No draw_polyline here — removes visible ray lane banding
 	for zone: Dictionary in _packet_zones(prism_render_packet):
 		var material_id := String(zone.get("material_id", ""))
 		if material_id != "glass" and material_id != "wet" and String(zone.get("kind", "diffuse")) != "redirect":
 			continue
-		var zone_color := Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.04 * float(zone["strength"]))
 		if material_id == "glass":
-			zone_color = Color(0.68, 0.94, 1.0, 0.05 * float(zone["strength"]))
+			draw_circle(zone["pos"], float(zone["radius"]) * 0.56, Color(0.68, 0.94, 1.0, 0.08 * float(zone["strength"])))
+			draw_circle(zone["pos"], float(zone["radius"]) * 0.28, Color(0.85, 1.0, 1.0, 0.14 * float(zone["strength"])))
 		elif material_id == "wet":
-			zone_color = Color(0.72, 0.93, 1.0, 0.05 * float(zone["strength"]))
-		draw_arc(zone["pos"], float(zone["radius"]) * 0.54, 0.0, TAU, 20, Color(zone_color.r, zone_color.g, zone_color.b, 0.14 + 0.10 * float(zone["strength"])), 1.4)
+			draw_circle(zone["pos"], float(zone["radius"]) * 0.54, Color(0.72, 0.93, 1.0, 0.10 * float(zone["strength"])))
+		else:
+			draw_circle(zone["pos"], float(zone["radius"]) * 0.54, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.12 * float(zone["strength"])))
 	for segment: Dictionary in _packet_segments(prism_render_packet):
 		var kind := String(segment.get("kind", "primary"))
 		if kind == "primary" and not bool(segment.get("visible", true)):
@@ -1015,15 +1021,25 @@ func _draw_primary_beam_segments() -> void:
 
 func _draw_secondary_overlays() -> void:
 	for diffuse: Dictionary in _beam_packet_zones():
+		if _zone_is_opaque_surface(diffuse) and not _zone_front_facing(diffuse):
+			continue
 		draw_circle(diffuse["pos"], diffuse["radius"], Color(1.0, 0.84, 0.48, 0.06 * float(diffuse["strength"])))
-		draw_arc(diffuse["pos"], diffuse["radius"] * 0.58, 0.0, TAU, 20, Color(1.0, 0.88, 0.54, 0.18 * float(diffuse["strength"])), 2.0)
+		if not _zone_is_opaque_surface(diffuse):
+			draw_circle(diffuse["pos"], diffuse["radius"] * 0.58, Color(1.0, 0.88, 0.54, 0.14 * float(diffuse["strength"])))
 	for zone: Dictionary in _packet_zones(secondary_render_packet):
 		var zone_material_id := String(zone.get("material_id", ""))
 		if zone_material_id != "glass" and zone_material_id != "wet" and zone_material_id != "mirror":
 			continue
+		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
+			continue
 		var zmat := LightMaterials.get_definition(zone_material_id)
 		var zone_color: Color = _secondary_zone_color(zone)
-		draw_arc(zone["pos"], zone["radius"] * 0.52, 0.0, TAU, 20, Color(zmat["alive_color"].r, zmat["alive_color"].g, zmat["alive_color"].b, 0.16 * float(zone["strength"])), 1.4)
+		if zone_material_id == "glass":
+			# Soft glow instead of ring outline — no visible circle stroke
+			draw_circle(zone["pos"], zone["radius"] * 0.54, Color(zmat["alive_color"].r, zmat["alive_color"].g, zmat["alive_color"].b, 0.10 * float(zone["strength"])))
+			draw_circle(zone["pos"], zone["radius"] * 0.28, Color(zmat["alive_color"].r, zmat["alive_color"].g, zmat["alive_color"].b, 0.18 * float(zone["strength"])))
+		else:
+			draw_circle(zone["pos"], zone["radius"] * 0.52, Color(zmat["alive_color"].r, zmat["alive_color"].g, zmat["alive_color"].b, 0.12 * float(zone["strength"])))
 	for segment: Dictionary in _packet_segments(secondary_render_packet):
 		var sa: Vector2 = segment["a"]
 		var sb: Vector2 = segment["b"]

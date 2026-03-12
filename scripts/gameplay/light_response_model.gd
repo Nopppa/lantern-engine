@@ -61,9 +61,15 @@ static func response(material_id: String, source_type: String, intensity: float,
 	var reflect_dir: Vector2 = incoming.bounce(normal).normalized()
 	if reflect_dir == Vector2.ZERO:
 		reflect_dir = incoming
-	var refraction_strength: float = clampf(float(material.get("refraction_strength", 0.0)), 0.0, 0.35)
+	var base_refraction: float = clampf(float(material.get("refraction_strength", 0.0)), 0.0, 0.35)
 	var transmit_dir := incoming
-	if refraction_strength > 0.0:
+	if base_refraction > 0.0:
+		# Angle-dependent refraction: near-normal incidence bends less, grazing angles bend more.
+		# cos_theta = |incoming · normal|; angle_factor = 1 - cos_theta (0 at normal, 1 at grazing)
+		var cos_theta: float = absf(incoming.dot(normal.normalized()))
+		var angle_factor: float = clampf(1.0 - cos_theta, 0.0, 1.0)
+		# Apply Snell-like power curve so mid-angles have moderate bend
+		var refraction_strength: float = base_refraction * pow(angle_factor, 0.65)
 		var tangent := Vector2(-normal.y, normal.x).normalized()
 		if tangent == Vector2.ZERO:
 			tangent = Vector2.RIGHT

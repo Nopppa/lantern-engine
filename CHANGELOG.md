@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2 - 2026-03-12
+
+Lighting Visual Quality & Physics patch:
+
+- **fixed ray-banded flashlight/prism beam artifacts**: removed `draw_polyline` triangle-outline calls from fill rendering in `_draw_flashlight_trace` and `_draw_prism_trace`; the visible cone/field now renders as a smooth continuous gradient without exposing individual ray lanes between guide samples
+- **fixed opaque material back-side light leakage**: added front-facing validation checks to beam packet zones in `_build_lit_zones` and `_draw_secondary_overlays`; brick, wood, stone, metal, mirror, and tree surfaces now correctly block diffuse light from propagating through walls — front-side diffuse response is preserved, back-side glow is eliminated
+- **fixed glass hit ring outlines**: replaced `draw_arc` ring strokes with layered `draw_circle` soft radial glows for glass zones in flashlight, prism, and secondary overlay rendering; glass interactions now show as smooth integrated surface highlights without visible circular boundaries
+- **added angle-dependent laser refraction through glass**: implemented physically-inspired Snell-like angle scaling in `light_response_model.gd` using incoming direction · surface normal; near-normal incidence produces minimal bending, shallow/grazing angles produce stronger refraction, laser continues through glass with correct directional shift based on hit geometry
+- preserved current lighting performance gains: no ray-count increases, no heavy per-pixel scanning reintroduced, no packet architecture changes — all fixes operate within existing render/solver budget
+- validated syntax with headless Godot checks and produced fresh Windows v0.6.2 release build
+
 ## 0.6.1a - 2026-03-11
 
 Lighting behavior + restoration follow-up patch:
