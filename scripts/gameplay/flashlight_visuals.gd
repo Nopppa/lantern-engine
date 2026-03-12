@@ -77,6 +77,7 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 	var fills: Array = []
 	var debug_points: Array = []
 	var primary_frontier: Array = []
+	var transmitted_rays: Array = []
 	var trace_count := 0
 	var base_angle: float = Vector2(options.get("direction", Vector2.RIGHT)).angle()
 	var cone_angle: float = deg_to_rad(float(options.get("half_angle_deg", 32.0)))
@@ -151,8 +152,7 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 			remaining -= travel
 			if remaining <= 10.0:
 				break
-			var material_id: String = String(hit.get("material_id", "brick"))
-			if material_id == "tree" or material_id == "brick":
+			if material_id == "tree" or material_id == "brick" or material_id == "stone" or material_id == "metal":
 				if source_type != "flashlight" and source_type != "prism":
 					zones.append({
 						"pos": hit_point,
@@ -164,6 +164,7 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 						"normal": Vector2(hit["normal"]),
 						"incoming_dir": direction
 					})
+				frontier_point = hit_point
 				break
 			var response: Dictionary = LightResponseModel.response(material_id, source_type, intensity, direction, Vector2(hit["normal"]))
 			if float(response["diffusion"]) * intensity > 0.03:
@@ -207,12 +208,12 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 						"visible": true
 					})
 			elif material_id == "mirror":
-				var mirror_segment := LightSurfaceResolver._clip_secondary_branch(lab, hit_point, Vector2(response["reflect_dir"]), remaining * 0.26, material_id, false)
+				var mirror_segment := LightSurfaceResolver._clip_secondary_branch(lab, hit_point, Vector2(response["reflect_dir"]), remaining * 0.85, material_id, false)
 				if not mirror_segment.is_empty():
 					segments.append({
 						"a": mirror_segment["a"],
 						"b": mirror_segment["b"],
-						"intensity": intensity * 0.18,
+						"intensity": intensity * 0.72,
 						"kind": "reflect",
 						"material_id": material_id,
 						"bounce_index": bounce_index + 1,
@@ -234,7 +235,13 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 						"sample": t,
 						"blocked": transmit_segment.get("blocked", false),
 						"source_type": source_type,
-						"visible": true
+						"visible": false
+					})
+					transmitted_rays.append({
+						"ray_index": i,
+						"start": transmit_segment["a"],
+						"end": transmit_segment["b"],
+						"intensity": intensity * float(response["transmission"])
 					})
 				direction = Vector2(response["transmit_dir"]).normalized()
 				origin = hit_point + direction * lab.BEAM_OFFSET
@@ -263,6 +270,16 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 	if bool(options.get("use_frontier_smoothing", true)) and not radial_emission:
 		primary_frontier = LightStability.smooth_frontier(source_anchor, primary_frontier, previous_frontier, float(config.get("envelope_smoothing", 0.35)))
 	fills = _build_light_fills(source_anchor, primary_frontier, config, radial_emission)
+	
+	var last_transmit: Dictionary = {}
+	for tr: Dictionary in transmitted_rays:
+		if not last_transmit.is_empty() and tr["ray_index"] == last_transmit["ray_index"] + 1:
+			fills.append({
+				"points": PackedVector2Array([last_transmit["start"], tr["start"], tr["end"], last_transmit["end"]]),
+				"strength": (tr["intensity"] + last_transmit["intensity"]) * 0.5
+			})
+		last_transmit = tr
+
 	var new_frontier: Dictionary = {}
 	for i in range(primary_frontier.size()):
 		new_frontier[LightStability.stable_frontier_key(Vector2(primary_frontier[i]), i)] = primary_frontier[i]

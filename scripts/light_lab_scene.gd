@@ -63,8 +63,8 @@ func _ready() -> void:
 	beam_bounces = 4
 	beam_damage = 22.0
 	flashlight_on = true
-	flashlight_range = 360.0
-	flashlight_half_angle = 34.0
+	flashlight_range = 480.0
+	flashlight_half_angle = 48.0
 	last_event = "Light Lab booted — readability + extraction pass active"
 	_build_light_lab()
 	_update_ui()
@@ -604,18 +604,30 @@ func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, sec
 		var a: Vector2 = segment["a"]
 		var b: Vector2 = segment["b"]
 		var length: float = a.distance_to(b)
+		
+		var mat_id := String(segment.get("material_id", ""))
+		var is_end_solid: bool = (mat_id == "brick" or mat_id == "wood" or mat_id == "mirror" or mat_id == "tree" or mat_id == "stone" or mat_id == "metal")
+		
 		var steps: int = max(1, int(ceil(length / max(gameplay_light_field.cell_size * 0.75, 8.0))))
 		for step in range(steps + 1):
 			var t: float = float(step) / float(steps)
 			var pos: Vector2 = a.lerp(b, t)
 			var energy: float = clampf(float(segment.get("intensity", 0.0)) * scale, 0.0, 1.0)
-			gameplay_light_field.add_splat_world(pos, radius, energy)
+			
+			var eff_radius := radius
+			if is_end_solid:
+				var dist_to_b := pos.distance_to(b)
+				if dist_to_b < radius:
+					eff_radius = max(dist_to_b, 4.0)
+					
+			gameplay_light_field.add_splat_world(pos, eff_radius, energy)
 	for zone: Dictionary in _packet_zones(packet):
 		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
 			continue
-		var zone_pos: Vector2 = _zone_effective_pos(zone, 0.24)
+		var is_opaque := _zone_is_opaque_surface(zone)
+		var zone_pos: Vector2 = _zone_effective_pos(zone, 0.85 if is_opaque else 0.24)
 		var zone_radius: float = float(zone.get("radius", 0.0))
-		if _zone_is_opaque_surface(zone):
+		if is_opaque:
 			zone_radius *= 0.78
 			if String(zone.get("kind", "")) == "block":
 				zone_radius *= 0.72
@@ -633,16 +645,34 @@ func _write_laser_packet_to_light_field(packet: Dictionary) -> void:
 		var intensity: float = clampf(float(segment.get("intensity", 0.0)), 0.0, 1.0)
 		var layer: int = int(segment.get("layer", 0))
 		var layer_scale: float = pow(0.88, float(layer))
+		
+		var mat_id := String(segment.get("material_id", ""))
+		var is_end_solid: bool = (mat_id == "brick" or mat_id == "wood" or mat_id == "mirror" or mat_id == "tree" or mat_id == "stone" or mat_id == "metal")
+
 		var steps: int = max(2, int(ceil(length / max(gameplay_light_field.cell_size * 0.6, 10.0))))
 		for step in range(steps + 1):
 			var t: float = float(step) / float(steps)
 			var pos: Vector2 = a.lerp(b, t)
 			var along_scale: float = 0.86 + 0.14 * (1.0 - absf(t - 0.5) * 2.0)
 			var energy: float = clampf(intensity * layer_scale * along_scale, 0.0, 1.0)
-			gameplay_light_field.add_splat_world(pos, 38.0, energy * 0.74)
-			gameplay_light_field.add_splat_world(pos, 22.0, energy * 0.96)
+			
+			var r1 := 38.0
+			var r2 := 22.0
+			if is_end_solid:
+				var dist_to_b := pos.distance_to(b)
+				if dist_to_b < r1:
+					r1 = max(dist_to_b, 6.0)
+				if dist_to_b < r2:
+					r2 = max(dist_to_b, 4.0)
+
+			gameplay_light_field.add_splat_world(pos, r1, energy * 0.74)
+			gameplay_light_field.add_splat_world(pos, r2, energy * 0.96)
 	for zone: Dictionary in _packet_zones(packet):
-		gameplay_light_field.add_splat_world(zone["pos"], float(zone["radius"]), clampf(float(zone.get("strength", 0.0)) * 1.18, 0.0, 1.0))
+		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
+			continue
+		var is_opaque := _zone_is_opaque_surface(zone)
+		var zone_pos: Vector2 = _zone_effective_pos(zone, 0.85 if is_opaque else 0.0)
+		gameplay_light_field.add_splat_world(zone_pos, float(zone["radius"]), clampf(float(zone.get("strength", 0.0)) * 1.18, 0.0, 1.0))
 
 func _rebuild_gameplay_light_field() -> void:
 	if gameplay_light_field == null:
@@ -737,7 +767,8 @@ func _update_native_light_presentation() -> void:
 			flashlight_on,
 			player_pos,
 			facing,
-			light_world
+			light_world,
+			enemies
 		)
 
 func _update_ui() -> void:
@@ -940,12 +971,17 @@ func _draw() -> void:
 func _draw_flashlight_trace() -> void:
 	if not flashlight_on:
 		return
-	for fill: Dictionary in _packet_fills(flashlight_render_packet):
-		var points: PackedVector2Array = fill["points"]
-		var strength: float = float(fill.get("strength", 1.0))
-		draw_colored_polygon(points, Color(1.0, 0.94, 0.72, 0.024 * strength))
-		# No draw_polyline here — polyline outlines each fill triangle, creating visible ray bands
+	if beam_debug_enabled and not ui_overlays_hidden:
+		for fill: Dictionary in _packet_fills(flashlight_render_packet):
+			var points: PackedVector2Array = fill["points"]
+			var strength: float = float(fill.get("strength", 1.0))
+			draw_colored_polygon(points, Color(1.0, 0.94, 0.72, 0.024 * strength))
+			
 	for zone: Dictionary in _packet_zones(flashlight_render_packet):
+		# Only draw the bright hits if debug is on OR if we want them as visual effects
+		if beam_debug_enabled and not ui_overlays_hidden:
+			pass
+		
 		var material_id := String(zone.get("material_id", ""))
 		if material_id != "glass" and material_id != "wet" and String(zone.get("kind", "diffuse")) != "redirect":
 			continue
@@ -957,6 +993,10 @@ func _draw_flashlight_trace() -> void:
 			draw_circle(zone["pos"], float(zone["radius"]) * 0.52, Color(0.76, 0.95, 1.0, 0.10 * float(zone["strength"])))
 		else:
 			draw_circle(zone["pos"], float(zone["radius"]) * 0.52, Color(1.0, 0.90, 0.62, 0.12 * float(zone["strength"])))
+			
+	if not beam_debug_enabled or ui_overlays_hidden:
+		return
+		
 	for segment: Dictionary in _packet_segments(flashlight_render_packet):
 		var kind := String(segment.get("kind", "primary"))
 		if kind == "primary" and not bool(segment.get("visible", true)):

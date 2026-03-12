@@ -566,7 +566,8 @@ func _refresh_environment_light_traces() -> void:
 			flashlight_on,
 			player_pos,
 			facing,
-			light_world
+			light_world,
+			enemies
 		)
 
 func _trace_bounced_light_path(origin: Vector2, direction: Vector2, max_range: float, max_bounces: int) -> Dictionary:
