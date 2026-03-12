@@ -50,6 +50,10 @@ var _native_light_presentation: NativeLightPresentation = null
 var _player_controller: ExplorationPlayerController = null
 var _pause_open := false
 
+## Scene-hierarchy containers – populated in _setup_scene() from pre-placed nodes.
+var _proc_entities_node: Node2D = null
+var _prism_stations_node: Node2D = null
+
 # Material color palette for visualization
 const MATERIAL_COLORS := {
 	"brick": Color(0.52, 0.32, 0.28, 0.85),
@@ -142,10 +146,19 @@ func _on_world_ready() -> void:
 # --- Scene setup ---
 
 func _setup_scene() -> void:
+	# Prefer pre-placed scene-tree nodes over dynamic construction.
+	# This makes the scene work correctly whether opened standalone in the editor
+	# or instantiated programmatically without a pre-built .tscn hierarchy.
+	if _player_node == null:
+		_player_node = get_node_or_null("Player") as Node2D
 	if _player_node == null:
 		_player_node = PlayerScene.instantiate()
 		_player_node.name = "Player"
 		add_child(_player_node)
+
+	# Store world-layer containers for runtime entity placement.
+	_proc_entities_node = get_node_or_null("World/ProceduralEntities") as Node2D
+	_prism_stations_node = get_node_or_null("World/PrismStations") as Node2D
 
 	_player_node.position = _player_pos
 
@@ -338,7 +351,11 @@ func _draw() -> void:
 	var viewport_rect := get_viewport_rect()
 	draw_rect(viewport_rect, Color(0.01, 0.015, 0.03, 1.0), true)
 	draw_rect(ARENA_RECT.grow(28.0), Color(0.02, 0.04, 0.07, 0.88), true)
-	draw_rect(ARENA_RECT, Color("111827"), true)
+	# Skip the arena fill when TerrainLayer has scene-based terrain content;
+	# the terrain Polygon2D provides the ground color instead.
+	var terrain_layer := get_node_or_null("World/TerrainLayer")
+	if terrain_layer == null or terrain_layer.get_child_count() == 0:
+		draw_rect(ARENA_RECT, Color("111827"), true)
 
 	# Grid overlay
 	for x in range(int(ARENA_RECT.position.x) + 64, int(ARENA_RECT.end.x), 128):

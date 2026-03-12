@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3 uid="uid://meadow_ground_v1"]
+
+[ext_resource type="Script" path="res://scripts/world/exploration/meadow_ground.gd" id="1"]
+
+[node name="MeadowGround" type="Node2D"]
+script = ExtResource("1")
+zone_rect = Rect2(-3000, -3000, 6000, 6000)
+zone_tag = "meadow"
+
+[node name="TerrainPolygon" type="Polygon2D" parent="."]
+color = Color(0.208, 0.373, 0.161, 1.0)
+polygon = PackedVector2Array(-3000, -3000, 3000, -3000, 3000, 3000, -3000, 3000)
