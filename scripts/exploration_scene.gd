@@ -167,6 +167,9 @@ func _setup_scene() -> void:
 	_camera.limit_right = int(ARENA_RECT.end.x)
 	_camera.limit_bottom = int(ARENA_RECT.end.y)
 
+	# If player.tscn carries a Flashlight component, let it drive the runtime config.
+	_apply_flashlight_from_player_scene()
+
 	if _overlay_ui == null:
 		_overlay_ui = ExplorationOverlayUi.new()
 		_overlay_ui.attach(self)
@@ -288,6 +291,28 @@ func _setup_light_runtime() -> void:
 		"light_cell_size": LIGHT_CELL_SIZE,
 		"flashlight_range": FLASHLIGHT_RANGE,
 		"flashlight_half_angle": FLASHLIGHT_HALF_ANGLE,
+		"beam_offset": BEAM_OFFSET
+	})
+
+## Read Flashlight component from the instanced player scene and push its
+## exported values into the light runtime.  Falls back silently if the
+## Flashlight node is absent (legacy or headless test scenarios).
+func _apply_flashlight_from_player_scene() -> void:
+	if _player_node == null or _light_runtime == null:
+		return
+	var fl := _player_node.get_node_or_null("Flashlight")
+	if fl == null:
+		return
+	# Only reconfigure if the scene values differ from the defaults already set.
+	var scene_range: float = float(fl.get("beam_range") if fl.get("beam_range") != null else FLASHLIGHT_RANGE)
+	var scene_angle: float = float(fl.get("half_angle_deg") if fl.get("half_angle_deg") != null else FLASHLIGHT_HALF_ANGLE)
+	if is_equal_approx(scene_range, FLASHLIGHT_RANGE) and is_equal_approx(scene_angle, FLASHLIGHT_HALF_ANGLE):
+		return  # Nothing to update.
+	_light_runtime.configure({
+		"arena_rect": ARENA_RECT,
+		"light_cell_size": LIGHT_CELL_SIZE,
+		"flashlight_range": scene_range,
+		"flashlight_half_angle": scene_angle,
 		"beam_offset": BEAM_OFFSET
 	})
 

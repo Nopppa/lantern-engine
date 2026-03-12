@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://flashlight_component_v1"]
+
+[ext_resource type="Script" path="res://scripts/player/flashlight.gd" id="1"]
+
+[node name="Flashlight" type="Node2D"]
+script = ExtResource("1")
+beam_range = 420.0
+half_angle_deg = 48.0
+enabled = true
