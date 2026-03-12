@@ -1,4 +1,6 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="1"]
 
 [node name="ExplorationOverlayUi" type="CanvasLayer"]
 
@@ -14,16 +16,4 @@ bbcode_enabled = true
 scroll_active = false
 mouse_filter = 2
 
-[node name="PausePanel" type="PanelContainer" parent="."]
-visible = false
-
-[node name="VBox" type="VBoxContainer" parent="PausePanel"]
-theme_override_constants/separation = 10
-
-[node name="PauseTitleLabel" type="Label" parent="PausePanel/VBox"]
-text = "Exploration Paused"
-theme_override_font_sizes/font_size = 24
-
-[node name="PauseBodyLabel" type="Label" parent="PausePanel/VBox"]
-text = "ESC: resume\nEnter or M: return to main menu"
-theme_override_font_sizes/font_size = 18
+[node name="PauseMenu" parent="." instance=ExtResource("1")]

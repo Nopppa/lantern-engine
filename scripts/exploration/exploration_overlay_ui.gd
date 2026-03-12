@@ -75,9 +75,9 @@ func _ensure_nodes() -> void:
 		_host.add_child(_overlay_root)
 		_hud_label = _overlay_root.get_node("HudLabel") as RichTextLabel
 		_status_label = _overlay_root.get_node("StatusLabel") as RichTextLabel
-		_pause_panel = _overlay_root.get_node("PausePanel") as PanelContainer
-		_pause_title_label = _overlay_root.get_node("PausePanel/VBox/PauseTitleLabel") as Label
-		_pause_body_label = _overlay_root.get_node("PausePanel/VBox/PauseBodyLabel") as Label
+		_pause_panel = _overlay_root.get_node("PauseMenu") as PanelContainer
+		_pause_title_label = _overlay_root.get_node("PauseMenu/VBox/PauseTitleLabel") as Label
+		_pause_body_label = _overlay_root.get_node("PauseMenu/VBox/PauseBodyLabel") as Label
 		_apply_styles()
 
 func _apply_styles() -> void:
@@ -93,8 +93,6 @@ func _apply_styles() -> void:
 		_status_label.add_theme_constant_override("margin_top", 8)
 		_status_label.add_theme_constant_override("margin_right", 12)
 		_status_label.add_theme_constant_override("margin_bottom", 8)
-	if _pause_panel != null:
-		_pause_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.05, 0.07, 0.11, 0.96), Color(0.95, 0.9, 0.55, 1.0), 3, 12))
 
 func _make_panel_style(bg: Color, border: Color, border_width: int = 2, radius: int = 8) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
