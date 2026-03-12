@@ -1,8 +1,10 @@
 extends RefCounted
 class_name ExplorationOverlayUi
 
+const OVERLAY_SCENE := preload("res://scenes/ui/exploration_overlay.tscn")
+
 var _host: Node = null
-var _hud_layer: CanvasLayer = null
+var _overlay_root: CanvasLayer = null
 var _hud_label: RichTextLabel = null
 var _status_label: RichTextLabel = null
 var _pause_panel: PanelContainer = null
@@ -67,39 +69,40 @@ func layout() -> void:
 func _ensure_nodes() -> void:
 	if _host == null:
 		return
-	if _hud_layer == null:
-		_hud_layer = CanvasLayer.new()
-		_hud_layer.name = "ExplorationOverlayUi"
-		_host.add_child(_hud_layer)
-	if _hud_label == null:
-		_hud_label = RichTextLabel.new()
-		_hud_label.fit_content = true
-		_hud_label.bbcode_enabled = true
-		_hud_label.scroll_active = false
-		_hud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_hud_layer.add_child(_hud_label)
-	if _status_label == null:
-		_status_label = RichTextLabel.new()
-		_status_label.fit_content = true
-		_status_label.bbcode_enabled = true
-		_status_label.scroll_active = false
-		_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_hud_layer.add_child(_status_label)
-	if _pause_panel == null:
-		_pause_panel = PanelContainer.new()
-		_pause_panel.visible = false
-		_hud_layer.add_child(_pause_panel)
-		var panel_vbox := VBoxContainer.new()
-		panel_vbox.add_theme_constant_override("separation", 10)
-		_pause_panel.add_child(panel_vbox)
-		_pause_title_label = Label.new()
-		_pause_title_label.text = "Exploration Paused"
-		_pause_title_label.add_theme_font_size_override("font_size", 24)
-		panel_vbox.add_child(_pause_title_label)
-		_pause_body_label = Label.new()
-		_pause_body_label.text = "ESC: resume\nEnter or M: return to main menu"
-		_pause_body_label.add_theme_font_size_override("font_size", 18)
-		panel_vbox.add_child(_pause_body_label)
+	if _overlay_root == null:
+		_overlay_root = OVERLAY_SCENE.instantiate()
+		_overlay_root.name = "ExplorationOverlayUi"
+		_host.add_child(_overlay_root)
+		_hud_label = _overlay_root.get_node("HudLabel") as RichTextLabel
+		_status_label = _overlay_root.get_node("StatusLabel") as RichTextLabel
+		_pause_panel = _overlay_root.get_node("PausePanel") as PanelContainer
+		_pause_title_label = _overlay_root.get_node("PausePanel/VBox/PauseTitleLabel") as Label
+		_pause_body_label = _overlay_root.get_node("PausePanel/VBox/PauseBodyLabel") as Label
+		_apply_styles()
+
+func _apply_styles() -> void:
+	if _hud_label != null:
+		_hud_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.05, 0.07, 0.11, 0.84), Color(0.36, 0.5, 0.7, 0.95), 2, 10))
+		_hud_label.add_theme_constant_override("margin_left", 14)
+		_hud_label.add_theme_constant_override("margin_top", 10)
+		_hud_label.add_theme_constant_override("margin_right", 14)
+		_hud_label.add_theme_constant_override("margin_bottom", 10)
+	if _status_label != null:
+		_status_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.04, 0.05, 0.09, 0.76), Color(0.27, 0.35, 0.52, 0.9), 2, 10))
+		_status_label.add_theme_constant_override("margin_left", 12)
+		_status_label.add_theme_constant_override("margin_top", 8)
+		_status_label.add_theme_constant_override("margin_right", 12)
+		_status_label.add_theme_constant_override("margin_bottom", 8)
+	if _pause_panel != null:
+		_pause_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.05, 0.07, 0.11, 0.96), Color(0.95, 0.9, 0.55, 1.0), 3, 12))
+
+func _make_panel_style(bg: Color, border: Color, border_width: int = 2, radius: int = 8) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(radius)
+	return style
 
 func _viewport_size() -> Vector2:
 	var viewport := _host.get_viewport() if _host != null else null

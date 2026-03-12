@@ -1,0 +1,29 @@
+[gd_scene format=3]
+
+[node name="ExplorationOverlayUi" type="CanvasLayer"]
+
+[node name="HudLabel" type="RichTextLabel" parent="."]
+fit_content = true
+bbcode_enabled = true
+scroll_active = false
+mouse_filter = 2
+
+[node name="StatusLabel" type="RichTextLabel" parent="."]
+fit_content = true
+bbcode_enabled = true
+scroll_active = false
+mouse_filter = 2
+
+[node name="PausePanel" type="PanelContainer" parent="."]
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="PausePanel"]
+theme_override_constants/separation = 10
+
+[node name="PauseTitleLabel" type="Label" parent="PausePanel/VBox"]
+text = "Exploration Paused"
+theme_override_font_sizes/font_size = 24
+
+[node name="PauseBodyLabel" type="Label" parent="PausePanel/VBox"]
+text = "ESC: resume\nEnter or M: return to main menu"
+theme_override_font_sizes/font_size = 18
