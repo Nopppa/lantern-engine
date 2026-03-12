@@ -10,11 +10,11 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `75e0409`
-- **Verification time:** 2026-03-12 14:12 Europe/Berlin
+- **Verified HEAD:** `07d52f7`
+- **Verification time:** 2026-03-12 14:17 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `75e0409`.
+- Current branch is pushed through commit `07d52f7`.
 - At the time of this update there are **no verified uncommitted RandomGEN code changes** on the branch.
 - Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
@@ -22,6 +22,17 @@
   - `builds/windows/lantern-engine.pck`
   - `scripts/main_menu.gd.uid`
   - `scripts/random_gen_placeholder.gd.uid`
+
+### Timeout verification note
+- The latest GPT-5.4 timeout did **not** leave any verified code diff in:
+  - `scripts/exploration_scene.gd`
+  - `scripts/gameplay/light_field.gd`
+  - `scripts/gameplay/dead_alive_grid.gd`
+  - `scripts/gameplay/native_light_presentation.gd`
+  - `scripts/gameplay/light_types.gd`
+  - `scripts/gameplay/light_surface_resolver.gd`
+  - `scripts/gameplay/light_query.gd`
+- Conclusion: the last run appears to have stayed in code-reading / pathfinding mode and did not persist code changes before timing out.
 
 ---
 
@@ -46,6 +57,11 @@
 - Spawn position is validated with `_find_valid_spawn()`.
 - Camera limits are constrained to arena bounds.
 - Reroll keeps player node state in sync more cleanly.
+
+### Live handoff workflow
+**Commit:** `07d52f7`
+- Added this living handoff document.
+- Established the verified-state-before-continue workflow for timeout recovery.
 
 ---
 
@@ -101,6 +117,13 @@ Reuse existing project systems rather than inventing new ones:
 - Keep Light Lab intact.
 - Keep the change small and architecture-aligned.
 - Prefer one focused commit.
+
+### Execution note for next agent
+The last timeout suggests the agent spent too much of its budget reading broadly. The next run should:
+1. read only the handoff + the smallest lighting entrypoint files,
+2. patch `scripts/exploration_scene.gd` first,
+3. avoid repo-wide re-analysis,
+4. get to code quickly.
 
 ---
 
