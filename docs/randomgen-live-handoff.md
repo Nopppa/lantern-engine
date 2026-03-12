@@ -10,11 +10,11 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `5a03058`
-- **Verification time:** 2026-03-12 15:18 Europe/Berlin
+- **Verified HEAD:** `dfaf4dd`
+- **Verification time:** 2026-03-12 15:35 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `5a03058`.
+- Current branch is pushed through commit `dfaf4dd`.
 - There are **no verified uncommitted RandomGEN code changes** at this moment.
 - Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
@@ -72,7 +72,7 @@
 - Shared frontier smoothing state (`_approx_flashlight_frontier`) is now tracked in exploration scene.
 - Exploration gameplay-light writing now uses packet segments, zones, and fills with the same general packet-to-field write approach used in Light Lab.
 - Mirror/glass/transmit/reflect continuations from the shared packet path now feed exploration gameplay light more truthfully.
-- Added small helper passthroughs (`_light_world_patches`, `_light_world_occluders`, `_light_world_tree_entities`) needed by the shared flashlight packet path.
+- Added small helper passthroughs needed by the shared flashlight packet path.
 
 ### Milestone 4 / Exploration pause return path
 **Commit:** `1c0f69c`
@@ -86,6 +86,18 @@
 - Exploration pause UI was moved out of world-space drawing into viewport-anchored overlay UI.
 - Pause presentation now behaves more correctly under resolution/fullscreen changes.
 - Exploration HUD sizing also became viewport-aware.
+
+### Architecture anchoring docs
+**Commit:** `0a2e6ff`
+- Added `docs/world-generation-and-persistence-vision.md`.
+- Locked RandomGEN toward a deterministic finite procedural world with chunk streaming, persistent chunk modifications, persistent restoration state, and save/load direction.
+
+### Decomposition pass 1 / light runtime extraction
+**Commit:** `dfaf4dd`
+- Created `scripts/exploration/exploration_light_runtime.gd`.
+- Moved exploration-specific light runtime responsibilities out of `scripts/exploration_scene.gd` into the new helper.
+- `exploration_scene.gd` now acts more clearly as runtime coordinator/composition root.
+- Extracted responsibilities include LightField/DeadAliveGrid/runtime packet state, packet-to-field writing, flashlight/prism light runtime helpers, gameplay-light sampling, and native presentation update delegation.
 
 ---
 
@@ -109,6 +121,7 @@ In `feature/randomgen-exploration-world`, the exploration shell currently has:
 - gameplay-light field is now fed from flashlight packet segments / zones / fills using the Light Lab-style packet-to-field write approach
 - in-scene pause/menu return path on `Esc`, with resume or return to main menu
 - viewport-anchored exploration overlay UI that adapts more safely to resolution/fullscreen changes
+- first decomposition pass complete: exploration light runtime now lives in `scripts/exploration/exploration_light_runtime.gd`
 
 Light Lab remains untouched by these branch changes.
 
@@ -117,7 +130,7 @@ Light Lab remains untouched by these branch changes.
 ## What Is Still Missing
 
 ### Next likely milestone
-Extend exploration beyond flashlight-only integration.
+Continue incremental decomposition or add the next real gameplay/runtime capability.
 
 ### Missing pieces
 - no beam/laser integration yet in exploration scene
@@ -125,19 +138,26 @@ Extend exploration beyond flashlight-only integration.
 - pause/menu path exists, but its presentation is still intentionally minimal
 - no enemies/runtime gameplay loop yet
 - no deeper generated-world variety beyond current scaffold path
+- no chunk streaming/save-load implementation yet despite the world-vision doc
 - no explicit validation build/report has been attached to this milestone yet
-- exploration currently has only the smallest helper surface needed for flashlight packet reuse, not the full Light Lab runtime feature set
 
 ---
 
 ## Next Recommended Step
 
-**Highest-value next increment:**
-Add the next smallest shared-light feature after flashlight reuse.
+**Best next architectural step:**
+Continue the low-risk decomposition plan.
 
-### Best candidates
-1. add a simple in-scene pause/menu return path for exploration usability, **or**
-2. add one more shared-light system step (secondary/prism support) if you want to keep pushing lighting parity first.
+### Recommended next extraction
+- `scripts/exploration/exploration_overlay_ui.gd`
+
+Why:
+- pause/HUD/layout logic is already a clearly separate responsibility
+- it also aligns directly with the new requirement that the real game must adapt to different resolutions and fullscreen
+- it keeps `exploration_scene.gd` narrowing toward orchestration only
+
+### Alternative functional step
+If feature progress is preferred over structure in the next pass, add one more shared-light parity increment (beam/laser or fuller prism handling) while keeping the new runtime helper boundary intact.
 
 ### Constraints
 - Do **not** fork lighting/material logic.
@@ -161,13 +181,9 @@ If the previous agent timed out:
 
 Read these first:
 - `docs/architecture-randomgen-branch-plan.md`
-- `docs/checklist-randomgen-exploration-world.md`
+- `docs/world-generation-and-persistence-vision.md`
 - `docs/randomgen-live-handoff.md`
 - `scripts/exploration_scene.gd`
-- `scripts/light_lab_scene.gd`
-- `scripts/gameplay/flashlight_visuals.gd`
-- `scripts/gameplay/light_field.gd`
-- `scripts/gameplay/native_light_presentation.gd`
-- `scripts/gameplay/light_types.gd`
+- `scripts/exploration/exploration_light_runtime.gd`
 
 Do not trust prior timeout summaries unless they match the verified branch state.
