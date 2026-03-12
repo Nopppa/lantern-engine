@@ -30,6 +30,7 @@ const LIGHT_CELL_SIZE := 32.0
 const FLASHLIGHT_RANGE := 420.0
 const FLASHLIGHT_HALF_ANGLE := 48.0
 const BEAM_OFFSET := 4.0
+const MAIN_MENU_SCENE_PATH := "res://scenes/main.tscn"
 
 ## Seed used for this scene instance.  Change to explore different worlds.
 @export var world_seed: int = 2001
@@ -48,6 +49,7 @@ var _dead_alive_cells: Array = []
 var _flashlight_render_packet: Dictionary = LightTypes.empty_render_packet("flashlight")
 var _approx_flashlight_frontier := {}
 var _native_light_presentation: NativeLightPresentation = null
+var _pause_open := false
 
 # Material color palette for visualization
 const MATERIAL_COLORS := {
@@ -74,17 +76,25 @@ func _ready() -> void:
 	])
 
 func _process(delta: float) -> void:
-	_update_player(delta)
-	_rebuild_gameplay_light_field()
-	if _gameplay_light_field != null:
-		_gameplay_light_field.process_field(delta)
-	DeadAliveGrid.update(_dead_alive_cells, delta, Callable(self, "_sample_gameplay_light"))
-	_update_native_light_presentation()
+	if not _pause_open:
+		_update_player(delta)
+		_rebuild_gameplay_light_field()
+		if _gameplay_light_field != null:
+			_gameplay_light_field.process_field(delta)
+		DeadAliveGrid.update(_dead_alive_cells, delta, Callable(self, "_sample_gameplay_light"))
+		_update_native_light_presentation()
 	_update_hud()
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE:
+			_toggle_pause_menu()
+			return
+		if _pause_open:
+			if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER or event.keycode == KEY_M:
+				_return_to_main_menu()
+			return
 		if event.keycode == KEY_R:
 			reroll(world_seed + 1)
 		elif event.keycode == KEY_T:
@@ -175,7 +185,10 @@ func _update_player(delta: float) -> void:
 func _update_hud() -> void:
 	if _hud_label == null:
 		return
-	_hud_label.text = "[%s]\nSeed: %d\nSegments: %d  |  Patches: %d  |  Entities: %d\nPlayer: (%.0f, %.0f)\nFlashlight: %s  |  Light: %.2f\nGameplay-light cells: %d\n\nControls: WASD/Arrows = Move  |  Mouse = Aim  |  F = Flashlight  |  R = Next Seed  |  T = Random Seed" % [
+	var pause_line := "Pause: ESC"
+	if _pause_open:
+		pause_line = "PAUSED — ESC resume | Enter/M main menu"
+	_hud_label.text = "[%s]\nSeed: %d\nSegments: %d  |  Patches: %d  |  Entities: %d\nPlayer: (%.0f, %.0f)\nFlashlight: %s  |  Light: %.2f\nGameplay-light cells: %d\n%s\n\nControls: WASD/Arrows = Move  |  Mouse = Aim  |  F = Flashlight  |  R = Next Seed  |  T = Random Seed" % [
 		SCENE_LABEL,
 		world_seed,
 		segment_count(),
@@ -185,7 +198,8 @@ func _update_hud() -> void:
 		_player_pos.y,
 		("ON" if _flashlight_on else "OFF"),
 		_sample_gameplay_light(_player_pos),
-		_dead_alive_cells.size()
+		_dead_alive_cells.size(),
+		pause_line
 	]
 
 # --- Public API ---
@@ -202,6 +216,15 @@ func reroll(new_seed: int) -> void:
 		_player_node.position = _player_pos
 	queue_redraw()
 	print("[ExplorationScene] Rerolled — seed: %d  spawn: %s" % [world_seed, str(_provider.spawn_hint())])
+
+func _toggle_pause_menu() -> void:
+	_pause_open = not _pause_open
+
+func _return_to_main_menu() -> void:
+	_pause_open = false
+	var err := get_tree().change_scene_to_file(MAIN_MENU_SCENE_PATH)
+	if err != OK:
+		push_warning("[ExplorationScene] Failed to return to main menu scene: %s (%d)" % [MAIN_MENU_SCENE_PATH, err])
 
 ## World metadata passthrough.
 func world_metadata() -> Dictionary:
@@ -460,6 +483,16 @@ func _draw() -> void:
 	# Arena border
 	draw_rect(ARENA_RECT, Color(0.46, 0.68, 0.95, 0.95), false, 6.0)
 	draw_rect(ARENA_RECT.grow(-8.0), Color(0.76, 0.9, 1.0, 0.18), false, 2.0)
+	
+	if _pause_open:
+		var panel_size := Vector2(420, 136)
+		var panel_rect := Rect2(ARENA_RECT.get_center() - panel_size * 0.5, panel_size)
+		draw_rect(ARENA_RECT, Color(0.0, 0.0, 0.0, 0.42), true)
+		draw_rect(panel_rect, Color(0.05, 0.08, 0.13, 0.94), true)
+		draw_rect(panel_rect, Color(0.72, 0.86, 1.0, 0.95), false, 3.0)
+		draw_string(ThemeDB.fallback_font, panel_rect.position + Vector2(26, 40), "Exploration Paused", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 24, Color(0.95, 0.98, 1.0, 1.0))
+		draw_string(ThemeDB.fallback_font, panel_rect.position + Vector2(26, 78), "ESC: resume", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color(0.84, 0.91, 1.0, 0.95))
+		draw_string(ThemeDB.fallback_font, panel_rect.position + Vector2(26, 108), "Enter or M: return to main menu", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color(0.84, 0.91, 1.0, 0.95))
 	
 	# Player
 	if _player_node != null:
