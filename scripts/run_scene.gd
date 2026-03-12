@@ -648,14 +648,16 @@ func _draw() -> void:
 	draw_rect(Rect2(ARENA_RECT.position + Vector2(720, 320), Vector2(160, 150)), Color(0.18, 0.21, 0.28, 0.18), true)
 	if prism_node:
 		var pulse := 0.78 + 0.22 * sin(Time.get_ticks_msec() / 160.0)
-		draw_circle(prism_node.position, 56.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.04 * pulse))
-		draw_circle(prism_node.position, 40.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.08 * pulse))
-		draw_arc(prism_node.position, 26.0, 0.0, TAU, 40, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.85), 3.0)
-		draw_arc(prism_node.position, 18.0, 0.0, TAU, 32, Color(1.0, 1.0, 1.0, 0.45), 1.5)
-		draw_line(prism_node.position + Vector2(-24, 0), prism_node.position + Vector2(24, 0), Color(1.0, 1.0, 1.0, 0.16), 2.0)
-		draw_line(prism_node.position + Vector2(0, -24), prism_node.position + Vector2(0, 24), Color(1.0, 1.0, 1.0, 0.16), 2.0)
-		draw_circle(prism_node.position, current_prism_radius(), Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.08))
-		draw_circle(prism_node.position, prism_surge_radius, Color(0.62, 0.94, 1.0, 0.035 if prism_surge_timer <= 0.0 else 0.02))
+		# Prism is a visible light emitter: bright multi-layer glow
+		draw_circle(prism_node.position, 56.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.10 * pulse))
+		draw_circle(prism_node.position, 40.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.25 * pulse))
+		draw_circle(prism_node.position, 26.0, Color(PRISM_COLOR.r * 1.1, PRISM_COLOR.g * 1.05, PRISM_COLOR.b, 0.62))
+		draw_arc(prism_node.position, 26.0, 0.0, TAU, 40, Color(PRISM_COLOR.r * 1.2, PRISM_COLOR.g * 1.15, PRISM_COLOR.b * 1.1, 0.92), 3.5)
+		draw_circle(prism_node.position, 16.0, Color(1.0, 1.0, 1.0, 0.42))
+		draw_line(prism_node.position + Vector2(-24, 0), prism_node.position + Vector2(24, 0), Color(1.0, 1.0, 1.0, 0.24), 2.0)
+		draw_line(prism_node.position + Vector2(0, -24), prism_node.position + Vector2(0, 24), Color(1.0, 1.0, 1.0, 0.24), 2.0)
+		draw_circle(prism_node.position, current_prism_radius(), Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.12))
+		draw_circle(prism_node.position, prism_surge_radius, Color(0.62, 0.94, 1.0, 0.045 if prism_surge_timer <= 0.0 else 0.025))
 	# Flashlight / prism visible fields are rendered by LightFieldPresentation (GPU polygons + native light nodes).
 
 	for projectile: Dictionary in boss_projectiles:

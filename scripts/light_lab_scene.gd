@@ -860,13 +860,14 @@ func _draw() -> void:
 		var alive_color := Color(0.28, 0.46, 0.31, 1.0)
 		draw_rect(rect, dead_color, true)
 		if blend > 0.01:
-			# Soft circular overlay instead of hard square — cells overlap neighbors,
-			# hiding the grid seams and making restoration look organic.
+			# Ultra-smooth restoration mask: much larger radius for seamless blending across cells
+			# Eliminates grid artifacts by making neighboring cell circles merge smoothly
 			var center: Vector2 = rect.get_center()
-			var r: float = CELL_SIZE * 0.72  # radius > half-cell so circles overlap
-			draw_circle(center, r, Color(alive_color.r, alive_color.g, alive_color.b, blend * 0.82))
-			# Inner brighter core gives depth to the restoration effect
-			draw_circle(center, r * 0.44, Color(alive_color.r * 1.12, alive_color.g * 1.12, alive_color.b * 1.08, blend * 0.38))
+			var r: float = CELL_SIZE * 1.15  # Large overlap radius for continuous field
+			draw_circle(center, r, Color(alive_color.r, alive_color.g, alive_color.b, blend * 0.55))
+			# Multi-layer soft gradient for organic depth
+			draw_circle(center, r * 0.68, Color(alive_color.r * 1.08, alive_color.g * 1.08, alive_color.b * 1.05, blend * 0.35))
+			draw_circle(center, r * 0.38, Color(alive_color.r * 1.15, alive_color.g * 1.15, alive_color.b * 1.10, blend * 0.25))
 	for patch: Dictionary in _light_world_patches():
 		var mat := LightMaterials.get_definition(patch["material_id"])
 		var patch_color := Color(mat["color"].r, mat["color"].g, mat["color"].b, 0.82)
@@ -898,8 +899,14 @@ func _draw() -> void:
 	for prism_entity: Dictionary in _light_world_prism_entities():
 		if String(prism_entity.get("kind", "")) != "prism_station":
 			continue
-		draw_circle(prism_entity["pos"], 26.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.18))
-		draw_arc(prism_entity["pos"], 26.0, 0.0, TAU, 24, PRISM_COLOR, 3.0)
+		var prism_pos: Vector2 = prism_entity["pos"]
+		# Prism is a visible light emitter: bright multi-layer glow
+		draw_circle(prism_pos, 52.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.12))
+		draw_circle(prism_pos, 38.0, Color(PRISM_COLOR.r, PRISM_COLOR.g, PRISM_COLOR.b, 0.28))
+		draw_circle(prism_pos, 26.0, Color(PRISM_COLOR.r * 1.1, PRISM_COLOR.g * 1.05, PRISM_COLOR.b, 0.65))
+		draw_arc(prism_pos, 26.0, 0.0, TAU, 24, Color(PRISM_COLOR.r * 1.2, PRISM_COLOR.g * 1.15, PRISM_COLOR.b * 1.1, 0.95), 3.5)
+		# Bright core to emphasize emission
+		draw_circle(prism_pos, 16.0, Color(1.0, 1.0, 1.0, 0.45))
 	for patch: Dictionary in _light_world_patches():
 		_draw_sign_patch(patch)
 	_draw_flashlight_trace()
@@ -916,11 +923,9 @@ func _draw() -> void:
 		draw_circle(enemy["node"].position, enemy["radius"], color)
 		if hp_overhead_enabled and not ui_overlays_hidden:
 			draw_string(ThemeDB.fallback_font, enemy["node"].position + Vector2(-28, -24), "%d/%d" % [int(ceil(float(enemy["hp"]))), int(ceil(float(enemy.get("max_hp", enemy["hp"]))))], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1,1,1,0.9))
-	# Soft multi-layer player glow — no hard circle boundary
-	draw_circle(player_pos, PLAYER_RADIUS + 40.0, Color(1.0, 0.95, 0.72, 0.028))
-	draw_circle(player_pos, PLAYER_RADIUS + 24.0, Color(1.0, 0.95, 0.72, 0.055))
-	draw_circle(player_pos, PLAYER_RADIUS + 12.0, Color(1.0, 0.95, 0.72, 0.10))
-	draw_circle(player_pos, PLAYER_RADIUS + 4.0,  Color(1.0, 0.96, 0.78, 0.18))
+	# Player visual indicator — single smooth glow, not exposing internal gameplay-light blob structure
+	# Native light presentation (PointLight2D) now handles local ambient lighting
+	draw_circle(player_pos, PLAYER_RADIUS + 8.0, Color(1.0, 0.96, 0.78, 0.08))
 	draw_circle(player_pos, PLAYER_RADIUS,         Color("f1fa8c"))
 	draw_line(player_pos, player_pos + facing * 26.0, Color(0.14, 0.18, 0.24, 1.0), 2.0)
 	if cursor_probe_enabled and not ui_overlays_hidden and ARENA_RECT.has_point(get_global_mouse_position()):
@@ -975,12 +980,14 @@ func _draw_flashlight_trace() -> void:
 			tint = Color(0.78, 0.96, 1.0, 1.0)
 			width = 2.6
 		var is_primary := kind == "primary"
-		# Transmit/reflect segments use wide soft glow (no dashed pattern — dashes created stripe bands)
+		# Transmit/reflect segments use ultra-wide soft glow for continuous unified beam appearance
 		if kind == "transmit" or kind == "reflect":
-			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.05 * intensity), 22.0)
-			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.12 * intensity), 12.0)
-			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.42 * intensity), 4.0)
-			draw_line(a, b, Color(1.0, 1.0, 1.0, 0.28 * intensity), 1.5)
+			# Extra-wide outer glow creates smooth cone continuation across material boundaries
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.03 * intensity), 36.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.08 * intensity), 24.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.18 * intensity), 14.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.38 * intensity), 6.0)
+			draw_line(a, b, Color(1.0, 1.0, 1.0, 0.24 * intensity), 2.0)
 		else:
 			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.035 if is_primary else 0.07) * intensity), 10.0 if is_primary else 12.0)
 			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.08 if is_primary else 0.18) * intensity), 5.5 if is_primary else 7.0)
@@ -1037,10 +1044,12 @@ func _draw_prism_trace() -> void:
 			width = 2.2
 		var is_primary := kind == "primary"
 		if kind == "transmit" or kind == "reflect":
-			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.045 * intensity), 20.0)
-			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.11 * intensity), 10.0)
-			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.40 * intensity), 3.5)
-			draw_line(a, b, Color(1.0, 1.0, 1.0, 0.26 * intensity), 1.4)
+			# Ultra-wide smooth prism beam continuation after glass/mirror
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.025 * intensity), 34.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.07 * intensity), 22.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.16 * intensity), 12.0)
+			draw_line(a, b, Color(tint.r, tint.g, tint.b, 0.35 * intensity), 5.5)
+			draw_line(a, b, Color(1.0, 1.0, 1.0, 0.22 * intensity), 1.8)
 		else:
 			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.028 if is_primary else 0.06) * intensity), 9.0 if is_primary else 10.0)
 			draw_line(a, b, Color(tint.r, tint.g, tint.b, (0.07 if is_primary else 0.16) * intensity), 4.8 if is_primary else 6.0)

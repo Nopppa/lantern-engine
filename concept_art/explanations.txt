@@ -1,0 +1,142 @@
+dungeon_crawl.png
+
+Description: A wide-angle conceptual render of the core gameplay loop.
+
+Contents: Shows the Scavenger navigating a derelict urban ruin.
+
+Key Features: Demonstrates the interaction between the player's flashlight and environment occluders (collapsed walls, debris). Highlights the high-contrast atmosphere.
+
+encounter.png
+
+Description: Combat visualization and UI mockup.
+
+Contents: The player facing a mutated biological horror in a corridor.
+
+Key Features: Showcases the Photon Lance skill in action, including dynamic lighting intensity and the "Strobe" and "Lance" HUD icons.
+
+surge.png
+
+Description: High-intensity ability VFX demonstration.
+
+Contents: Visualization of the Beacon Sacrifice ultimate ability.
+
+Key Features: A massive electrical/light discharge emanating from the player, clearing a room of shadows and enemies. Used to test max-brightness shader limits.
+
+basic_pose.png
+
+State: Idle / Base Pose.
+
+Visuals: The Scavenger standing in a ready position, equipped with a backpack and a tactical flashlight.
+
+Use Case: Default animation state for exploration.
+
+flickering.png
+
+State: Unstable Light / Low Battery.
+
+Visuals: Player character with rapid shadows cast upon their own gear.
+
+Use Case: Triggered when "Light Fuel" is below 10% or when near "Horror Echoes."
+
+dashing_or_sprinting.png
+
+State: High Mobility / Shadow Dash.
+
+Visuals: Dynamic forward-leaning pose with motion blur effects.
+
+Use Case: Active state for the Shadow Step talent; provides visual feedback for increased movement speed.
+
+downed.png 
+
+State: Failure / Incapacitated.
+
+Visuals: The Scavenger collapsed on the ground, flashlight dropped and illuminating the scene from a low angle.
+
+Use Case: Death screen or "Downed but not out" state.
+
+
+Technical Implementation Note
+
+
+All sprites follow the Hi-Res 2D Hand-Drawn style. When importing into Godot, ensure Texture Filter is set to Linear to preserve the smooth gradients required for realistic Lantern Engine light interaction.
+
+
+_____________
+
+
+forest_ruin.png
+
+    Description: Gnarled, blackened timber with skeletal branches.
+
+    Lighting Role: Specifically designed with gaps in the canopy to allow for God Rays and dramatic shadow casting when the player moves between trunks.
+
+    Biome: The Black Timber (High-density occluders).
+
+city_facade.png
+
+    Description: Crumbling brickwork and shattered window frames of a pre-collapse urban structure.
+
+    Lighting Role: Acts as a primary hard-surface occluder. Windows allow light to leak into dark interiors, creating "safe-view" pockets.
+
+    Biome: The Silent District (Urban Dungeon).
+
+cavern_entrance.png
+
+    Description: A jagged, rocky opening leading into subterranean darkness.
+
+    Lighting Role: Used to test "Infinite Darkness" zones where the ambient light is set to 0, forcing total reliance on the Flashlight and Flares.
+
+    Biome: Subterranean Crawl (Underground network).
+
+overgrown_plains.png
+
+    Description: Tall, dry grass interspersed with low-lying concrete debris and rusted metal.
+
+    Lighting Role: Provides low-height occlusion. Ideal for hiding "Stalker" class enemies that are only revealed when the light beam passes directly over them.
+
+    Biome: The Wasteland Fringe (Open-world navigation).
+
+Technical Placement Logic for OpenClaw
+
+    Z-Index: Environmental assets should be placed on Layer 0 (Ground) and Layer 1 (Obstacles).
+
+    Occlusion Culling: Each asset requires a LightOccluder2D polygon drawn to match its silhouette to ensure realistic shadow casting.
+
+    Navigation: NavigationRegion2D must be baked around these assets to allow enemy AI to pathfind through the ruins.
+
+______________________
+
+
+
+dungeon_crawl_nature.png
+
+    Theme: "The Black Timber" – Post-collapse biological overgrowth.
+
+    Visual Narrative: Depicts the Scavenger navigating a dense, distorted forest. The trees are gnarled, partially charred, and alien in their growth patterns, suggesting a world where nature has reclaimed civilization in a violent manner. Rusting industrial debris is scattered among the roots.
+
+    Technical Role (Lantern Engine): Used to test Foliage Occlusion. The goal is to demonstrate how the flashlight beam interacts with irregular, organic shapes, creating a "God Ray" effect through the mist and branches.
+
+    Scale: Medium-shot. Focuses on the claustrophobia of the woods.
+
+
+
+dungeon_crawl_city.png
+
+    Theme: "The Silent Boulevard" – Urban desolation and infrastructure decay.
+
+    Visual Narrative: A wide-angle view of a massive, ruined city street. The Scavenger is depicted as a small, vulnerable figure against the backdrop of multi-story, crumbling skyscrapers and collapsed facades. Abandoned vehicles and downed power lines litter the cracked asphalt.
+
+    Technical Role (Lantern Engine): Used to test Hard-Surface Occlusion and Multi-Source Lighting. The scene features the primary flashlight beam interacting with large-scale geometric structures (buildings) and secondary environmental light sources, such as flickering electrical sparks from a damaged terminal.
+
+    Scale: Cinematic Wide-shot. Establishes the true scale of the world and the vastness of the "City Dungeon" biome.
+
+Implementation Directives for OpenClaw
+1. Scale & Proportion
+
+    Rule: Always maintain the character-to-environment ratio established in dungeon_crawl_city_v2.png. The world must feel "oppressively large" to enhance the survival-horror element.
+
+2. Atmospheric Rendering
+
+    Mist/Fog: Use the CanvasItem.material to implement a light-reactive fog. The fog should only be visible when illuminated by the LanternLight2D or environmental sparks.
+
+    Shadow Softness: Shadows cast by the buildings in the city biome should have a higher shadow_filter_smooth value than the sharp, jagged shadows in the forest.
