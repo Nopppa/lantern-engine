@@ -18,6 +18,7 @@ const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd")
 const RUN_OVERLAY_SCENE := preload("res://scenes/ui/run_overlay.tscn")
 const RUN_END_PANEL_SCENE := preload("res://scenes/ui/run_end_panel.tscn")
+const PRISM_NODE_SCENE := preload("res://scenes/world/shared/prism_node.tscn")
 
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
 const PLAYER_RADIUS := 14.0
@@ -292,13 +293,9 @@ func _place_prism(target: Vector2) -> void:
 	prism_timer = prism_cooldown
 	if prism_node:
 		prism_node.queue_free()
-	prism_node = Node2D.new()
+	prism_node = PRISM_NODE_SCENE.instantiate() as Node2D
 	prism_node.position = target.clamp(ARENA_RECT.position + Vector2(32, 32), ARENA_RECT.end - Vector2(32, 32))
 	world_layer.add_child(prism_node)
-	var marker := Polygon2D.new()
-	marker.polygon = PackedVector2Array([Vector2(0, -20), Vector2(18, 0), Vector2(0, 20), Vector2(-18, 0)])
-	marker.color = PRISM_COLOR
-	prism_node.add_child(marker)
 	prism_timer = prism_duration
 	RunSummary.note_prism_placed(self)
 	last_event = "Prism Node deployed"

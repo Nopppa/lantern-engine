@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://prism_node_v1"]
+
+[node name="PrismNode" type="Node2D"]
+
+[node name="Marker" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(0, -20, 18, 0, 0, 20, -18, 0)
+color = Color(0.54, 0.93, 1, 1)
