@@ -19,6 +19,7 @@ const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const LightField = preload("res://scripts/gameplay/light_field.gd")
 const DeadAliveGrid = preload("res://scripts/gameplay/dead_alive_grid.gd")
 const NativeLightPresentation = preload("res://scripts/gameplay/native_light_presentation.gd")
+const FlashlightVisuals = preload("res://scripts/gameplay/flashlight_visuals.gd")
 
 # Arena rect matching RunScene / Light Lab for pipeline compatibility.
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
@@ -28,6 +29,7 @@ const PLAYER_RADIUS := 14.0
 const LIGHT_CELL_SIZE := 32.0
 const FLASHLIGHT_RANGE := 420.0
 const FLASHLIGHT_HALF_ANGLE := 48.0
+const BEAM_OFFSET := 4.0
 
 ## Seed used for this scene instance.  Change to explore different worlds.
 @export var world_seed: int = 2001
@@ -44,6 +46,7 @@ var _flashlight_on := true
 var _gameplay_light_field: LightField = null
 var _dead_alive_cells: Array = []
 var _flashlight_render_packet: Dictionary = LightTypes.empty_render_packet("flashlight")
+var _approx_flashlight_frontier := {}
 var _native_light_presentation: NativeLightPresentation = null
 
 # Material color palette for visualization
@@ -261,54 +264,128 @@ func _boot_shared_light_runtime() -> void:
 	_gameplay_light_field = LightField.new(ARENA_RECT, LIGHT_CELL_SIZE, 1.25)
 	_dead_alive_cells = DeadAliveGrid.build(ARENA_RECT, LIGHT_CELL_SIZE, _light_world.metadata_array("dead_alive_zones") if _light_world != null else [])
 	_flashlight_render_packet = LightTypes.empty_render_packet("flashlight")
+	_approx_flashlight_frontier = {}
 
-func _flashlight_source_spec() -> Dictionary:
-	return LightTypes.light_source_spec("flashlight", _player_pos, _facing, 1.0 if _flashlight_on else 0.0, FLASHLIGHT_RANGE, {
-		"half_angle_deg": FLASHLIGHT_HALF_ANGLE
-	})
+func _flashlight_source_options() -> Dictionary:
+	return {
+		"source_type": "flashlight",
+		"origin": _player_pos,
+		"direction": _facing,
+		"range": FLASHLIGHT_RANGE,
+		"half_angle_deg": FLASHLIGHT_HALF_ANGLE,
+		"center_intensity": 0.96,
+		"edge_intensity": 0.42,
+		"use_frontier_smoothing": true,
+		"previous_frontier": _approx_flashlight_frontier,
+		"source_anchor": _player_pos,
+		"radial_emission": false
+	}
 
 func _rebuild_gameplay_light_field() -> void:
 	if _gameplay_light_field == null:
 		return
 	_gameplay_light_field.clear_dynamic_light()
-	_flashlight_render_packet = LightTypes.light_render_packet("flashlight", _flashlight_source_spec(), [], [], [], [], {
-		"active": _flashlight_on
-	})
 	if not _flashlight_on:
+		_flashlight_render_packet = LightTypes.empty_render_packet("flashlight")
+		_approx_flashlight_frontier = {}
 		return
-	_write_flashlight_packet_to_light_field(_flashlight_render_packet)
+	_flashlight_render_packet = FlashlightVisuals.build_render_packet(self, _flashlight_source_options())
+	_approx_flashlight_frontier = _flashlight_render_packet.get("frontier", {})
+	_write_packet_to_light_field(_flashlight_render_packet, 30.0, 24.0, 0.86, 0.62)
 
-func _write_flashlight_packet_to_light_field(packet: Dictionary) -> void:
+func _packet_segments(packet: Dictionary) -> Array:
+	return packet.get("segments", [])
+
+func _packet_zones(packet: Dictionary) -> Array:
+	return packet.get("zones", [])
+
+func _packet_fills(packet: Dictionary) -> Array:
+	return packet.get("fills", [])
+
+func _zone_is_opaque_surface(zone: Dictionary) -> bool:
+	var material_id := String(zone.get("material_id", ""))
+	return material_id == "brick" or material_id == "wood" or material_id == "mirror" or material_id == "tree" or material_id == "stone" or material_id == "metal"
+
+func _zone_front_facing(zone: Dictionary) -> bool:
+	var normal: Vector2 = Vector2(zone.get("normal", Vector2.ZERO))
+	var incoming_dir: Vector2 = Vector2(zone.get("incoming_dir", Vector2.ZERO))
+	if normal == Vector2.ZERO or incoming_dir == Vector2.ZERO:
+		return true
+	return incoming_dir.normalized().dot(normal.normalized()) < -0.05
+
+func _zone_effective_pos(zone: Dictionary, offset_scale: float) -> Vector2:
+	var pos: Vector2 = Vector2(zone.get("pos", Vector2.ZERO))
+	var normal: Vector2 = Vector2(zone.get("normal", Vector2.ZERO))
+	if normal == Vector2.ZERO or not _zone_is_opaque_surface(zone):
+		return pos
+	return pos + normal.normalized() * float(zone.get("radius", 0.0)) * offset_scale
+
+func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, secondary_radius: float, primary_scale: float, secondary_scale: float) -> void:
 	if _gameplay_light_field == null:
 		return
-	var source := Dictionary(packet.get("source", {}))
-	var origin: Vector2 = source.get("origin", _player_pos)
-	var direction: Vector2 = Vector2(source.get("direction", _facing))
-	if direction == Vector2.ZERO:
-		direction = Vector2.RIGHT
-	var max_range := float(source.get("range", FLASHLIGHT_RANGE))
-	var half_angle := deg_to_rad(float(source.get("half_angle_deg", FLASHLIGHT_HALF_ANGLE)))
-	var rays := 9
-	for ray_idx in range(rays):
-		var t := 0.5 if rays <= 1 else float(ray_idx) / float(rays - 1)
-		var angle := lerpf(-half_angle, half_angle, t)
-		var ray_dir := direction.rotated(angle).normalized()
-		var ray_end := origin + ray_dir * max_range
-		var steps := max(2, int(ceil(max_range / max(_gameplay_light_field.cell_size * 0.75, 12.0))))
+	for segment: Dictionary in _packet_segments(packet):
+		var kind := String(segment.get("kind", "primary"))
+		var is_continuation := (kind == "reflect" or kind == "transmit")
+		var radius: float = primary_radius if (kind == "primary" or is_continuation) else secondary_radius
+		var scale: float = (primary_scale * 0.88) if is_continuation else (primary_scale if kind == "primary" else secondary_scale)
+		var a: Vector2 = segment["a"]
+		var b: Vector2 = segment["b"]
+		var length: float = a.distance_to(b)
+		var mat_id := String(segment.get("material_id", ""))
+		var is_end_solid: bool = (mat_id == "brick" or mat_id == "wood" or mat_id == "mirror" or mat_id == "tree" or mat_id == "stone" or mat_id == "metal")
+		var steps: int = max(1, int(ceil(length / max(_gameplay_light_field.cell_size * 0.75, 8.0))))
 		for step in range(steps + 1):
-			var step_t := float(step) / float(steps)
-			var sample_pos := origin.lerp(ray_end, step_t)
-			var distance_ratio := origin.distance_to(sample_pos) / max(max_range, 0.001)
-			var energy := clampf(1.0 - distance_ratio, 0.0, 1.0)
-			if energy <= 0.0:
-				continue
-			_gameplay_light_field.add_splat_world(sample_pos, 26.0, 0.72 * energy)
-	_gameplay_light_field.add_splat_world(origin, 42.0, 1.0)
+			var t: float = float(step) / float(steps)
+			var pos: Vector2 = a.lerp(b, t)
+			var energy: float = clampf(float(segment.get("intensity", 0.0)) * scale, 0.0, 1.0)
+			var eff_radius := radius
+			if is_end_solid:
+				var dist_to_b := pos.distance_to(b)
+				if dist_to_b < radius:
+					eff_radius = max(dist_to_b, 4.0)
+			_gameplay_light_field.add_splat_world(pos, eff_radius, energy)
+		if kind == "primary" and mat_id == "mirror":
+			var hit_energy := clampf(float(segment.get("intensity", 0.0)) * primary_scale, 0.0, 1.0)
+			_gameplay_light_field.add_splat_world(b, primary_radius * 1.2, hit_energy * 0.9)
+		elif kind == "primary" and (mat_id == "glass" or mat_id == "wet"):
+			var pass_energy := clampf(float(segment.get("intensity", 0.0)) * primary_scale, 0.0, 1.0)
+			_gameplay_light_field.add_splat_world(b, primary_radius * 0.9, pass_energy * 0.65)
+	for zone: Dictionary in _packet_zones(packet):
+		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
+			continue
+		var is_opaque := _zone_is_opaque_surface(zone)
+		var zone_pos: Vector2 = _zone_effective_pos(zone, 0.85 if is_opaque else 0.24)
+		var zone_radius: float = float(zone.get("radius", 0.0))
+		if is_opaque:
+			zone_radius *= 0.78
+			if String(zone.get("kind", "")) == "block":
+				zone_radius *= 0.72
+		_gameplay_light_field.add_splat_world(zone_pos, zone_radius, float(zone.get("strength", 0.0)))
+	for fill: Dictionary in _packet_fills(packet):
+		var pts: PackedVector2Array = fill.get("points", PackedVector2Array())
+		if pts.size() < 3:
+			continue
+		var centroid := Vector2.ZERO
+		for p: Vector2 in pts:
+			centroid += p
+		centroid /= float(pts.size())
+		var fill_strength: float = clampf(float(fill.get("strength", 0.0)) * 0.38, 0.0, 1.0)
+		if fill_strength > 0.01:
+			_gameplay_light_field.add_splat_world(centroid, primary_radius * 1.15, fill_strength)
 
 func _sample_gameplay_light(pos: Vector2) -> float:
 	if _gameplay_light_field == null:
 		return 0.0
 	return clampf(_gameplay_light_field.sample_world(pos), 0.0, 1.0)
+
+func _light_world_patches() -> Array:
+	return _light_world.material_patches if _light_world != null else []
+
+func _light_world_occluders() -> Array:
+	return _light_world.occluder_segments if _light_world != null else []
+
+func _light_world_tree_entities() -> Array:
+	return _light_world.entity_list("tree_trunk") if _light_world != null else []
 
 func _update_native_light_presentation() -> void:
 	if _native_light_presentation == null:
