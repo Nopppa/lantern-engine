@@ -1,14 +1,16 @@
-## ExplorationScene – RandomGEN exploration world runtime scaffold.
+## ExplorationScene – biome-driven exploration world runtime scaffold.
 ##
-## Milestone 2: Runtime integration with visual rendering and player movement.
-## Loads a generated LightWorld via GeneratedExplorationProvider and
-## renders it with basic debug visualization.
+## Milestone 2/3: Runtime integration with visual rendering and player movement.
+## Loads a generated biome-world via GeneratedExplorationProvider and renders it
+## with debug-first visualization while preserving the shared LightWorld pipeline.
 ##
 ## Design rules enforced here:
-##   - Does NOT touch lighting/material logic.
-##   - Light Lab is left untouched.
+##   - Does NOT own lighting/material logic.
+##   - Light Lab remains untouched.
 ##   - All world data flows through GeneratedExplorationProvider → LightWorldBuilder.
 ##   - The resulting LightWorld is the single world-truth object for this scene.
+##   - Exploration scenes should feel like places (forest, meadow, street,
+##     housing, industrial), not material test arenas.
 ##
 extends Node2D
 class_name ExplorationScene
@@ -20,9 +22,9 @@ const ExplorationLightRuntime = preload("res://scripts/exploration/exploration_l
 const ExplorationOverlayUi = preload("res://scripts/exploration/exploration_overlay_ui.gd")
 const ExplorationPlayerController = preload("res://scripts/exploration/exploration_player_controller.gd")
 
-# Arena rect matching RunScene / Light Lab for pipeline compatibility.
+# World rect kept compatible with current pipeline bootstrap.
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
-const SCENE_LABEL := "Exploration World v0.3-layoutv2"
+const SCENE_LABEL := "Exploration World v0.4-biome-layout"
 const PLAYER_SPEED := 240.0
 const PLAYER_RADIUS := 14.0
 const LIGHT_CELL_SIZE := 32.0
@@ -31,7 +33,7 @@ const FLASHLIGHT_HALF_ANGLE := 48.0
 const BEAM_OFFSET := 4.0
 const MAIN_MENU_SCENE_PATH := "res://scenes/main.tscn"
 
-## Seed used for this scene instance.  Change to explore different worlds.
+## Seed used for this scene instance. Change to explore different worlds.
 @export var world_seed: int = 2001
 
 var _provider: GeneratedExplorationProvider = null
@@ -57,6 +59,15 @@ const MATERIAL_COLORS := {
 	"tree": Color(0.32, 0.28, 0.18, 0.92)
 }
 
+# Biome tint overlay for layout readability
+const BIOME_TINTS := {
+	"forest": Color(0.18, 0.33, 0.22, 0.10),
+	"meadow": Color(0.30, 0.42, 0.20, 0.08),
+	"street": Color(0.26, 0.26, 0.30, 0.10),
+	"housing": Color(0.34, 0.28, 0.24, 0.10),
+	"industrial": Color(0.22, 0.28, 0.34, 0.10)
+}
+
 # --- Lifecycle ---
 
 func _ready() -> void:
@@ -76,12 +87,15 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _pause_open:
 		_update_player(delta)
+
 		if Input.is_action_just_pressed("cast_beam") and _light_runtime != null:
 			_sync_light_runtime_state()
 			_light_runtime.cast_beam(get_global_mouse_position())
+
 		_sync_light_runtime_state()
 		_light_runtime.process_frame(delta)
 		_light_runtime.update_native_presentation(_native_light_presentation)
+
 	_overlay_ui.layout()
 	_update_overlay_ui()
 	queue_redraw()
@@ -91,10 +105,12 @@ func _input(event: InputEvent) -> void:
 		if event.keycode == KEY_ESCAPE:
 			_toggle_pause_menu()
 			return
+
 		if _pause_open:
 			if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER or event.keycode == KEY_M:
 				_return_to_main_menu()
 			return
+
 		if event.keycode == KEY_R:
 			reroll(world_seed + 1)
 		elif event.keycode == KEY_T:
@@ -116,55 +132,63 @@ func _on_world_ready() -> void:
 		_player_pos = spawn
 	else:
 		_player_pos = ARENA_RECT.get_center()
+
 	_player_controller.reset(_light_world)
 	_player_pos = _player_controller.resolve_spawn(_player_pos)
 	_light_runtime.reset(_light_world)
 	_sync_light_runtime_state()
 
-# --- Scene setup (Milestone 2) ---
+# --- Scene setup ---
 
 func _setup_scene() -> void:
-	# Player node
 	if _player_node == null:
 		_player_node = Node2D.new()
 		_player_node.name = "Player"
 		add_child(_player_node)
+
 	_player_node.position = _player_pos
-	
+
 	if _native_light_presentation == null:
 		_native_light_presentation = NativeLightPresentation.new()
 		add_child(_native_light_presentation)
-	
-	# Camera — attached to player so it follows movement
+
+	# Camera attached to player so it follows movement.
 	if _camera == null:
 		_camera = Camera2D.new()
 		_camera.enabled = true
 		_player_node.add_child(_camera)
+
 	_camera.limit_left = int(ARENA_RECT.position.x)
 	_camera.limit_top = int(ARENA_RECT.position.y)
 	_camera.limit_right = int(ARENA_RECT.end.x)
 	_camera.limit_bottom = int(ARENA_RECT.end.y)
-	
+
 	if _overlay_ui == null:
 		_overlay_ui = ExplorationOverlayUi.new()
 		_overlay_ui.attach(self)
+
 	_overlay_ui.set_pause_overlay_visible(_pause_open)
 
-# --- Player movement (Milestone 2) ---
+# --- Player movement ---
 
 func _update_player(delta: float) -> void:
 	if _player_controller == null:
 		return
+
 	var player_state := _player_controller.step(_player_pos, _facing, get_global_mouse_position(), delta)
 	_player_pos = Vector2(player_state.get("position", _player_pos))
 	_facing = Vector2(player_state.get("facing", _facing))
+
 	if _player_node != null:
 		_player_node.position = _player_pos
 
 func _update_overlay_ui() -> void:
 	if _overlay_ui == null:
 		return
+
 	var prism_entities := _light_world.prism_emitters() if _light_world != null else []
+	var biome_summary := _format_biome_summary()
+
 	_overlay_ui.update_hud({
 		"scene_label": SCENE_LABEL,
 		"world_seed": world_seed,
@@ -180,7 +204,8 @@ func _update_overlay_ui() -> void:
 		"energized_station_count": _light_runtime.active_prism_emitter_count() if _light_runtime != null else 0,
 		"light_cell_count": _light_runtime.dead_alive_cell_count() if _light_runtime != null else 0,
 		"pause_open": _pause_open,
-		"status_text": "[b]Exploration controls[/b]\nWASD / Arrows move | Mouse aim | [color=#8be9fd]F[/color] flashlight | [color=#8be9fd]LMB[/color] beam\n[color=#8be9fd]R[/color] next seed | [color=#8be9fd]T[/color] random seed | [color=#8be9fd]ESC[/color] pause/menu\n\n[b]Current mode goal[/b]\nTraverse a graph-generated world with calm spawn space, themed zones, linked corridors, and a deeper gate-style destination.\n\n[b]Lighting status[/b]\nFlashlight uses shared render packets. Beam segments now reuse the shared resolver/presentation path, feed gameplay light, and can energize prism stations placed for route-reading and redirection.\nBeam: %s | segments: %d | active: %s | event: %s" % [
+		"status_text": "[b]Exploration controls[/b]\nWASD / Arrows move | Mouse aim | [color=#8be9fd]F[/color] flashlight | [color=#8be9fd]LMB[/color] beam\n[color=#8be9fd]R[/color] next seed | [color=#8be9fd]T[/color] random seed | [color=#8be9fd]ESC[/color] pause/menu\n\n[b]Current mode goal[/b]\nTraverse a biome-driven procedural world with calm spawn space, believable places, linked routes, and a deeper destination.\n\n[b]Biome graph[/b]\n%s\n\n[b]Lighting status[/b]\nFlashlight uses shared render packets. Beam segments reuse the shared resolver/presentation path, feed gameplay light, and can energize prism stations placed for route-reading and redirection.\nBeam: %s | segments: %d | active: %s | event: %s" % [
+			biome_summary,
 			("[color=#8be9fd]READY[/color]" if _light_runtime != null and _light_runtime.beam_ready() else "[color=#ffb86c]%.2fs[/color]" % (_light_runtime.beam_cooldown_remaining() if _light_runtime != null else 0.0)),
 			(_light_runtime.beam_segment_count() if _light_runtime != null else 0),
 			("yes" if _light_runtime != null and _light_runtime.beam_active() else "no"),
@@ -198,8 +223,10 @@ func light_world() -> LightWorld:
 func reroll(new_seed: int) -> void:
 	world_seed = new_seed
 	_boot_world()
+
 	if _player_node != null:
 		_player_node.position = _player_pos
+
 	queue_redraw()
 	print("[ExplorationScene] Rerolled — seed: %d  spawn: %s" % [world_seed, str(_provider.spawn_hint())])
 
@@ -210,8 +237,10 @@ func _toggle_pause_menu() -> void:
 
 func _return_to_main_menu() -> void:
 	_pause_open = false
+
 	if _overlay_ui != null:
 		_overlay_ui.set_pause_overlay_visible(false)
+
 	var err := get_tree().change_scene_to_file(MAIN_MENU_SCENE_PATH)
 	if err != OK:
 		push_warning("[ExplorationScene] Failed to return to main menu scene: %s (%d)" % [MAIN_MENU_SCENE_PATH, err])
@@ -246,7 +275,7 @@ func entity_count() -> int:
 		return 0
 	return _light_world.light_entities.size()
 
-# --- Shared lighting runtime bootstrap (Milestone 3, decomposed) ---
+# --- Shared lighting runtime bootstrap ---
 
 func _setup_light_runtime() -> void:
 	_light_runtime = ExplorationLightRuntime.new()
@@ -271,24 +300,49 @@ func _sync_light_runtime_state() -> void:
 		return
 	_light_runtime.sync_player_runtime(_player_pos, _facing, _flashlight_on)
 
-# --- Rendering (Milestone 2) ---
+# --- Rendering ---
 
 func _draw() -> void:
 	if _light_world == null:
 		return
-	
-	# Background
+
 	var viewport_rect := get_viewport_rect()
 	draw_rect(viewport_rect, Color(0.01, 0.015, 0.03, 1.0), true)
 	draw_rect(ARENA_RECT.grow(28.0), Color(0.02, 0.04, 0.07, 0.88), true)
 	draw_rect(ARENA_RECT, Color("111827"), true)
-	
+
 	# Grid overlay
 	for x in range(int(ARENA_RECT.position.x) + 64, int(ARENA_RECT.end.x), 128):
-		draw_line(Vector2(x, ARENA_RECT.position.y + 14), Vector2(x, ARENA_RECT.end.y - 14), Color(0.3, 0.42, 0.58, 0.08), 1.0)
+		draw_line(
+			Vector2(x, ARENA_RECT.position.y + 14),
+			Vector2(x, ARENA_RECT.end.y - 14),
+			Color(0.3, 0.42, 0.58, 0.08),
+			1.0
+		)
 	for y in range(int(ARENA_RECT.position.y) + 64, int(ARENA_RECT.end.y), 128):
-		draw_line(Vector2(ARENA_RECT.position.x + 14, y), Vector2(ARENA_RECT.end.x - 14, y), Color(0.3, 0.42, 0.58, 0.08), 1.0)
-	
+		draw_line(
+			Vector2(ARENA_RECT.position.x + 14, y),
+			Vector2(ARENA_RECT.end.x - 14, y),
+			Color(0.3, 0.42, 0.58, 0.08),
+			1.0
+		)
+
+	# Biome zone tint pass (readability only; not gameplay logic)
+	var layout_nodes: Array = _light_world.metadata.get("layout_nodes", [])
+	for node: Dictionary in layout_nodes:
+		var rect: Rect2 = node.get("rect", Rect2())
+		if rect.size == Vector2.ZERO:
+			continue
+
+		var biome := String(node.get("biome", ""))
+		if biome == "":
+			biome = String(node.get("theme", "")) # backward compatibility if older metadata sneaks in
+
+		var tint: Color = BIOME_TINTS.get(biome, Color(1.0, 1.0, 1.0, 0.0))
+		if tint.a > 0.0:
+			draw_rect(rect, tint, true)
+			draw_rect(rect, tint.lightened(0.3), false, 2.0)
+
 	# Material patches
 	for patch: Dictionary in _light_world.material_patches:
 		var patch_rect: Rect2 = patch.get("rect", Rect2())
@@ -296,7 +350,20 @@ func _draw() -> void:
 		var color: Color = MATERIAL_COLORS.get(material_id, Color(0.5, 0.5, 0.5, 0.5))
 		draw_rect(patch_rect, color, true)
 		draw_rect(patch_rect, color.lightened(0.3), false, 2.0)
-	
+
+	# Corridor/link visualization
+	var layout_links: Array = _light_world.metadata.get("layout_links", [])
+	for link: Dictionary in layout_links:
+		var points: Array = link.get("corridor_points", [])
+		var route_kind := String(link.get("route_kind", "main"))
+		var link_color := Color(0.72, 0.86, 1.0, 0.18) if route_kind == "main" else Color(0.62, 0.72, 0.82, 0.12)
+
+		for i in range(points.size() - 1):
+			var a: Vector2 = points[i]
+			var b: Vector2 = points[i + 1]
+			draw_line(a, b, link_color, 10.0)
+			draw_line(a, b, link_color.lightened(0.2), 3.0)
+
 	# Occluder segments
 	for segment: Dictionary in _light_world.occluder_segments:
 		var a: Vector2 = segment.get("a", Vector2.ZERO)
@@ -305,32 +372,83 @@ func _draw() -> void:
 		var color: Color = MATERIAL_COLORS.get(material_id, Color(0.7, 0.7, 0.7, 0.9))
 		draw_line(a, b, color, 4.0)
 		draw_line(a, b, color.lightened(0.4), 2.0)
-	
+
 	# Light entities (tree trunks, prism stations)
 	for entity: Dictionary in _light_world.light_entities:
 		var kind := String(entity.get("kind", ""))
 		var pos: Vector2 = entity.get("pos", Vector2.ZERO)
 		var radius: float = float(entity.get("radius", 18.0))
-		
+
 		match kind:
 			"tree_trunk":
 				draw_circle(pos, radius, MATERIAL_COLORS.get("tree", Color(0.3, 0.25, 0.18, 0.9)))
 				draw_circle(pos, radius - 4.0, Color(0.28, 0.22, 0.16, 1.0))
 				draw_arc(pos, radius, 0.0, TAU, 24, Color(0.5, 0.4, 0.3, 0.6), 2.0)
-			
+
 			"prism_station":
 				var prism_color := Color(0.54, 0.93, 1.0, 0.85)
 				draw_circle(pos, radius + 8.0, Color(prism_color.r, prism_color.g, prism_color.b, 0.15))
 				draw_circle(pos, radius, prism_color)
 				draw_circle(pos, radius - 6.0, Color(1.0, 1.0, 1.0, 0.5))
 				draw_arc(pos, radius, 0.0, TAU, 20, Color(1.0, 1.0, 1.0, 0.7), 2.5)
-	
+
+	# Node centers and biome labels
+	for node: Dictionary in layout_nodes:
+		var center: Vector2 = node.get("center", Vector2.ZERO)
+		var rect: Rect2 = node.get("rect", Rect2())
+		var kind := String(node.get("kind", "zone"))
+		var biome := String(node.get("biome", ""))
+		if biome == "":
+			biome = String(node.get("theme", ""))
+
+		var node_color := Color(0.55, 0.95, 0.70, 0.9) if kind == "spawn" else Color(0.95, 0.72, 0.25, 0.85)
+		if kind == "progression":
+			node_color = Color(0.95, 0.50, 0.35, 0.92)
+
+		draw_circle(center, 8.0, node_color)
+		draw_circle(center, 12.0, Color(node_color.r, node_color.g, node_color.b, 0.20))
+
+		if rect.size != Vector2.ZERO:
+			var label_pos := rect.position + Vector2(10.0, 18.0)
+			draw_string(
+				ThemeDB.fallback_font,
+				label_pos,
+				("%s%s" % [biome.capitalize(), " (Exit)" if kind == "progression" else ""]),
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1,
+				14,
+				Color(0.92, 0.95, 1.0, 0.78)
+			)
+
 	# Arena border
 	draw_rect(ARENA_RECT, Color(0.46, 0.68, 0.95, 0.95), false, 6.0)
 	draw_rect(ARENA_RECT.grow(-8.0), Color(0.76, 0.9, 1.0, 0.18), false, 2.0)
-	
+
 	# Player
 	if _player_node != null:
 		draw_circle(_player_pos, PLAYER_RADIUS, Color(0.95, 0.72, 0.25, 0.9))
 		draw_circle(_player_pos, PLAYER_RADIUS - 4.0, Color(1.0, 0.85, 0.45, 1.0))
 		draw_arc(_player_pos, PLAYER_RADIUS, 0.0, TAU, 16, Color(1.0, 0.95, 0.7, 0.95), 2.0)
+
+# --- Helpers ---
+
+func _format_biome_summary() -> String:
+	if _light_world == null:
+		return "no world"
+
+	var summaries: Array = _light_world.metadata.get("zone_summaries", [])
+	if summaries.is_empty():
+		return "no biome summary"
+
+	var biome_names: Array[String] = []
+	for summary: Dictionary in summaries:
+		var biome := String(summary.get("biome", ""))
+		if biome == "":
+			biome = String(summary.get("theme", ""))
+		if biome != "":
+			biome_names.append(biome)
+
+	if biome_names.is_empty():
+		return "no biome summary"
+
+	return " → ".join(biome_names)
