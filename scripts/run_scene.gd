@@ -16,6 +16,7 @@ const LightFieldPresentation = preload("res://scripts/gameplay/light_field_prese
 const NativeLightPresentation = preload("res://scripts/gameplay/native_light_presentation.gd")
 const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd")
+const RUN_END_PANEL_SCENE := preload("res://scenes/ui/run_end_panel.tscn")
 
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
 const PLAYER_RADIUS := 14.0
@@ -204,30 +205,17 @@ func _build_hud() -> void:
 	status_label.add_theme_constant_override("margin_bottom", 8)
 	ui_layer.add_child(status_label)
 	RewardController.build_panel(self)
-	end_panel = PanelContainer.new()
-	end_panel.visible = false
-	end_panel.position = Vector2(360, 210)
-	end_panel.size = Vector2(560, 220)
-	end_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.05, 0.07, 0.11, 0.96), Color(0.95, 0.9, 0.55, 1.0), 3, 12))
-	var end_vb := VBoxContainer.new()
-	end_vb.add_theme_constant_override("separation", 10)
-	end_panel.add_child(end_vb)
-	end_title_label = Label.new()
-	end_title_label.text = "Run complete"
-	end_vb.add_child(end_title_label)
-	end_body_label = RichTextLabel.new()
-	end_body_label.fit_content = true
-	end_body_label.bbcode_enabled = true
-	end_body_label.scroll_active = false
-	end_body_label.custom_minimum_size = Vector2(0, 110)
-	end_vb.add_child(end_body_label)
-	var restart_button := Button.new()
-	restart_button.text = "Restart run [R]"
-	restart_button.custom_minimum_size = Vector2(0, 44)
-	restart_button.pressed.connect(_restart_run)
-	end_vb.add_child(restart_button)
-	ui_layer.add_child(end_panel)
+	_build_end_panel()
 	_update_ui()
+
+func _build_end_panel() -> void:
+	end_panel = RUN_END_PANEL_SCENE.instantiate() as PanelContainer
+	end_title_label = end_panel.get_node("%EndTitleLabel") as Label
+	end_body_label = end_panel.get_node("%EndBodyLabel") as RichTextLabel
+	var restart_button := end_panel.get_node("%RestartButton") as Button
+	if restart_button != null and not restart_button.pressed.is_connected(_restart_run):
+		restart_button.pressed.connect(_restart_run)
+	ui_layer.add_child(end_panel)
 
 func _input(event: InputEvent) -> void:
 	DebugActions.handle_key_input(self, event)
