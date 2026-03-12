@@ -10,11 +10,11 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `1c0f69c`
-- **Verification time:** 2026-03-12 15:14 Europe/Berlin
+- **Verified HEAD:** `5a03058`
+- **Verification time:** 2026-03-12 15:18 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `1c0f69c`.
+- Current branch is pushed through commit `5a03058`.
 - There are **no verified uncommitted RandomGEN code changes** at this moment.
 - Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
@@ -81,6 +81,12 @@
 - Pause state exposes resume plus return-to-main-menu on `Enter` or `M`.
 - This change stayed exploration-local and left Light Lab untouched.
 
+### Milestone 4.5 / Viewport-anchored pause UI
+**Commit:** `5a03058`
+- Exploration pause UI was moved out of world-space drawing into viewport-anchored overlay UI.
+- Pause presentation now behaves more correctly under resolution/fullscreen changes.
+- Exploration HUD sizing also became viewport-aware.
+
 ---
 
 ## What Is Working Now
@@ -102,6 +108,7 @@ In `feature/randomgen-exploration-world`, the exploration shell currently has:
 - exploration flashlight now goes through the shared flashlight packet builder path instead of a purely local approximation
 - gameplay-light field is now fed from flashlight packet segments / zones / fills using the Light Lab-style packet-to-field write approach
 - in-scene pause/menu return path on `Esc`, with resume or return to main menu
+- viewport-anchored exploration overlay UI that adapts more safely to resolution/fullscreen changes
 
 Light Lab remains untouched by these branch changes.
 
@@ -113,7 +120,8 @@ Light Lab remains untouched by these branch changes.
 Extend exploration beyond flashlight-only integration.
 
 ### Missing pieces
-- no secondary/prism/laser integration yet in exploration scene
+- no beam/laser integration yet in exploration scene
+- exploration now has minimal prism-station shared-light response, but not the fuller authored-world prism/runtime feature set
 - pause/menu path exists, but its presentation is still intentionally minimal
 - no enemies/runtime gameplay loop yet
 - no deeper generated-world variety beyond current scaffold path
