@@ -16,6 +16,7 @@ const LightFieldPresentation = preload("res://scripts/gameplay/light_field_prese
 const NativeLightPresentation = preload("res://scripts/gameplay/native_light_presentation.gd")
 const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd")
+const RUN_OVERLAY_SCENE := preload("res://scenes/ui/run_overlay.tscn")
 const RUN_END_PANEL_SCENE := preload("res://scenes/ui/run_end_panel.tscn")
 
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
@@ -147,8 +148,7 @@ func _setup_scene() -> void:
 	camera.enabled = true
 	camera.position = Vector2(640, 360)
 	add_child(camera)
-	ui_layer = CanvasLayer.new()
-	add_child(ui_layer)
+	_build_overlay_ui()
 	_build_hud()
 	SfxController.setup(self)
 	_refresh_runtime_light_world()
@@ -176,34 +176,13 @@ func _make_panel_style(bg: Color, border: Color, border_width: int = 2, radius: 
 	style.set_corner_radius_all(radius)
 	return style
 
+func _build_overlay_ui() -> void:
+	ui_layer = RUN_OVERLAY_SCENE.instantiate() as CanvasLayer
+	add_child(ui_layer)
+	hud_label = ui_layer.get_node("%HudLabel") as RichTextLabel
+	status_label = ui_layer.get_node("%StatusLabel") as RichTextLabel
+
 func _build_hud() -> void:
-	hud_label = RichTextLabel.new()
-	hud_label.fit_content = true
-	hud_label.bbcode_enabled = true
-	hud_label.scroll_active = false
-	hud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud_label.position = Vector2(20, 16)
-	hud_label.size = Vector2(460, 200)
-	hud_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.05, 0.07, 0.11, 0.84), Color(0.36, 0.5, 0.7, 0.95), 2, 10))
-	hud_label.add_theme_constant_override("margin_left", 14)
-	hud_label.add_theme_constant_override("margin_top", 10)
-	hud_label.add_theme_constant_override("margin_right", 14)
-	hud_label.add_theme_constant_override("margin_bottom", 10)
-	ui_layer.add_child(hud_label)
-	status_label = RichTextLabel.new()
-	status_label.fit_content = true
-	status_label.bbcode_enabled = true
-	status_label.scroll_active = false
-	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	status_label.position = Vector2(824, 18)
-	status_label.size = Vector2(432, 190)
-	status_label.visible = false
-	status_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.04, 0.05, 0.09, 0.76), Color(0.27, 0.35, 0.52, 0.9), 2, 10))
-	status_label.add_theme_constant_override("margin_left", 12)
-	status_label.add_theme_constant_override("margin_top", 8)
-	status_label.add_theme_constant_override("margin_right", 12)
-	status_label.add_theme_constant_override("margin_bottom", 8)
-	ui_layer.add_child(status_label)
 	RewardController.build_panel(self)
 	_build_end_panel()
 	_update_ui()
