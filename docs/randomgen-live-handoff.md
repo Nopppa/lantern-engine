@@ -10,11 +10,11 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `dfaf4dd`
-- **Verification time:** 2026-03-12 15:35 Europe/Berlin
+- **Verified HEAD:** `f5a4e31`
+- **Verification time:** 2026-03-12 15:41 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `dfaf4dd`.
+- Current branch is pushed through commit `f5a4e31`.
 - There are **no verified uncommitted RandomGEN code changes** at this moment.
 - Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
@@ -99,6 +99,13 @@
 - `exploration_scene.gd` now acts more clearly as runtime coordinator/composition root.
 - Extracted responsibilities include LightField/DeadAliveGrid/runtime packet state, packet-to-field writing, flashlight/prism light runtime helpers, gameplay-light sampling, and native presentation update delegation.
 
+### Decomposition pass 2 / overlay UI extraction
+**Commit:** `f5a4e31`
+- Created `scripts/exploration/exploration_overlay_ui.gd`.
+- Moved HUD/status/pause overlay creation, layout, and update logic out of `scripts/exploration_scene.gd`.
+- `exploration_scene.gd` now delegates overlay attach/layout/update/show calls to the helper.
+- Viewport-aware overlay behavior remains intact and is now more cleanly isolated for future resolution/fullscreen work.
+
 ---
 
 ## What Is Working Now
@@ -121,7 +128,9 @@ In `feature/randomgen-exploration-world`, the exploration shell currently has:
 - gameplay-light field is now fed from flashlight packet segments / zones / fills using the Light Lab-style packet-to-field write approach
 - in-scene pause/menu return path on `Esc`, with resume or return to main menu
 - viewport-anchored exploration overlay UI that adapts more safely to resolution/fullscreen changes
-- first decomposition pass complete: exploration light runtime now lives in `scripts/exploration/exploration_light_runtime.gd`
+- first two decomposition passes complete:
+  - light runtime in `scripts/exploration/exploration_light_runtime.gd`
+  - overlay/HUD/pause UI in `scripts/exploration/exploration_overlay_ui.gd`
 
 Light Lab remains untouched by these branch changes.
 
@@ -135,29 +144,26 @@ Continue incremental decomposition or add the next real gameplay/runtime capabil
 ### Missing pieces
 - no beam/laser integration yet in exploration scene
 - exploration now has minimal prism-station shared-light response, but not the fuller authored-world prism/runtime feature set
-- pause/menu path exists, but its presentation is still intentionally minimal
 - no enemies/runtime gameplay loop yet
 - no deeper generated-world variety beyond current scaffold path
 - no chunk streaming/save-load implementation yet despite the world-vision doc
+- movement/spawn logic still lives in `scripts/exploration_scene.gd`
+- debug/world draw logic still lives in `scripts/exploration_scene.gd`
 - no explicit validation build/report has been attached to this milestone yet
 
 ---
 
 ## Next Recommended Step
 
-**Best next architectural step:**
-Continue the low-risk decomposition plan.
-
-### Recommended next extraction
-- `scripts/exploration/exploration_overlay_ui.gd`
+### Best next decomposition step
+- `scripts/exploration/exploration_player_controller.gd`
 
 Why:
-- pause/HUD/layout logic is already a clearly separate responsibility
-- it also aligns directly with the new requirement that the real game must adapt to different resolutions and fullscreen
-- it keeps `exploration_scene.gd` narrowing toward orchestration only
+- movement, facing, spawn validation, and collision-resolved motion are now the next clear scene-local cluster
+- this continues the low-risk extraction plan without touching shared truth systems
 
-### Alternative functional step
-If feature progress is preferred over structure in the next pass, add one more shared-light parity increment (beam/laser or fuller prism handling) while keeping the new runtime helper boundary intact.
+### Alternative feature step
+If feature progress is preferred over structure next, add the next shared-light parity increment (beam/laser or fuller prism behavior) while preserving the new helper boundaries.
 
 ### Constraints
 - Do **not** fork lighting/material logic.
@@ -185,5 +191,6 @@ Read these first:
 - `docs/randomgen-live-handoff.md`
 - `scripts/exploration_scene.gd`
 - `scripts/exploration/exploration_light_runtime.gd`
+- `scripts/exploration/exploration_overlay_ui.gd`
 
 Do not trust prior timeout summaries unless they match the verified branch state.
