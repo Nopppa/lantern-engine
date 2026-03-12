@@ -152,6 +152,7 @@ static func _build_source_trace(lab, options: Dictionary) -> Dictionary:
 			remaining -= travel
 			if remaining <= 10.0:
 				break
+			var material_id: String = String(hit.get("material_id", "brick"))
 			if material_id == "tree" or material_id == "brick" or material_id == "stone" or material_id == "metal":
 				if source_type != "flashlight" and source_type != "prism":
 					zones.append({

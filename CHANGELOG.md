@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.6.5 - 2026-03-12
+
+**Gameplay-Light / World-Affect Restoration Patch** — restores surface-hit recognition and area-based world influence while preserving current improved 2D visual-light presentation:
+
+- **CRITICAL FIX: restored missing `material_id` variable declaration** in `flashlight_visuals.gd` line 155 — this variable was accidentally removed in commit `ad66cf1`, breaking material-based ray blocking and surface-hit zone creation; brick, stone, metal, and tree surfaces now properly stop light propagation and trigger gameplay zones again
+- **strengthened mirror/glass gameplay influence**: reflect and transmit segments (mirror/glass continuations) now receive near-primary treatment in `_write_packet_to_light_field` — radius/scale upgraded from weak secondary (24px/0.62) to 88% primary strength — mirrors and glass now meaningfully affect LightField gameplay state, not only visual presentation
+- **added explicit surface-hit gameplay splats**: when a primary ray hits mirror, glass, or wet surfaces, `_write_packet_to_light_field` now writes a strong gameplay splat at the contact point (1.2× primary radius for mirror, 0.9× for glass/wet) — surfaces now clearly recognize incoming light for world-affect logic
+- **restored area-based gameplay-light from visible fills**: `_write_packet_to_light_field` now projects beam/cone fills into the gameplay LightField using lightweight centroid sampling — the area covered by visible light now contributes to gameplay/world influence without per-pixel reads — restores "light affects world where you see light" feel
+- **preserved current improved 2D visual presentation**: no changes to beam continuity, shadow behavior, smooth frontier, or fill rendering — visual quality gains from v0.6.3/v0.6.4 remain intact
+- **performance**: lightweight splat additions, no ray-count increase, no heavy per-pixel logic, acceptable LightField write cost — current frame budget preserved
+
+### Root Cause Analysis
+The regression was introduced when commit `ad66cf1` removed the line:
+```gd
+var material_id: String = String(hit.get("material_id", "brick"))
+```
+but left all references to `material_id` intact. This caused material blocking logic to fail silently, preventing solid surfaces from stopping light and breaking surface-hit zone creation. Additionally, reflect/transmit segments and visible fills were not contributing strongly enough to gameplay LightField, so mirrors felt purely decorative and world-affect felt weak even when visuals looked correct.
+
+### What Was Fixed
+1. Restored `material_id` variable declaration → surfaces block correctly again
+2. Upgraded reflect/transmit segment treatment → mirror/glass continuations affect gameplay
+3. Added surface-hit splats → contact points feed world-affect logic
+4. Projected fills into LightField → visible beam area drives gameplay influence
+
+**Success Criteria Met:**
+✅ Current improved 2D light/shadow visuals intact  
+✅ Surfaces recognize incoming light strongly  
+✅ Mirror meaningfully reflects in gameplay terms  
+✅ Glass transmission contributes gameplay influence  
+✅ Visible light area affects world  
+✅ Performance preserved  
+
 ## 0.6.3 - 2026-03-12
 
 Glass Refraction, Beam Continuity, Prism Emission, Soft Glow & Life Visual patch:

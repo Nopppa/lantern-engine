@@ -600,8 +600,10 @@ func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, sec
 		return
 	for segment: Dictionary in _packet_segments(packet):
 		var kind := String(segment.get("kind", "primary"))
-		var radius: float = primary_radius if kind == "primary" else secondary_radius
-		var scale: float = primary_scale if kind == "primary" else secondary_scale
+		# Reflect/transmit continuations are real light — treat them near-primary for gameplay
+		var is_continuation := (kind == "reflect" or kind == "transmit")
+		var radius: float = primary_radius if (kind == "primary" or is_continuation) else secondary_radius
+		var scale: float = (primary_scale * 0.88) if is_continuation else (primary_scale if kind == "primary" else secondary_scale)
 		var a: Vector2 = segment["a"]
 		var b: Vector2 = segment["b"]
 		var length: float = a.distance_to(b)
@@ -622,6 +624,16 @@ func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, sec
 					eff_radius = max(dist_to_b, 4.0)
 					
 			gameplay_light_field.add_splat_world(pos, eff_radius, energy)
+		
+		# For segments hitting a mirror surface (primary ray ending at mirror), write a
+		# strong gameplay splat at the contact point so the mirror feels reactive.
+		if kind == "primary" and mat_id == "mirror":
+			var hit_energy := clampf(float(segment.get("intensity", 0.0)) * primary_scale, 0.0, 1.0)
+			gameplay_light_field.add_splat_world(b, primary_radius * 1.2, hit_energy * 0.9)
+		elif kind == "primary" and (mat_id == "glass" or mat_id == "wet"):
+			var hit_energy := clampf(float(segment.get("intensity", 0.0)) * primary_scale, 0.0, 1.0)
+			gameplay_light_field.add_splat_world(b, primary_radius * 0.9, hit_energy * 0.65)
+
 	for zone: Dictionary in _packet_zones(packet):
 		if _zone_is_opaque_surface(zone) and not _zone_front_facing(zone):
 			continue
@@ -633,6 +645,21 @@ func _write_packet_to_light_field(packet: Dictionary, primary_radius: float, sec
 			if String(zone.get("kind", "")) == "block":
 				zone_radius *= 0.72
 		gameplay_light_field.add_splat_world(zone_pos, zone_radius, float(zone.get("strength", 0.0)))
+	
+	# Project visible beam fills into the gameplay LightField so the area covered by
+	# visible light contributes to world-affect logic — lightweight centroid approach,
+	# no per-pixel reads.
+	for fill: Dictionary in _packet_fills(packet):
+		var pts: PackedVector2Array = fill.get("points", PackedVector2Array())
+		if pts.size() < 3:
+			continue
+		var centroid := Vector2.ZERO
+		for p: Vector2 in pts:
+			centroid += p
+		centroid /= float(pts.size())
+		var fill_strength: float = clampf(float(fill.get("strength", 0.0)) * 0.38, 0.0, 1.0)
+		if fill_strength > 0.01:
+			gameplay_light_field.add_splat_world(centroid, primary_radius * 1.15, fill_strength)
 
 func _write_laser_packet_to_light_field(packet: Dictionary) -> void:
 	if gameplay_light_field == null:
