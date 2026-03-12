@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://hollow_enemy_visual_v1"]
+
+[node name="HollowEnemyVisual" type="Polygon2D"]
+polygon = PackedVector2Array(-12, -12, 12, -12, 12, 12, -12, 12)
+color = Color(0.741176, 0.576471, 0.976471, 1)
