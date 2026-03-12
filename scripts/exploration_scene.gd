@@ -41,6 +41,9 @@ var _player_node: Node2D = null
 var _camera: Camera2D = null
 var _hud_layer: CanvasLayer = null
 var _hud_label: Label = null
+var _pause_panel: PanelContainer = null
+var _pause_title_label: Label = null
+var _pause_body_label: Label = null
 var _player_pos: Vector2 = Vector2.ZERO
 var _facing: Vector2 = Vector2.RIGHT
 var _flashlight_on := true
@@ -67,6 +70,7 @@ func _ready() -> void:
 	_boot_world()
 	_setup_scene()
 	_boot_shared_light_runtime()
+	_layout_overlay_ui()
 	queue_redraw()
 	print("[ExplorationScene] %s booted — world_type: %s  seed: %d  spawn: %s" % [
 		SCENE_LABEL,
@@ -83,6 +87,7 @@ func _process(delta: float) -> void:
 			_gameplay_light_field.process_field(delta)
 		DeadAliveGrid.update(_dead_alive_cells, delta, Callable(self, "_sample_gameplay_light"))
 		_update_native_light_presentation()
+	_layout_overlay_ui()
 	_update_hud()
 	queue_redraw()
 
@@ -143,7 +148,7 @@ func _setup_scene() -> void:
 	_camera.limit_right = int(ARENA_RECT.end.x)
 	_camera.limit_bottom = int(ARENA_RECT.end.y)
 	
-	# HUD
+	# HUD / overlay UI in screen space for resolution + fullscreen safety.
 	if _hud_layer == null:
 		_hud_layer = CanvasLayer.new()
 		add_child(_hud_layer)
@@ -153,6 +158,24 @@ func _setup_scene() -> void:
 		_hud_label.position = Vector2(20, 20)
 		_hud_label.add_theme_font_size_override("font_size", 14)
 		_hud_layer.add_child(_hud_label)
+	
+	if _pause_panel == null:
+		_pause_panel = PanelContainer.new()
+		_pause_panel.visible = false
+		_pause_panel.custom_minimum_size = Vector2(420, 136)
+		_hud_layer.add_child(_pause_panel)
+		var panel_vbox := VBoxContainer.new()
+		panel_vbox.add_theme_constant_override("separation", 10)
+		_pause_panel.add_child(panel_vbox)
+		_pause_title_label = Label.new()
+		_pause_title_label.text = "Exploration Paused"
+		_pause_title_label.add_theme_font_size_override("font_size", 24)
+		panel_vbox.add_child(_pause_title_label)
+		_pause_body_label = Label.new()
+		_pause_body_label.text = "ESC: resume\nEnter or M: return to main menu"
+		_pause_body_label.add_theme_font_size_override("font_size", 18)
+		panel_vbox.add_child(_pause_body_label)
+	_set_pause_overlay_visible(_pause_open)
 
 # --- Player movement (Milestone 2) ---
 
@@ -219,9 +242,11 @@ func reroll(new_seed: int) -> void:
 
 func _toggle_pause_menu() -> void:
 	_pause_open = not _pause_open
+	_set_pause_overlay_visible(_pause_open)
 
 func _return_to_main_menu() -> void:
 	_pause_open = false
+	_set_pause_overlay_visible(false)
 	var err := get_tree().change_scene_to_file(MAIN_MENU_SCENE_PATH)
 	if err != OK:
 		push_warning("[ExplorationScene] Failed to return to main menu scene: %s (%d)" % [MAIN_MENU_SCENE_PATH, err])
@@ -401,6 +426,21 @@ func _sample_gameplay_light(pos: Vector2) -> float:
 		return 0.0
 	return clampf(_gameplay_light_field.sample_world(pos), 0.0, 1.0)
 
+func _layout_overlay_ui() -> void:
+	if _hud_label != null:
+		var viewport_size := get_viewport_rect().size
+		_hud_label.position = Vector2(20, 20)
+		_hud_label.size = Vector2(minf(520.0, maxf(viewport_size.x - 40.0, 220.0)), 220)
+	if _pause_panel != null:
+		var panel_size := _pause_panel.custom_minimum_size
+		var viewport_rect := get_viewport_rect()
+		_pause_panel.position = viewport_rect.size * 0.5 - panel_size * 0.5
+		_pause_panel.size = panel_size
+
+func _set_pause_overlay_visible(visible: bool) -> void:
+	if _pause_panel != null:
+		_pause_panel.visible = visible
+
 func _light_world_patches() -> Array:
 	return _light_world.material_patches if _light_world != null else []
 
@@ -483,16 +523,6 @@ func _draw() -> void:
 	# Arena border
 	draw_rect(ARENA_RECT, Color(0.46, 0.68, 0.95, 0.95), false, 6.0)
 	draw_rect(ARENA_RECT.grow(-8.0), Color(0.76, 0.9, 1.0, 0.18), false, 2.0)
-	
-	if _pause_open:
-		var panel_size := Vector2(420, 136)
-		var panel_rect := Rect2(ARENA_RECT.get_center() - panel_size * 0.5, panel_size)
-		draw_rect(ARENA_RECT, Color(0.0, 0.0, 0.0, 0.42), true)
-		draw_rect(panel_rect, Color(0.05, 0.08, 0.13, 0.94), true)
-		draw_rect(panel_rect, Color(0.72, 0.86, 1.0, 0.95), false, 3.0)
-		draw_string(ThemeDB.fallback_font, panel_rect.position + Vector2(26, 40), "Exploration Paused", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 24, Color(0.95, 0.98, 1.0, 1.0))
-		draw_string(ThemeDB.fallback_font, panel_rect.position + Vector2(26, 78), "ESC: resume", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color(0.84, 0.91, 1.0, 0.95))
-		draw_string(ThemeDB.fallback_font, panel_rect.position + Vector2(26, 108), "Enter or M: return to main menu", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color(0.84, 0.91, 1.0, 0.95))
 	
 	# Player
 	if _player_node != null:

@@ -10,11 +10,11 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `0ea286f`
-- **Verification time:** 2026-03-12 14:58 Europe/Berlin
+- **Verified HEAD:** `1c0f69c`
+- **Verification time:** 2026-03-12 15:14 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `0ea286f`.
+- Current branch is pushed through commit `1c0f69c`.
 - There are **no verified uncommitted RandomGEN code changes** at this moment.
 - Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
@@ -70,9 +70,16 @@
 **Commit:** `0ea286f`
 - Exploration scene now reuses `FlashlightVisuals.build_render_packet(...)` instead of the earlier ad-hoc local flashlight approximation.
 - Shared frontier smoothing state (`_approx_flashlight_frontier`) is now tracked in exploration scene.
-- Exploration gameplay-light writing now uses packet segments, zones, and fills with the same general packet-to-field approach used in Light Lab.
+- Exploration gameplay-light writing now uses packet segments, zones, and fills with the same general packet-to-field write approach used in Light Lab.
 - Mirror/glass/transmit/reflect continuations from the shared packet path now feed exploration gameplay light more truthfully.
 - Added small helper passthroughs (`_light_world_patches`, `_light_world_occluders`, `_light_world_tree_entities`) needed by the shared flashlight packet path.
+
+### Milestone 4 / Exploration pause return path
+**Commit:** `1c0f69c`
+- Exploration scene now has a minimal in-scene pause state on `Esc`.
+- Exploration runtime updates freeze while paused.
+- Pause state exposes resume plus return-to-main-menu on `Enter` or `M`.
+- This change stayed exploration-local and left Light Lab untouched.
 
 ---
 
@@ -94,6 +101,7 @@ In `feature/randomgen-exploration-world`, the exploration shell currently has:
 - flashlight toggle (`F`) and aim direction from mouse for exploration runtime
 - exploration flashlight now goes through the shared flashlight packet builder path instead of a purely local approximation
 - gameplay-light field is now fed from flashlight packet segments / zones / fills using the Light Lab-style packet-to-field write approach
+- in-scene pause/menu return path on `Esc`, with resume or return to main menu
 
 Light Lab remains untouched by these branch changes.
 
@@ -106,7 +114,7 @@ Extend exploration beyond flashlight-only integration.
 
 ### Missing pieces
 - no secondary/prism/laser integration yet in exploration scene
-- no in-scene return-to-menu / pause overlay yet
+- pause/menu path exists, but its presentation is still intentionally minimal
 - no enemies/runtime gameplay loop yet
 - no deeper generated-world variety beyond current scaffold path
 - no explicit validation build/report has been attached to this milestone yet
