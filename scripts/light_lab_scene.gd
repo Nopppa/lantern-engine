@@ -933,10 +933,30 @@ func _draw_lit_zone(zone: Dictionary) -> void:
 	draw_circle(pos, radius, color)
 	draw_circle(pos, radius * 0.62, Color(color.r, color.g, color.b, color.a * 0.42))
 
+func _patch_light_strength(rect: Rect2) -> float:
+	var samples := [
+		rect.get_center(),
+		rect.position + Vector2(rect.size.x * 0.22, rect.size.y * 0.22),
+		rect.position + Vector2(rect.size.x * 0.78, rect.size.y * 0.22),
+		rect.position + Vector2(rect.size.x * 0.22, rect.size.y * 0.78),
+		rect.position + Vector2(rect.size.x * 0.78, rect.size.y * 0.78)
+	]
+	var total := 0.0
+	for sample: Vector2 in samples:
+		total += _light_intensity_at(sample)
+	return clampf(total / float(samples.size()), 0.0, 1.0)
+
+func _surface_light_strength(a: Vector2, b: Vector2) -> float:
+	var samples := [a.lerp(b, 0.18), a.lerp(b, 0.5), a.lerp(b, 0.82)]
+	var total := 0.0
+	for sample: Vector2 in samples:
+		total += _light_intensity_at(sample)
+	return clampf(total / float(samples.size()), 0.0, 1.0)
+
 func _draw() -> void:
-	draw_rect(get_viewport_rect(), Color(0.05, 0.055, 0.075, 1.0), true)
-	draw_rect(ARENA_RECT.grow(28.0), Color(0.09, 0.10, 0.13, 0.94), true)
-	draw_rect(ARENA_RECT, Color(0.15, 0.16, 0.19, 1.0), true)
+	draw_rect(get_viewport_rect(), Color(0.09, 0.10, 0.13, 1.0), true)
+	draw_rect(ARENA_RECT.grow(28.0), Color(0.16, 0.17, 0.22, 0.96), true)
+	draw_rect(ARENA_RECT, Color(0.24, 0.25, 0.30, 1.0), true)
 	for cell: Dictionary in dead_alive_cells:
 		var rect: Rect2 = cell["rect"]
 		var blend: float = float(cell["display"])
@@ -954,14 +974,20 @@ func _draw() -> void:
 			draw_circle(center, r * 0.38, Color(alive_color.r * 1.15, alive_color.g * 1.15, alive_color.b * 1.10, blend * 0.25))
 	for patch: Dictionary in _light_world_patches():
 		var mat := LightMaterials.get_definition(patch["material_id"])
-		var patch_color := Color(mat["color"].r, mat["color"].g, mat["color"].b, 0.82)
+		var patch_rect: Rect2 = patch["rect"]
+		var patch_color := Color(mat["color"].r, mat["color"].g, mat["color"].b, 0.90)
 		var title := String(patch.get("title", patch.get("label", "")))
 		if title.contains("Shallow"):
 			patch_color = patch_color.lightened(0.12)
 		elif title.contains("Deep"):
 			patch_color = patch_color.darkened(0.08)
-		draw_rect(patch["rect"], patch_color, true)
-		draw_rect(patch["rect"], Color(1, 1, 1, 0.08), false, 2.0)
+		var light_strength := _patch_light_strength(patch_rect)
+		var lit_fill := patch_color.lightened(0.18 + light_strength * 0.52)
+		draw_rect(patch_rect, patch_color, true)
+		if light_strength > 0.02:
+			draw_rect(patch_rect, Color(lit_fill.r, lit_fill.g, lit_fill.b, 0.22 + light_strength * 0.34), true)
+			draw_rect(patch_rect, Color(1.0, 0.96, 0.86, 0.05 + light_strength * 0.12), true)
+		draw_rect(patch_rect, Color(1, 1, 1, 0.10 + light_strength * 0.08), false, 2.0)
 	for zone: Dictionary in lit_zones:
 		_draw_lit_zone(zone)
 	for flash: Dictionary in hit_flashes:
@@ -971,8 +997,16 @@ func _draw() -> void:
 		draw_circle(flash["pos"], flash_radius, Color(flash_color.r, flash_color.g, flash_color.b, 0.10 * flash_t))
 	for surface: Dictionary in _light_world_occluders():
 		var mat := LightMaterials.get_definition(surface["material_id"])
-		draw_line(surface["a"], surface["b"], mat["color"], 10.0)
-		draw_line(surface["a"], surface["b"], Color(1, 1, 1, 0.12), 2.0)
+		var a: Vector2 = surface["a"]
+		var b: Vector2 = surface["b"]
+		var surface_strength := _surface_light_strength(a, b)
+		var base_color: Color = Color(mat["color"].r, mat["color"].g, mat["color"].b, 1.0)
+		var lit_color := base_color.lightened(0.20 + surface_strength * 0.60)
+		draw_line(a, b, base_color.darkened(0.06), 10.0)
+		if surface_strength > 0.02:
+			draw_line(a, b, Color(lit_color.r, lit_color.g, lit_color.b, 0.28 + surface_strength * 0.40), 14.0)
+		draw_line(a, b, lit_color, 10.0)
+		draw_line(a, b, Color(1, 1, 1, 0.12 + surface_strength * 0.16), 2.0)
 	for trunk: Dictionary in _light_world_tree_entities():
 		var pos: Vector2 = trunk["pos"]
 		var radius: float = float(trunk["radius"])
