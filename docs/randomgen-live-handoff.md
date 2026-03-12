@@ -10,29 +10,18 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `07d52f7`
-- **Verification time:** 2026-03-12 14:17 Europe/Berlin
+- **Verified HEAD:** `26e811e`
+- **Verification time:** 2026-03-12 14:50 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `07d52f7`.
-- At the time of this update there are **no verified uncommitted RandomGEN code changes** on the branch.
+- Current branch is pushed through commit `26e811e`.
+- There are **no verified uncommitted RandomGEN code changes** at this moment.
 - Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
   - `builds/windows/lantern-engine.exe`
   - `builds/windows/lantern-engine.pck`
   - `scripts/main_menu.gd.uid`
   - `scripts/random_gen_placeholder.gd.uid`
-
-### Timeout verification note
-- The latest GPT-5.4 timeout did **not** leave any verified code diff in:
-  - `scripts/exploration_scene.gd`
-  - `scripts/gameplay/light_field.gd`
-  - `scripts/gameplay/dead_alive_grid.gd`
-  - `scripts/gameplay/native_light_presentation.gd`
-  - `scripts/gameplay/light_types.gd`
-  - `scripts/gameplay/light_surface_resolver.gd`
-  - `scripts/gameplay/light_query.gd`
-- Conclusion: the last run appears to have stayed in code-reading / pathfinding mode and did not persist code changes before timing out.
 
 ---
 
@@ -63,6 +52,20 @@
 - Added this living handoff document.
 - Established the verified-state-before-continue workflow for timeout recovery.
 
+### Timeout verification update
+**Commit:** `4415cc9`
+- Updated this document after verifying a timeout left no code diff.
+- Tightened instructions to keep future agents focused and fast.
+
+### Milestone 3 / Minimal shared light runtime boot
+**Commit:** `26e811e`
+- Exploration scene now boots shared `LightField`.
+- Exploration scene now boots `DeadAliveGrid` from generated-world metadata.
+- Exploration scene now instantiates and updates `NativeLightPresentation`.
+- Minimal exploration flashlight runtime state was added (`_flashlight_on`, `_facing`, minimal flashlight packet source spec).
+- Gameplay light field now rebuilds every frame from a small exploration flashlight approximation.
+- HUD now reports flashlight state and sampled gameplay-light intensity.
+
 ---
 
 ## What Is Working Now
@@ -77,6 +80,11 @@ In `feature/randomgen-exploration-world`, the exploration shell currently has:
 - reroll controls
 - blocker collision via shared collision helper
 - safer spawn handling
+- shared `LightField` boot
+- `DeadAliveGrid` boot/update
+- native light presentation boot/update
+- minimal gameplay-light sampling in exploration scene
+- flashlight toggle (`F`) and aim direction from mouse for exploration runtime
 
 Light Lab remains untouched by these branch changes.
 
@@ -84,46 +92,35 @@ Light Lab remains untouched by these branch changes.
 
 ## What Is Still Missing
 
-The next milestone should focus on **shared lighting/gameplay-light pipeline integration**.
+### Next likely milestone
+Move from minimal shared-light boot toward a more truthful reuse of the Light Lab light path.
 
 ### Missing pieces
-- exploration scene does **not yet** fully boot shared:
-  - `LightField`
-  - packet generation
-  - `DeadAliveGrid`
-  - shared flashlight/secondary-light flow
-  - native light presentation flow
+- exploration flashlight packet is still a **minimal local approximation**, not yet using the full Light Lab flashlight render/solver path
+- no secondary/prism/laser integration yet in exploration scene
 - no in-scene return-to-menu / pause overlay yet
 - no enemies/runtime gameplay loop yet
 - no deeper generated-world variety beyond current scaffold path
+- no explicit validation build/report has been attached to this milestone yet
 
 ---
 
 ## Next Recommended Step
 
 **Highest-value next increment:**
-Connect the shared lighting/gameplay-light pipeline into `scripts/exploration_scene.gd` in a small, mergeable way.
+Replace or upgrade the minimal exploration flashlight packet path with a more direct reuse of existing shared flashlight/render packet logic, while still keeping the diff small.
 
 ### Explicit target
-Reuse existing project systems rather than inventing new ones:
-- `LightField`
-- `DeadAliveGrid`
-- flashlight visuals / secondary-light resolver where practical
-- native light presentation flow
-- shared packet/light-write path
+Prefer reusing existing project systems rather than inventing new ones:
+- `FlashlightVisuals` or the smallest shared flashlight packet builder path
+- existing packet-to-field write approach where practical
+- continue to keep Light Lab intact
 
 ### Constraints
 - Do **not** fork lighting/material logic.
 - Keep Light Lab intact.
 - Keep the change small and architecture-aligned.
 - Prefer one focused commit.
-
-### Execution note for next agent
-The last timeout suggests the agent spent too much of its budget reading broadly. The next run should:
-1. read only the handoff + the smallest lighting entrypoint files,
-2. patch `scripts/exploration_scene.gd` first,
-3. avoid repo-wide re-analysis,
-4. get to code quickly.
 
 ---
 
