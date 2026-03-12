@@ -4,6 +4,7 @@ class_name EncounterController
 const EncounterDefs = preload("res://scripts/data/encounter_defs.gd")
 const BossController = preload("res://scripts/gameplay/boss_controller.gd")
 const RunSummary = preload("res://scripts/gameplay/run_summary.gd")
+const MOTH_ENEMY_VISUAL_SCENE := preload("res://scenes/enemies/moth/moth_enemy_visual.tscn")
 
 static func check_complete(run: RunScene) -> void:
 	if not run.encounter_active:
@@ -59,13 +60,14 @@ static func spawn_enemy(run: RunScene, type: String, pos: Vector2) -> void:
 	node.name = "Enemy_%s_%d" % [type, randi() % 9999]
 	node.position = pos
 	run.world_layer.add_child(node)
-	var sprite := Polygon2D.new()
+	var sprite: Node = null
 	if type == "moth":
-		sprite.polygon = PackedVector2Array([Vector2(-14, 0), Vector2(0, -10), Vector2(14, 0), Vector2(0, 10)])
-		sprite.color = Color("ffb86c")
+		sprite = MOTH_ENEMY_VISUAL_SCENE.instantiate()
 		run.enemies.append({"node": node, "type": type, "hp": 24.0, "speed": 116.0, "radius": 16.0, "contact_damage": 14.0, "alive": true, "flash": 0.0, "death_timer": 0.0, "attack_timer": 0.0, "special_lock_timer": 0.0, "light_burn_timer": 0.0, "light_burn_tick_timer": 0.0, "light_burn_pulse": 0.0})
 	else:
-		sprite.polygon = PackedVector2Array([Vector2(-12, -12), Vector2(12, -12), Vector2(12, 12), Vector2(-12, 12)])
-		sprite.color = Color("bd93f9")
+		var hollow_sprite := Polygon2D.new()
+		hollow_sprite.polygon = PackedVector2Array([Vector2(-12, -12), Vector2(12, -12), Vector2(12, 12), Vector2(-12, 12)])
+		hollow_sprite.color = Color("bd93f9")
+		sprite = hollow_sprite
 		run.enemies.append({"node": node, "type": type, "hp": 34.0, "speed": 92.0, "radius": 16.0, "contact_damage": 19.0, "alive": true, "flash": 0.0, "death_timer": 0.0, "attack_timer": 1.3, "special_lock_timer": 0.0, "light_burn_timer": 0.0, "light_burn_tick_timer": 0.0, "light_burn_pulse": 0.0, "revealed_by_light": false, "shimmer_timer": 0.0, "blink_windup": 0.0, "blink_winding_up": false, "blink_transiting": false, "blink_transit_timer": 0.0, "blink_transit_duration": 0.0, "blink_transit_start": Vector2.ZERO, "blink_transit_end": Vector2.ZERO})
 	node.add_child(sprite)

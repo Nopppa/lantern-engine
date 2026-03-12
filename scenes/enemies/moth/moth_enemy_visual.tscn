@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://moth_enemy_visual_v1"]
+
+[node name="MothEnemyVisual" type="Polygon2D"]
+polygon = PackedVector2Array(-14, 0, 0, -10, 14, 0, 0, 10)
+color = Color(1, 0.721569, 0.423529, 1)
