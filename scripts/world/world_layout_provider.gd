@@ -9,6 +9,8 @@
 class_name WorldLayoutProvider
 extends RefCounted
 
+const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd")
+
 
 # ---------------------------------------------------------------------
 # LAYOUT GENERATION
