@@ -1,8 +1,11 @@
-[gd_scene load_steps=4 format=3 uid="uid://exploration_scene_v1"]
+[gd_scene load_steps=7 format=3 uid="uid://exploration_scene_v1"]
 
 [ext_resource type="Script" path="res://scripts/exploration_scene.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/world/exploration/terrain/meadow_ground.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/world/exploration/terrain/road_section.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/world/exploration/vegetation/tree_broadleaf.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/world/exploration/structures/house_small.tscn" id="6"]
 
 [node name="ExplorationScene" type="Node2D"]
 script = ExtResource("1")
@@ -14,9 +17,26 @@ world_seed = 2001
 
 [node name="MeadowGround" parent="World/TerrainLayer" instance=ExtResource("3")]
 
+[node name="MainRoad" parent="World/TerrainLayer" instance=ExtResource("4")]
+position = Vector2(0, 80)
+road_length = 1800.0
+road_width = 72.0
+
 [node name="VegetationLayer" type="Node2D" parent="World"]
 
+[node name="Tree_A" parent="World/VegetationLayer" instance=ExtResource("5")]
+position = Vector2(-180, -220)
+
+[node name="Tree_B" parent="World/VegetationLayer" instance=ExtResource("5")]
+position = Vector2(260, -340)
+
+[node name="Tree_C" parent="World/VegetationLayer" instance=ExtResource("5")]
+position = Vector2(-420, 150)
+
 [node name="StructureLayer" type="Node2D" parent="World"]
+
+[node name="Farmhouse" parent="World/StructureLayer" instance=ExtResource("6")]
+position = Vector2(320, -180)
 
 [node name="ProceduralEntities" type="Node2D" parent="World"]
 

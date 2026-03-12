@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3 uid="uid://house_small_v1"]
+
+[ext_resource type="Script" path="res://scripts/world/exploration/house_small.gd" id="1"]
+
+[node name="HouseSmall" type="Node2D"]
+script = ExtResource("1")
+half_width = 52.0
+half_height = 38.0
+wall_thickness = 8.0
+
+[node name="Walls" type="Polygon2D" parent="."]
+color = Color(0.76, 0.71, 0.62, 1.0)
+polygon = PackedVector2Array(-52, -38, 52, -38, 52, 38, -52, 38)
+
+[node name="Interior" type="Polygon2D" parent="."]
+color = Color(0.18, 0.15, 0.12, 1.0)
+polygon = PackedVector2Array(-44, -30, 44, -30, 44, 30, -44, 30)

@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://tree_broadleaf_v1"]
+
+[ext_resource type="Script" path="res://scripts/world/exploration/tree_broadleaf.gd" id="1"]
+
+[node name="TreeBroadleaf" type="Node2D"]
+script = ExtResource("1")
+trunk_radius = 14.0
+canopy_radius = 40.0
+
+[node name="Canopy" type="Polygon2D" parent="."]
+color = Color(0.18, 0.35, 0.12, 0.92)
+polygon = PackedVector2Array(40, 0, 30.9, 19.1, 12.4, 38.0, -12.4, 38.0, -30.9, 19.1, -40, 0, -30.9, -19.1, -12.4, -38.0, 12.4, -38.0, 30.9, -19.1)
+
+[node name="Trunk" type="Polygon2D" parent="."]
+color = Color(0.32, 0.22, 0.12, 1.0)
+polygon = PackedVector2Array(-7.7, -14, 7.7, -14, 7.7, 14, -7.7, 14)

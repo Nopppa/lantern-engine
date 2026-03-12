@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://road_section_v1"]
+
+[ext_resource type="Script" path="res://scripts/world/exploration/road_section.gd" id="1"]
+
+[node name="RoadSection" type="Node2D"]
+script = ExtResource("1")
+road_length = 256.0
+road_width = 64.0
+surface = "dirt"
+
+[node name="RoadPolygon" type="Polygon2D" parent="."]
+color = Color(0.42, 0.34, 0.22, 1.0)
+polygon = PackedVector2Array(-128, -32, 128, -32, 128, 32, -128, 32)
