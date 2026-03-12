@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://prism_station_v1"]
+
+[node name="PrismStation" type="Node2D"]
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+
+[node name="Label" type="Label" parent="."]
+text = "Prism"
+horizontal_alignment = 1
+vertical_alignment = 1

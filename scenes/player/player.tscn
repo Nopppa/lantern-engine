@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://player_entity_v1"]
+
+[node name="Player" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+enabled = true

@@ -16,6 +16,7 @@ extends Node2D
 class_name ExplorationScene
 
 const GeneratedExplorationProvider = preload("res://scripts/world/generated_exploration_provider.gd")
+const PlayerScene = preload("res://scenes/player/player.tscn")
 const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const NativeLightPresentation = preload("res://scripts/gameplay/native_light_presentation.gd")
 const ExplorationLightRuntime = preload("res://scripts/exploration/exploration_light_runtime.gd")
@@ -142,7 +143,7 @@ func _on_world_ready() -> void:
 
 func _setup_scene() -> void:
 	if _player_node == null:
-		_player_node = Node2D.new()
+		_player_node = PlayerScene.instantiate()
 		_player_node.name = "Player"
 		add_child(_player_node)
 
@@ -152,8 +153,11 @@ func _setup_scene() -> void:
 		_native_light_presentation = NativeLightPresentation.new()
 		add_child(_native_light_presentation)
 
-	# Camera attached to player so it follows movement.
+	# Camera is part of the player scene; retrieve the existing node.
 	if _camera == null:
+		_camera = _player_node.get_node_or_null("Camera2D") as Camera2D
+	if _camera == null:
+		# Fallback: create manually (legacy path, should not be hit with player.tscn).
 		_camera = Camera2D.new()
 		_camera.enabled = true
 		_player_node.add_child(_camera)
