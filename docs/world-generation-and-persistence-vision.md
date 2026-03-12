@@ -1,5 +1,7 @@
 # Lantern Engine – World Generation and Persistence Vision
 
+> **Partially obsolete for worldgen architecture unless aligned with `TRUTH.md`.** This document may still be useful for persistence direction, but `TRUTH.md` is now the authoritative source for world-generation architecture. Any conflicting assumptions about exploration-world structure or generation layering are obsolete.
+
 ## Purpose
 
 This document defines how the game world should be generated, stored, and restored.

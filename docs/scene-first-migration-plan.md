@@ -3,6 +3,7 @@
 **Date:** 2026-03-12  
 **Status:** Authoritative architecture reference – supersedes prior scene-first notes  
 **Applies to:** All feature work from this date forward  
+**Worldgen truth source:** `TRUTH.md` is the controlling source for world generation architecture. Any worldgen guidance here must be interpreted through `TRUTH.md`, and conflicting older material is obsolete.  
 
 ---
 

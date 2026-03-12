@@ -1,5 +1,7 @@
 # Exploration World Generation – Biome Architecture Guidelines
 
+> **Partially obsolete unless aligned with `TRUTH.md`.** This document may still contain useful biome-direction ideas, but `TRUTH.md` now defines the non-negotiable worldgen architecture. Any conflicting assumptions about layering, ownership, or build/runtime structure are obsolete.
+
 ## Purpose
 
 This document defines the **new architectural direction for exploration world generation**.  

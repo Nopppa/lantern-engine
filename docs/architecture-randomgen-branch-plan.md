@@ -1,5 +1,7 @@
 # RandomGEN Exploration World – Branch Architecture Plan
 
+> **Partially obsolete for worldgen architecture unless aligned with `TRUTH.md`.** This document may still be useful as branch history and implementation context, but `TRUTH.md` is now the authoritative source for exploration/worldgen architecture. Any conflicting assumptions about generation ownership, layering, or world structure are obsolete.
+
 **Date:** 2026-03-12  
 **Status:** Architecture design / pre-implementation  
 **Target branch:** `feature/randomgen-exploration-world`
