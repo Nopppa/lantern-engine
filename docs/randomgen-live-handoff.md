@@ -10,11 +10,11 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `80a0b13`
-- **Verification time:** 2026-03-12 16:00 Europe/Berlin
+- **Verified HEAD:** `9f7881b`
+- **Verification time:** 2026-03-12 16:24 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `80a0b13`.
+- Current branch is pushed through commit `9f7881b`.
 - There are **no verified uncommitted RandomGEN code changes** at this moment.
 - Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
@@ -114,10 +114,24 @@
 ### Feature step / exploration beam runtime
 **Commit:** `80a0b13`
 - Added beam/laser runtime state to `scripts/exploration/exploration_light_runtime.gd`.
-- Exploration now reuses shared beam/laser solving and native beam presentation flow instead of keeping beam cosmetic or absent.
+- Exploration now reuses shared beam/laser solving and native beam presentation flow.
 - Beam packet energy is now written into the gameplay light field.
 - Prism energizing can now respond to beam energy as well as flashlight energy.
 - Added minimal exploration-side beam trigger/testing hook in `scripts/exploration_scene.gd` plus HUD/status reporting for beam readiness/activity.
+
+### Generator milestone / Layout v2
+**Commit:** `9f7881b`
+- `scripts/world/generated_exploration_provider.gd` now builds a deterministic graph-based procedural layout instead of reusing the old generated light-lab arena scatter.
+- Layout now includes:
+  - calm spawn node
+  - 3–7 themed zone nodes
+  - corridor/connector links
+  - one progression/exit-style node deeper in the map
+- Material-zone logic now deliberately creates mirror / glass / wet / wood flavored regions.
+- Prism stations, blockers, and route geometry are placed with more purpose according to zone theme.
+- Provider now emits richer metadata (`layout_nodes`, `layout_links`, `zone_summaries`, progression node ids, graph depth) while still compiling into the same `LightWorld`/shared material pipeline.
+- `docs/randomgen-layout-v2-notes.md` added to anchor the design intent.
+- `scripts/exploration_scene.gd` scene label/HUD copy updated to reflect layout-v2 exploration goals.
 
 ---
 
@@ -141,11 +155,18 @@ In `feature/randomgen-exploration-world`, the exploration shell currently has:
 - gameplay-light field is fed from flashlight packet segments / zones / fills using the Light Lab-style packet-to-field write approach
 - in-scene pause/menu return path on `Esc`, with resume or return to main menu
 - viewport-anchored exploration overlay UI that adapts more safely to resolution/fullscreen changes
-- beam/laser runtime exists in exploration:
+- beam/laser runtime in exploration:
   - beam can be triggered for testing from exploration input
   - beam uses shared solver/presentation path
   - beam writes energy into gameplay light field
   - beam can energize prism stations
+- graph-based layout v2 generation:
+  - calmer spawn region
+  - multiple distinct zones
+  - linked corridor structure
+  - deeper progression/exit node
+  - themed material regions
+  - purposeful prism/blocker placement
 - decomposition passes completed for:
   - light runtime
   - overlay/HUD/pause UI
@@ -158,27 +179,26 @@ Light Lab remains untouched by these branch changes.
 ## What Is Still Missing
 
 ### Next likely milestone
-Continue real feature progress, not more decomposition.
+Use the new v2 world layout to deepen gameplay meaning rather than only layout shape.
 
 ### Missing pieces
-- beam exists, but still needs actual in-game tuning/feel validation in exploration play
-- exploration has only minimal prism-station shared-light response, not the fuller authored-world prism/runtime feature set
+- layout v2 exists, but still needs practical play-feel tuning and validation inside exploration runtime
+- progression gate/exit is represented structurally, but not yet backed by a fuller gameplay rule or unlock loop
+- prism behavior in exploration still trails the fuller authored-world aspirations
 - no enemies/runtime gameplay loop yet
-- no deeper generated-world variety beyond current scaffold path
 - no chunk streaming/save-load implementation yet despite the world-vision doc
-- debug/world draw logic still lives in `scripts/exploration_scene.gd`
-- no explicit packaged validation build/report has been attached to this milestone beyond practical headless boot checks
+- no explicit packaged validation build/report has been attached to this milestone beyond headless boot checks
 
 ---
 
 ## Next Recommended Step
 
 ### Recommended feature direction
-Keep moving on real gameplay/runtime capability rather than more structural work.
+The next step should build gameplay meaning on top of layout v2, not add more structure for its own sake.
 
 Best candidates:
-1. fuller prism/runtime parity in exploration, or
-2. first tightly scoped world-structure step toward the persistence vision (seed/chunk-state direction), but only if kept small.
+1. make the progression/exit node mechanically meaningful (light gate, artifact, or unlock rule), or
+2. strengthen prism/light-puzzle behavior inside the new generated zones so the v2 map is more than just a better-shaped space.
 
 ### Constraints
 - Do **not** fork lighting/material logic.
@@ -192,7 +212,7 @@ Best candidates:
 
 If the previous agent timed out:
 1. Check branch + `git status` yourself.
-2. Check for actual diff in `scripts/exploration_scene.gd` and any related files.
+2. Check for actual diff in the expected files.
 3. Update this document with the verified state.
 4. Continue only from verified code state, not from speculative summaries.
 
@@ -203,10 +223,10 @@ If the previous agent timed out:
 Read these first:
 - `docs/architecture-randomgen-branch-plan.md`
 - `docs/world-generation-and-persistence-vision.md`
+- `docs/randomgen-layout-v2-notes.md`
 - `docs/randomgen-live-handoff.md`
+- `scripts/world/generated_exploration_provider.gd`
 - `scripts/exploration_scene.gd`
 - `scripts/exploration/exploration_light_runtime.gd`
-- `scripts/exploration/exploration_overlay_ui.gd`
-- `scripts/exploration/exploration_player_controller.gd`
 
 Do not trust prior timeout summaries unless they match the verified branch state.
