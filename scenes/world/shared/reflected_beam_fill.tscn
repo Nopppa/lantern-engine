@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://reflected_beam_fill_v1"]
+
+[node name="ReflectedBeamPoly" type="Polygon2D"]
+color = Color(1, 0.94902, 0.721569, 0.278431)
+z_as_relative = false
+z_index = 1
+visible = false

@@ -1,5 +1,7 @@
 extends Node2D
 class_name NativeLightPresentation
+
+const REFLECTED_BEAM_FILL_SCENE := preload("res://scenes/world/shared/reflected_beam_fill.tscn")
 ## Phase 4 — Native Godot native-light decoration + decorative occluder shadows.
 ##
 ## This node manages CanvasModulate, PointLight2D, and LightOccluder2D nodes
@@ -129,12 +131,7 @@ func _ready() -> void:
 		reflected_beam_pool.append(rb)
 
 	# Visual polygon fill for the reflected cone (drawn under the lights)
-	_reflected_beam_poly = Polygon2D.new()
-	_reflected_beam_poly.name = "ReflectedBeamPoly"
-	_reflected_beam_poly.color = Color(FLASH_COLOR.r, FLASH_COLOR.g, FLASH_COLOR.b, 0.28)
-	_reflected_beam_poly.z_as_relative = false
-	_reflected_beam_poly.z_index = 1
-	_reflected_beam_poly.visible = false
+	_reflected_beam_poly = REFLECTED_BEAM_FILL_SCENE.instantiate() as Polygon2D
 	add_child(_reflected_beam_poly)
 
 	for i in range(BEAM_GLOW_POOL_SIZE):
