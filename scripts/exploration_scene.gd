@@ -18,6 +18,7 @@ const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd
 const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const NativeLightPresentation = preload("res://scripts/gameplay/native_light_presentation.gd")
 const ExplorationLightRuntime = preload("res://scripts/exploration/exploration_light_runtime.gd")
+const ExplorationOverlayUi = preload("res://scripts/exploration/exploration_overlay_ui.gd")
 
 # Arena rect matching RunScene / Light Lab for pipeline compatibility.
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
@@ -37,16 +38,11 @@ var _provider: GeneratedExplorationProvider = null
 var _light_world: LightWorld = null
 var _player_node: Node2D = null
 var _camera: Camera2D = null
-var _hud_layer: CanvasLayer = null
-var _hud_label: RichTextLabel = null
-var _status_label: RichTextLabel = null
-var _pause_panel: PanelContainer = null
-var _pause_title_label: Label = null
-var _pause_body_label: Label = null
 var _player_pos: Vector2 = Vector2.ZERO
 var _facing: Vector2 = Vector2.RIGHT
 var _flashlight_on := true
 var _light_runtime: ExplorationLightRuntime = null
+var _overlay_ui: ExplorationOverlayUi = null
 var _native_light_presentation: NativeLightPresentation = null
 var _pause_open := false
 
@@ -66,7 +62,7 @@ func _ready() -> void:
 	_setup_light_runtime()
 	_boot_world()
 	_setup_scene()
-	_layout_overlay_ui()
+	_overlay_ui.layout()
 	queue_redraw()
 	print("[ExplorationScene] %s booted — world_type: %s  seed: %d  spawn: %s" % [
 		SCENE_LABEL,
@@ -81,8 +77,8 @@ func _process(delta: float) -> void:
 		_sync_light_runtime_state()
 		_light_runtime.process_frame(delta)
 		_light_runtime.update_native_presentation(_native_light_presentation)
-	_layout_overlay_ui()
-	_update_hud()
+	_overlay_ui.layout()
+	_update_overlay_ui()
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
@@ -143,47 +139,10 @@ func _setup_scene() -> void:
 	_camera.limit_right = int(ARENA_RECT.end.x)
 	_camera.limit_bottom = int(ARENA_RECT.end.y)
 	
-	# HUD / overlay UI in screen space for resolution + fullscreen safety.
-	if _hud_layer == null:
-		_hud_layer = CanvasLayer.new()
-		add_child(_hud_layer)
-	
-	if _hud_label == null:
-		_hud_label = RichTextLabel.new()
-		_hud_label.fit_content = true
-		_hud_label.bbcode_enabled = true
-		_hud_label.scroll_active = false
-		_hud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_hud_label.position = Vector2(20, 20)
-		_hud_label.size = Vector2(460, 220)
-		_hud_layer.add_child(_hud_label)
-	
-	if _status_label == null:
-		_status_label = RichTextLabel.new()
-		_status_label.fit_content = true
-		_status_label.bbcode_enabled = true
-		_status_label.scroll_active = false
-		_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_status_label.size = Vector2(420, 168)
-		_hud_layer.add_child(_status_label)
-	
-	if _pause_panel == null:
-		_pause_panel = PanelContainer.new()
-		_pause_panel.visible = false
-		_pause_panel.custom_minimum_size = Vector2(420, 136)
-		_hud_layer.add_child(_pause_panel)
-		var panel_vbox := VBoxContainer.new()
-		panel_vbox.add_theme_constant_override("separation", 10)
-		_pause_panel.add_child(panel_vbox)
-		_pause_title_label = Label.new()
-		_pause_title_label.text = "Exploration Paused"
-		_pause_title_label.add_theme_font_size_override("font_size", 24)
-		panel_vbox.add_child(_pause_title_label)
-		_pause_body_label = Label.new()
-		_pause_body_label.text = "ESC: resume\nEnter or M: return to main menu"
-		_pause_body_label.add_theme_font_size_override("font_size", 18)
-		panel_vbox.add_child(_pause_body_label)
-	_set_pause_overlay_visible(_pause_open)
+	if _overlay_ui == null:
+		_overlay_ui = ExplorationOverlayUi.new()
+		_overlay_ui.attach(self)
+	_overlay_ui.set_pause_overlay_visible(_pause_open)
 
 # --- Player movement (Milestone 2) ---
 
@@ -213,32 +172,27 @@ func _update_player(delta: float) -> void:
 		_player_pos = _clamp_player_to_arena(target_pos)
 		_player_node.position = _player_pos
 
-func _update_hud() -> void:
-	if _hud_label == null:
+func _update_overlay_ui() -> void:
+	if _overlay_ui == null:
 		return
-	var pause_line := "[color=#8be9fd]ESC[/color] pause"
-	if _pause_open:
-		pause_line = "[color=#ffb86c]PAUSED[/color] — [color=#8be9fd]ESC[/color] resume | [color=#8be9fd]Enter/M[/color] main menu"
 	var prism_entities := _light_world.prism_emitters() if _light_world != null else []
-	var energized_stations := _light_runtime.active_prism_emitter_count() if _light_runtime != null else 0
-	_hud_label.text = "[b]%s[/b]\n[color=#a4b1cd]Mode:[/color] RandomGEN exploration | [color=#a4b1cd]Seed:[/color] %d | [color=#a4b1cd]World:[/color] %s\n[color=#a4b1cd]Player:[/color] (%.0f, %.0f) | [color=#a4b1cd]Light:[/color] %.2f | [color=#a4b1cd]Flashlight:[/color] %s\n[color=#a4b1cd]World geo:[/color] %d segments | %d patches | %d entities\n[color=#a4b1cd]Prisms:[/color] %d stations | %d energized | [color=#a4b1cd]Light cells:[/color] %d\n%s" % [
-		SCENE_LABEL,
-		world_seed,
-		String(_light_world.metadata.get("world_type", "generated")) if _light_world != null else "generated",
-		_player_pos.x,
-		_player_pos.y,
-		_light_runtime.sample_gameplay_light(_player_pos) if _light_runtime != null else 0.0,
-		("[color=#f1fa8c]ON[/color]" if _flashlight_on else "[color=#6272a4]OFF[/color]"),
-		segment_count(),
-		patch_count(),
-		entity_count(),
-		prism_entities.size(),
-		energized_stations,
-		_light_runtime.dead_alive_cell_count() if _light_runtime != null else 0,
-		pause_line
-	]
-	if _status_label != null:
-		_status_label.text = "[b]Exploration controls[/b]\nWASD / Arrows move | Mouse aim | [color=#8be9fd]F[/color] flashlight\n[color=#8be9fd]R[/color] next seed | [color=#8be9fd]T[/color] random seed | [color=#8be9fd]ESC[/color] pause/menu\n\n[b]Current mode goal[/b]\nTraverse the generated map, read material responses, and test shared light behavior in a playable shell.\n\n[b]Lighting status[/b]\nFlashlight uses shared render packets. Prism stations now react when energized by exploration light coverage."
+	_overlay_ui.update_hud({
+		"scene_label": SCENE_LABEL,
+		"world_seed": world_seed,
+		"world_type": String(_light_world.metadata.get("world_type", "generated")) if _light_world != null else "generated",
+		"player_x": _player_pos.x,
+		"player_y": _player_pos.y,
+		"sample_light": _light_runtime.sample_gameplay_light(_player_pos) if _light_runtime != null else 0.0,
+		"flashlight_status": ("[color=#f1fa8c]ON[/color]" if _flashlight_on else "[color=#6272a4]OFF[/color]"),
+		"segment_count": segment_count(),
+		"patch_count": patch_count(),
+		"entity_count": entity_count(),
+		"prism_station_count": prism_entities.size(),
+		"energized_station_count": _light_runtime.active_prism_emitter_count() if _light_runtime != null else 0,
+		"light_cell_count": _light_runtime.dead_alive_cell_count() if _light_runtime != null else 0,
+		"pause_open": _pause_open,
+		"status_text": "[b]Exploration controls[/b]\nWASD / Arrows move | Mouse aim | [color=#8be9fd]F[/color] flashlight\n[color=#8be9fd]R[/color] next seed | [color=#8be9fd]T[/color] random seed | [color=#8be9fd]ESC[/color] pause/menu\n\n[b]Current mode goal[/b]\nTraverse the generated map, read material responses, and test shared light behavior in a playable shell.\n\n[b]Lighting status[/b]\nFlashlight uses shared render packets. Prism stations now react when energized by exploration light coverage."
+	})
 
 # --- Public API ---
 
@@ -257,11 +211,13 @@ func reroll(new_seed: int) -> void:
 
 func _toggle_pause_menu() -> void:
 	_pause_open = not _pause_open
-	_set_pause_overlay_visible(_pause_open)
+	if _overlay_ui != null:
+		_overlay_ui.set_pause_overlay_visible(_pause_open)
 
 func _return_to_main_menu() -> void:
 	_pause_open = false
-	_set_pause_overlay_visible(false)
+	if _overlay_ui != null:
+		_overlay_ui.set_pause_overlay_visible(false)
 	var err := get_tree().change_scene_to_file(MAIN_MENU_SCENE_PATH)
 	if err != OK:
 		push_warning("[ExplorationScene] Failed to return to main menu scene: %s (%d)" % [MAIN_MENU_SCENE_PATH, err])
