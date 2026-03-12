@@ -14,6 +14,7 @@ extends Node2D
 class_name ExplorationScene
 
 const GeneratedExplorationProvider = preload("res://scripts/world/generated_exploration_provider.gd")
+const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 
 # Arena rect matching RunScene / Light Lab for pipeline compatibility.
@@ -82,29 +83,38 @@ func _on_world_ready() -> void:
 		_player_pos = spawn
 	else:
 		_player_pos = ARENA_RECT.get_center()
+	_player_pos = _find_valid_spawn(_player_pos)
 
 # --- Scene setup (Milestone 2) ---
 
 func _setup_scene() -> void:
 	# Player node
-	_player_node = Node2D.new()
-	_player_node.name = "Player"
+	if _player_node == null:
+		_player_node = Node2D.new()
+		_player_node.name = "Player"
+		add_child(_player_node)
 	_player_node.position = _player_pos
-	add_child(_player_node)
 	
 	# Camera — attached to player so it follows movement
-	_camera = Camera2D.new()
-	_camera.enabled = true
-	_player_node.add_child(_camera)
+	if _camera == null:
+		_camera = Camera2D.new()
+		_camera.enabled = true
+		_player_node.add_child(_camera)
+	_camera.limit_left = int(ARENA_RECT.position.x)
+	_camera.limit_top = int(ARENA_RECT.position.y)
+	_camera.limit_right = int(ARENA_RECT.end.x)
+	_camera.limit_bottom = int(ARENA_RECT.end.y)
 	
 	# HUD
-	_hud_layer = CanvasLayer.new()
-	add_child(_hud_layer)
+	if _hud_layer == null:
+		_hud_layer = CanvasLayer.new()
+		add_child(_hud_layer)
 	
-	_hud_label = Label.new()
-	_hud_label.position = Vector2(20, 20)
-	_hud_label.add_theme_font_size_override("font_size", 14)
-	_hud_layer.add_child(_hud_label)
+	if _hud_label == null:
+		_hud_label = Label.new()
+		_hud_label.position = Vector2(20, 20)
+		_hud_label.add_theme_font_size_override("font_size", 14)
+		_hud_layer.add_child(_hud_label)
 
 # --- Player movement (Milestone 2) ---
 
@@ -121,9 +131,13 @@ func _update_player(delta: float) -> void:
 	
 	if input_dir.length() > 0.0:
 		input_dir = input_dir.normalized()
-		_player_pos += input_dir * PLAYER_SPEED * delta
-		_player_pos.x = clampf(_player_pos.x, ARENA_RECT.position.x + PLAYER_RADIUS, ARENA_RECT.end.x - PLAYER_RADIUS)
-		_player_pos.y = clampf(_player_pos.y, ARENA_RECT.position.y + PLAYER_RADIUS, ARENA_RECT.end.y - PLAYER_RADIUS)
+		var target_pos := LightLabCollision.resolve_circle_motion_in_space(
+			_player_pos,
+			PLAYER_RADIUS,
+			input_dir * PLAYER_SPEED * delta,
+			_collision_space()
+		)
+		_player_pos = _clamp_player_to_arena(target_pos)
 		_player_node.position = _player_pos
 
 func _update_hud() -> void:
@@ -149,6 +163,9 @@ func light_world() -> LightWorld:
 func reroll(new_seed: int) -> void:
 	world_seed = new_seed
 	_boot_world()
+	if _player_node != null:
+		_player_node.position = _player_pos
+	queue_redraw()
 	print("[ExplorationScene] Rerolled — seed: %d  spawn: %s" % [world_seed, str(_provider.spawn_hint())])
 
 ## World metadata passthrough.
@@ -180,6 +197,31 @@ func entity_count() -> int:
 	if _light_world == null:
 		return 0
 	return _light_world.light_entities.size()
+
+func _collision_space() -> Dictionary:
+	if _light_world == null:
+		return {"segments": [], "circles": []}
+	return _light_world.collision_space()
+
+func _clamp_player_to_arena(pos: Vector2) -> Vector2:
+	return Vector2(
+		clampf(pos.x, ARENA_RECT.position.x + PLAYER_RADIUS, ARENA_RECT.end.x - PLAYER_RADIUS),
+		clampf(pos.y, ARENA_RECT.position.y + PLAYER_RADIUS, ARENA_RECT.end.y - PLAYER_RADIUS)
+	)
+
+func _find_valid_spawn(target: Vector2) -> Vector2:
+	var candidate := _clamp_player_to_arena(target)
+	var collision_space := _collision_space()
+	if not LightLabCollision.is_circle_blocked_in_space(candidate, PLAYER_RADIUS, collision_space):
+		return candidate
+	for ring in range(1, 7):
+		for step in range(16):
+			var angle := TAU * float(step) / 16.0
+			var probe := candidate + Vector2.RIGHT.rotated(angle) * float(ring) * 20.0
+			probe = _clamp_player_to_arena(probe)
+			if not LightLabCollision.is_circle_blocked_in_space(probe, PLAYER_RADIUS, collision_space):
+				return probe
+	return _clamp_player_to_arena(ARENA_RECT.get_center())
 
 # --- Rendering (Milestone 2) ---
 
