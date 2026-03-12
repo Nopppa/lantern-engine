@@ -1,105 +1,421 @@
-# RandomGEN Layout V2 Notes
+# Exploration World Generation – Biome Architecture Guidelines
 
-This note captures the next intended direction for RandomGEN world generation.
+## Purpose
 
-## Core shift
+This document defines the **new architectural direction for exploration world generation**.  
+It replaces the previous **material-themed layout system** with a **biome-driven world model**.
 
-Move away from a simple random arena scatter toward a **graph-based procedural layout**.
+The goal is to move the exploration mode away from **technical test arenas** and toward **believable places** that still support the light engine and puzzle mechanics.
 
-## 1. Graph-based layout topology
+This document is authoritative for all agents working on:
 
-Instead of placing rooms fully randomly, v2 should use a **node-and-connection** model.
+- world generation
+- exploration runtime
+- layout providers
+- exploration scene rendering
+- gameplay environment design
 
-### Node types
+Lighting logic, physics, and Light Lab remain **unchanged**.
 
-- **Spawn node**
-  - always calm
-  - some light
-  - minimal/no blockers
-  - safe orientation zone
+---
 
-- **3–7 zone nodes**
-  - rooms or exploration regions
-  - varying size: small / medium / large
+# Core Design Principle
 
-- **Connector nodes**
-  - corridors, openings, doorways, transitions
-  - ensure reachability between zones
+Exploration worlds are no longer defined by **materials**.
 
-- **Depth / exit node**
-  - one node gets status like `Exit` / `Gate`
-  - should suggest deeper progression
-  - may require a light puzzle or setup to pass
+They are defined by **biomes**.
 
-## 2. Material and light-zone logic
+Materials are still used internally for the **light engine**, but they no longer define the identity of an area.
 
-The generator should deliberately paint regions with materials that matter to beam/light behavior.
+Old model:
 
-### Suggested zone archetypes
 
-- **Mirror zone**
-  - many reflective surfaces
-  - tests chained reflection behavior
+mirror zone
+glass zone
+wet zone
+wood zone
 
-- **Glass zone**
-  - transparent blockers
-  - light passes, player does not
 
-- **Wet stone / wood zone**
-  - more diffuse / absorptive surfaces
-  - dampens or weakly reflects beam
-  - useful for mood and soft gating
+New model:
 
-## 3. Procedural placement of interaction points
 
-Interaction points should not be random clutter. They should be placed according to the node/zone role.
+forest
+→ meadow
+→ street
+→ housing
+→ industrial
 
-### Placement rules
 
-- **Prisms**
-  - corners or room-center placements
-  - should split or redirect beam into side paths/corridors
+This shift is critical to make the world feel like **a place rather than a laboratory**.
 
-- **Blockers**
-  - intentionally placed on routes
-  - should create “open this by solving light routing” moments
+---
 
-## V2 generator workflow
+# World Generation Architecture
 
-### 1. Seed & Graph
-Generate nodes and links first.
+The generation pipeline remains the same.
 
-**Goal:** all rooms/areas remain reachable.
 
-### 2. Room Carving
-Turn the abstract graph into physical rooms/corridors/openings.
+GeneratedExplorationProvider
+↓
+LightWorldBuilder
+↓
+LightWorld
+↓
+ExplorationScene runtime
 
-**Goal:** convert topology into explorable geometry.
 
-### 3. Material Pass
-Assign materials to regions/zones.
+### Important rule
 
-**Goal:** visual and mechanical variation.
+The **ExplorationScene never constructs world data directly**.
 
-### 4. Puzzle Injection
-Place light-relevant interaction points: sources, prisms, blockers, gates.
+All world data must come from:
 
-**Goal:** create localized gameplay intent inside the generated layout.
 
-## Why this matters now
+GeneratedExplorationProvider
 
-This v2 step is important before larger persistence/streaming work because it teaches how the beam/light systems interact with generated space.
 
-If generation creates only mirrors, the beam may bounce too freely.
-If it creates only dull absorptive zones, the game becomes flat.
+---
 
-V2 should be the first pass that finds a useful balance between:
-- layout readability
-- beam/mechanics readability
-- generated exploration interest
-- future progression structure
+# Layout Model
 
-## Scope warning
+Exploration worlds use a **graph-based layout**.
 
-This note does **not** imply full chunk streaming, save/load, or infinite-world generation yet.
-It is a middle step: a stronger procedural layout model inside the current exploration runtime.
+
+spawn
+│
+├─ zone
+│
+├─ zone
+│
+├─ zone
+│
+└─ progression (exit)
+
+
+Each node represents a **biome zone**.
+
+Each link represents a **corridor route** between zones.
+
+---
+
+# Biome Types
+
+Current biome set:
+
+
+forest
+meadow
+street
+housing
+industrial
+
+
+These represent **environment identity**, not materials.
+
+Each biome controls:
+
+- geometry decoration
+- obstacle placement
+- vegetation / structures
+- material distribution
+- prism placement style
+
+Example mapping:
+
+| Biome | Materials Used |
+|------|------|
+| forest | wet, wood |
+| meadow | wood, wet |
+| street | brick, wet |
+| housing | brick, wood, glass |
+| industrial | brick, glass, mirror |
+
+Materials are **implementation details**, not gameplay identity.
+
+---
+
+# Biome Responsibilities
+
+Biome decorators are responsible for generating:
+
+
+patches
+segments
+tree_trunks
+prism_stations
+dead_alive_cells
+
+
+These must remain compatible with the **LightWorld pipeline**.
+
+Biome decorators must **never modify LightWorldBuilder behavior**.
+
+---
+
+# Light Engine Compatibility
+
+The lighting system continues to rely on:
+
+
+occluder_segments
+material_patches
+light_entities
+dead_alive_cells
+
+
+These must still follow the existing structure used by:
+
+
+LightWorldBuilder
+ExplorationLightRuntime
+NativeLightPresentation
+
+
+Exploration mode **must not alter lighting architecture**.
+
+---
+
+# GeneratedExplorationProvider Rules
+
+The provider is responsible for:
+
+1. generating the world graph
+2. assigning biome types
+3. placing zones
+4. decorating zones
+5. compiling the layout dictionary
+
+Required output keys:
+
+
+segments
+patches
+prism_stations
+tree_trunks
+dead_alive_cells
+layout_nodes
+layout_links
+zone_summaries
+spawn_hint
+generated_seed
+
+
+---
+
+# Layout Metadata
+
+Exploration worlds expose metadata for debugging and visualization.
+
+Example metadata:
+
+
+layout_nodes
+layout_links
+zone_summaries
+graph_depth
+spawn_node_id
+progression_node_id
+generated_seed
+
+
+Agents must preserve this metadata when modifying world generation.
+
+---
+
+# ExplorationScene Responsibilities
+
+The scene runtime must:
+
+- load world from provider
+- initialize runtime systems
+- render debug geometry
+- render biome zones
+- render material patches
+- render occluders
+- render entities
+- render player
+
+It **must not**:
+
+- generate world geometry
+- modify LightWorld data
+- introduce new lighting rules
+
+---
+
+# Rendering Guidelines
+
+Rendering exists for **debugging and readability**, not final art.
+
+ExplorationScene may render:
+
+### biome tint overlays
+
+Example:
+
+
+forest → green tint
+meadow → light green
+street → grey
+housing → brown
+industrial → steel blue
+
+
+These overlays are **visualization only**.
+
+They do not affect gameplay.
+
+---
+
+# Player and Runtime Systems
+
+The exploration runtime is composed of:
+
+
+ExplorationPlayerController
+ExplorationLightRuntime
+NativeLightPresentation
+ExplorationOverlayUi
+
+
+These systems must remain **loosely coupled**.
+
+The scene orchestrates them but does not implement their logic.
+
+---
+
+# World Seed Behavior
+
+Exploration worlds are deterministic.
+
+
+seed → identical world
+
+
+Changing the seed produces a new biome layout.
+
+
+R → next seed
+T → random seed
+
+
+The seed must always be stored in metadata.
+
+---
+
+# Spawn Philosophy
+
+The spawn location must always be:
+
+- calm
+- readable
+- safe
+- visually distinct
+
+Typical spawn biome:
+
+
+meadow
+
+
+Spawn areas may contain:
+
+
+soft occluders
+guide prism
+low obstacle density
+
+
+---
+
+# Exit / Progression Zone
+
+The final node in the graph is a **progression zone**.
+
+It should:
+
+- visually feel different
+- contain stronger gating geometry
+- guide the player toward the exit
+
+Example mechanics:
+
+
+glass gate
+mirror redirect
+prism alignment
+
+
+---
+
+# Agent Design Constraints
+
+Agents modifying exploration code must obey the following:
+
+### Do not modify
+
+
+LightWorldBuilder
+Light Lab
+lighting physics
+material semantics
+
+
+### Only modify
+
+
+GeneratedExplorationProvider
+biome decorators
+ExplorationScene visualization
+
+
+---
+
+# Future Expansion
+
+Possible biome additions:
+
+
+ruins
+suburbs
+canal
+harbor
+rail yard
+graveyard
+cathedral district
+
+
+These should be implemented as **biome decorators**, not new world systems.
+
+---
+
+# Summary
+
+The exploration world now follows this model:
+
+
+Biome World
+↓
+Graph Layout
+↓
+Zone Decoration
+↓
+Material Distribution
+↓
+LightWorld
+↓
+ExplorationScene
+
+
+This architecture keeps the **light engine stable** while allowing the world to feel **alive and believable**.
+
+Agents should prioritize:
+
+
+clarity
+determinism
+world readability
+biome identity
+
+
+over material experimentation.
