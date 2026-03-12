@@ -21,11 +21,12 @@
 class_name GeneratedExplorationProvider
 extends WorldLayoutProvider
 
-const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd")
+#poistetaan turhana
+#const LightWorldBuilder = preload("res://scripts/gameplay/light_world_builder.gd")
 
 const CONNECTOR_HALF_WIDTH := 46.0
-const MIN_ZONE_COUNT := 3
-const MAX_ZONE_COUNT := 7
+const MIN_ZONE_COUNT := 24
+const MAX_ZONE_COUNT := 48
 
 ## Biome types for exploration zones
 const BIOMES := [
@@ -126,10 +127,7 @@ func _build_graph_layout(rng: RandomNumberGenerator) -> Dictionary:
 
 	var spawn_size := Vector2(176, 148)
 	var spawn_rect := Rect2(
-		Vector2(
-			_arena_rect.position.x + 86.0,
-			_arena_rect.position.y + _arena_rect.size.y * 0.5 - spawn_size.y * 0.5
-		),
+		_arena_rect.get_center() - spawn_size * 0.5,
 		spawn_size
 	)
 
@@ -155,18 +153,26 @@ func _build_graph_layout(rng: RandomNumberGenerator) -> Dictionary:
 
 	var zone_count := rng.randi_range(MIN_ZONE_COUNT, MAX_ZONE_COUNT)
 	var progression_index := zone_count - 1
-	var lane_count := max(2, mini(3, zone_count))
+	var lane_count: int = int(max(2, mini(3, zone_count)))
 	var lane_y := [0.28, 0.54, 0.76]
 	var previous_zone_centers := {}
 	var last_zone_center := spawn_rect.get_center()
 
 	for i in range(zone_count):
-		var lane_index := i % lane_count
+		var lane_index: int = i % lane_count
 		var depth := i + 1
 		var biome := _biome_for_index(i)
 		var zone_size := _zone_size_for_biome(biome, rng)
 		var progress := float(i + 1) / float(zone_count + 1)
-		var zone_rect := _place_zone_rect(rng, zone_size, progress, lane_y[lane_index], used_rects)
+		var spawn_center: Vector2 = spawn_rect.get_center()
+		var zone_rect := _place_zone_rect_around_spawn(
+			rng,
+			zone_size,
+			spawn_center,
+			i,
+			zone_count,
+			used_rects
+		)
 
 		used_rects.append(zone_rect)
 
@@ -312,6 +318,58 @@ func _place_zone_rect(rng: RandomNumberGenerator, size: Vector2, progress: float
 		size
 	)
 
+func _place_zone_rect_around_spawn(
+	rng: RandomNumberGenerator,
+	size: Vector2,
+	spawn_center: Vector2,
+	index: int,
+	total_count: int,
+	used_rects: Array
+) -> Rect2:
+	var ring: int = 1 + int(index / 5)
+	var base_radius: float = 600.0 + float(ring) * 500.0
+
+	var angle_step: float = TAU / float(max(1, total_count))
+	var base_angle: float = angle_step * float(index)
+
+	var fallback_rect := Rect2(Vector2.INF, size)
+
+	for _attempt in range(80):
+		var angle: float = base_angle + rng.randf_range(-0.45, 0.45)
+		var radius: float = base_radius + rng.randf_range(-140.0, 140.0)
+
+		var center: Vector2 = spawn_center + Vector2.RIGHT.rotated(angle) * radius
+		center += Vector2(
+			rng.randf_range(-40.0, 40.0),
+			rng.randf_range(-40.0, 40.0)
+		)
+
+		if center.distance_to(spawn_center) < 350.0:
+			continue
+
+		var rect := Rect2(center - size * 0.5, size)
+
+		var overlaps := false
+		for existing: Rect2 in used_rects:
+			if rect.grow(40.0).intersects(existing):
+				overlaps = true
+				break
+
+		if overlaps:
+			continue
+
+		if not _arena_rect.encloses(rect):
+			continue
+
+		fallback_rect = rect
+		return rect
+
+	if fallback_rect.position != Vector2.INF:
+		return fallback_rect
+
+	var emergency_center: Vector2 = spawn_center + Vector2.RIGHT.rotated(base_angle) * (base_radius + 250.0)
+	return Rect2(emergency_center - size * 0.5, size)
+
 func _build_link(segments: Array, from_center: Vector2, to_center: Vector2, progression_link: bool, route_kind: String) -> Dictionary:
 	var horizontal_first := absf(to_center.x - from_center.x) >= absf(to_center.y - from_center.y)
 	var corridor_points := [from_center]
@@ -322,14 +380,6 @@ func _build_link(segments: Array, from_center: Vector2, to_center: Vector2, prog
 		corridor_points.append(Vector2(from_center.x, to_center.y))
 
 	corridor_points.append(to_center)
-
-	for i in range(corridor_points.size() - 1):
-		_add_corridor_segment(
-			segments,
-			corridor_points[i],
-			corridor_points[i + 1],
-			progression_link and i == corridor_points.size() - 2
-		)
 
 	return {
 		"from": from_center,

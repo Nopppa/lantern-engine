@@ -23,7 +23,7 @@ const ExplorationOverlayUi = preload("res://scripts/exploration/exploration_over
 const ExplorationPlayerController = preload("res://scripts/exploration/exploration_player_controller.gd")
 
 # World rect kept compatible with current pipeline bootstrap.
-const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
+const ARENA_RECT := Rect2(Vector2(-3000, -3000), Vector2(6000, 6000))
 const SCENE_LABEL := "Exploration World v0.4-biome-layout"
 const PLAYER_SPEED := 240.0
 const PLAYER_RADIUS := 14.0

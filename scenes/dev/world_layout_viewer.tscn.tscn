@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://vw5oqtsumcl2"]
+
+[ext_resource type="Script" uid="uid://bvlfckkimygfl" path="res://scripts/dev/world_layout_viewer.gd" id="1_52buq"]
+
+[node name="WorldLayoutViewer_tscn" type="Node2D" unique_id=1835511089]
+script = ExtResource("1_52buq")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1157076651]
