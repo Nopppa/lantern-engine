@@ -22,7 +22,7 @@ const ExplorationPlayerController = preload("res://scripts/exploration/explorati
 
 # Arena rect matching RunScene / Light Lab for pipeline compatibility.
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
-const SCENE_LABEL := "Exploration World v0.2-milestone2"
+const SCENE_LABEL := "Exploration World v0.3-layoutv2"
 const PLAYER_SPEED := 240.0
 const PLAYER_RADIUS := 14.0
 const LIGHT_CELL_SIZE := 32.0
@@ -180,7 +180,7 @@ func _update_overlay_ui() -> void:
 		"energized_station_count": _light_runtime.active_prism_emitter_count() if _light_runtime != null else 0,
 		"light_cell_count": _light_runtime.dead_alive_cell_count() if _light_runtime != null else 0,
 		"pause_open": _pause_open,
-		"status_text": "[b]Exploration controls[/b]\nWASD / Arrows move | Mouse aim | [color=#8be9fd]F[/color] flashlight | [color=#8be9fd]LMB[/color] beam\n[color=#8be9fd]R[/color] next seed | [color=#8be9fd]T[/color] random seed | [color=#8be9fd]ESC[/color] pause/menu\n\n[b]Current mode goal[/b]\nTraverse the generated map, read material responses, and test shared light behavior in a playable shell.\n\n[b]Lighting status[/b]\nFlashlight uses shared render packets. Beam segments now reuse the shared resolver/presentation path, feed gameplay light, and can energize prism stations.\nBeam: %s | segments: %d | active: %s | event: %s" % [
+		"status_text": "[b]Exploration controls[/b]\nWASD / Arrows move | Mouse aim | [color=#8be9fd]F[/color] flashlight | [color=#8be9fd]LMB[/color] beam\n[color=#8be9fd]R[/color] next seed | [color=#8be9fd]T[/color] random seed | [color=#8be9fd]ESC[/color] pause/menu\n\n[b]Current mode goal[/b]\nTraverse a graph-generated world with calm spawn space, themed zones, linked corridors, and a deeper gate-style destination.\n\n[b]Lighting status[/b]\nFlashlight uses shared render packets. Beam segments now reuse the shared resolver/presentation path, feed gameplay light, and can energize prism stations placed for route-reading and redirection.\nBeam: %s | segments: %d | active: %s | event: %s" % [
 			("[color=#8be9fd]READY[/color]" if _light_runtime != null and _light_runtime.beam_ready() else "[color=#ffb86c]%.2fs[/color]" % (_light_runtime.beam_cooldown_remaining() if _light_runtime != null else 0.0)),
 			(_light_runtime.beam_segment_count() if _light_runtime != null else 0),
 			("yes" if _light_runtime != null and _light_runtime.beam_active() else "no"),
