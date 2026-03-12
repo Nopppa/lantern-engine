@@ -1,0 +1,39 @@
+[gd_scene format=3 uid="uid://signpost_landmark_v1"]
+
+[node name="Signpost" type="Node2D"]
+
+[node name="Post" type="Polygon2D" parent="."]
+color = Color(0.34, 0.24, 0.14, 1.0)
+polygon = PackedVector2Array(-5, -26, 5, -26, 5, 34, -5, 34)
+
+[node name="Crossbeam" type="Polygon2D" parent="."]
+color = Color(0.28, 0.18, 0.10, 1.0)
+polygon = PackedVector2Array(-24, -26, 24, -26, 24, -18, -24, -18)
+
+[node name="ArrowLeft" type="Polygon2D" parent="."]
+color = Color(0.67, 0.53, 0.31, 1.0)
+polygon = PackedVector2Array(-40, -17, -11, -17, -11, -11, -40, -11, -52, -14)
+
+[node name="ArrowRight" type="Polygon2D" parent="."]
+color = Color(0.74, 0.60, 0.36, 1.0)
+polygon = PackedVector2Array(11, -33, 42, -33, 54, -30, 42, -27, 11, -27)
+
+[node name="PlankLeft" type="Polygon2D" parent="."]
+color = Color(0.76, 0.65, 0.42, 1.0)
+polygon = PackedVector2Array(-34, -4, -8, -4, -8, 4, -34, 4)
+
+[node name="PlankRight" type="Polygon2D" parent="."]
+color = Color(0.70, 0.57, 0.34, 1.0)
+polygon = PackedVector2Array(8, 4, 36, 4, 36, 12, 8, 12)
+
+[node name="PegLeft" type="Polygon2D" parent="."]
+color = Color(0.22, 0.14, 0.08, 1.0)
+polygon = PackedVector2Array(-19, -15, -15, -15, -15, -11, -19, -11)
+
+[node name="PegRight" type="Polygon2D" parent="."]
+color = Color(0.22, 0.14, 0.08, 1.0)
+polygon = PackedVector2Array(23, -31, 27, -31, 27, -27, 23, -27)
+
+[node name="GrassBase" type="Polygon2D" parent="."]
+color = Color(0.24, 0.44, 0.18, 0.9)
+polygon = PackedVector2Array(-24, 33, -18, 20, -12, 31, -6, 18, 0, 32, 7, 19, 14, 31, 22, 21, 28, 33, 18, 38, -20, 38)
