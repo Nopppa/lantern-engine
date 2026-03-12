@@ -10,16 +10,13 @@
 
 - **Repo:** `/opt/openclaw/projects/lantern-engine`
 - **Branch:** `feature/randomgen-exploration-world`
-- **Verified HEAD:** `5a6b8cf` (pending current local extraction pass)
-- **Verification time:** 2026-03-12 15:48 Europe/Berlin
+- **Verified HEAD:** `80a0b13`
+- **Verification time:** 2026-03-12 16:00 Europe/Berlin
 
 ### Remote/commit status
-- Current branch is pushed through commit `5a6b8cf` before the current local extraction pass.
-- Verified local RandomGEN worktree changes for this pass are limited to:
-  - `scripts/exploration_scene.gd`
-  - `scripts/exploration/exploration_player_controller.gd`
-  - this handoff document
-- Current untracked files in worktree unrelated to RandomGEN code:
+- Current branch is pushed through commit `80a0b13`.
+- There are **no verified uncommitted RandomGEN code changes** at this moment.
+- Current untracked files in worktree are unrelated build/editor leftovers:
   - `builds/releases/`
   - `builds/windows/lantern-engine.exe`
   - `builds/windows/lantern-engine.pck`
@@ -100,7 +97,6 @@
 - Created `scripts/exploration/exploration_light_runtime.gd`.
 - Moved exploration-specific light runtime responsibilities out of `scripts/exploration_scene.gd` into the new helper.
 - `exploration_scene.gd` now acts more clearly as runtime coordinator/composition root.
-- Extracted responsibilities include LightField/DeadAliveGrid/runtime packet state, packet-to-field writing, flashlight/prism light runtime helpers, gameplay-light sampling, and native presentation update delegation.
 
 ### Decomposition pass 2 / overlay UI extraction
 **Commit:** `f5a4e31`
@@ -110,10 +106,18 @@
 - Viewport-aware overlay behavior remains intact and is now more cleanly isolated for future resolution/fullscreen work.
 
 ### Decomposition pass 3 / player controller extraction
-**Pending local commit in current pass**
+**Commit:** `a045e50`
 - Created `scripts/exploration/exploration_player_controller.gd`.
 - Moved movement input, facing update from mouse, collision-resolved motion, arena clamping, and spawn validation out of `scripts/exploration_scene.gd`.
 - `exploration_scene.gd` now delegates spawn resolution and per-frame player stepping to the controller helper.
+
+### Feature step / exploration beam runtime
+**Commit:** `80a0b13`
+- Added beam/laser runtime state to `scripts/exploration/exploration_light_runtime.gd`.
+- Exploration now reuses shared beam/laser solving and native beam presentation flow instead of keeping beam cosmetic or absent.
+- Beam packet energy is now written into the gameplay light field.
+- Prism energizing can now respond to beam energy as well as flashlight energy.
+- Added minimal exploration-side beam trigger/testing hook in `scripts/exploration_scene.gd` plus HUD/status reporting for beam readiness/activity.
 
 ---
 
@@ -133,11 +137,16 @@ In `feature/randomgen-exploration-world`, the exploration shell currently has:
 - `DeadAliveGrid` boot/update
 - native light presentation boot/update
 - flashlight toggle (`F`) and aim direction from mouse for exploration runtime
-- exploration flashlight now goes through the shared flashlight packet builder path instead of a purely local approximation
-- gameplay-light field is now fed from flashlight packet segments / zones / fills using the Light Lab-style packet-to-field write approach
+- exploration flashlight goes through the shared flashlight packet builder path
+- gameplay-light field is fed from flashlight packet segments / zones / fills using the Light Lab-style packet-to-field write approach
 - in-scene pause/menu return path on `Esc`, with resume or return to main menu
 - viewport-anchored exploration overlay UI that adapts more safely to resolution/fullscreen changes
-- decomposition passes completed or in progress for:
+- beam/laser runtime exists in exploration:
+  - beam can be triggered for testing from exploration input
+  - beam uses shared solver/presentation path
+  - beam writes energy into gameplay light field
+  - beam can energize prism stations
+- decomposition passes completed for:
   - light runtime
   - overlay/HUD/pause UI
   - player controller / movement / spawn handling
@@ -148,28 +157,28 @@ Light Lab remains untouched by these branch changes.
 
 ## What Is Still Missing
 
-### Next likely milestone after this pass
-Leave decomposition alone for now and return to feature progress.
+### Next likely milestone
+Continue real feature progress, not more decomposition.
 
 ### Missing pieces
-- no beam/laser integration yet in exploration scene
-- exploration now has minimal prism-station shared-light response, but not the fuller authored-world prism/runtime feature set
+- beam exists, but still needs actual in-game tuning/feel validation in exploration play
+- exploration has only minimal prism-station shared-light response, not the fuller authored-world prism/runtime feature set
 - no enemies/runtime gameplay loop yet
 - no deeper generated-world variety beyond current scaffold path
 - no chunk streaming/save-load implementation yet despite the world-vision doc
 - debug/world draw logic still lives in `scripts/exploration_scene.gd`
-- no explicit validation build/report has been attached to this milestone beyond practical headless boot checks
+- no explicit packaged validation build/report has been attached to this milestone beyond practical headless boot checks
 
 ---
 
 ## Next Recommended Step
 
-**Do not do another decomposition pass immediately after this one.**
+### Recommended feature direction
+Keep moving on real gameplay/runtime capability rather than more structural work.
 
-### Recommended next direction
-Return to real feature progress, preferably one of:
-1. add the next shared-light parity increment (beam/laser or fuller prism behavior), or
-2. begin the first real world-structure step aligned with the persistence vision (seed/chunk/save direction), but only if scoped tightly.
+Best candidates:
+1. fuller prism/runtime parity in exploration, or
+2. first tightly scoped world-structure step toward the persistence vision (seed/chunk-state direction), but only if kept small.
 
 ### Constraints
 - Do **not** fork lighting/material logic.
