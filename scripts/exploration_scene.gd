@@ -14,11 +14,11 @@ extends Node2D
 class_name ExplorationScene
 
 const GeneratedExplorationProvider = preload("res://scripts/world/generated_exploration_provider.gd")
-const LightLabCollision = preload("res://scripts/gameplay/light_lab_collision.gd")
 const LightTypes = preload("res://scripts/gameplay/light_types.gd")
 const NativeLightPresentation = preload("res://scripts/gameplay/native_light_presentation.gd")
 const ExplorationLightRuntime = preload("res://scripts/exploration/exploration_light_runtime.gd")
 const ExplorationOverlayUi = preload("res://scripts/exploration/exploration_overlay_ui.gd")
+const ExplorationPlayerController = preload("res://scripts/exploration/exploration_player_controller.gd")
 
 # Arena rect matching RunScene / Light Lab for pipeline compatibility.
 const ARENA_RECT := Rect2(Vector2(64, 64), Vector2(1152, 592))
@@ -44,6 +44,7 @@ var _flashlight_on := true
 var _light_runtime: ExplorationLightRuntime = null
 var _overlay_ui: ExplorationOverlayUi = null
 var _native_light_presentation: NativeLightPresentation = null
+var _player_controller: ExplorationPlayerController = null
 var _pause_open := false
 
 # Material color palette for visualization
@@ -60,6 +61,7 @@ const MATERIAL_COLORS := {
 
 func _ready() -> void:
 	_setup_light_runtime()
+	_setup_player_controller()
 	_boot_world()
 	_setup_scene()
 	_overlay_ui.layout()
@@ -111,7 +113,8 @@ func _on_world_ready() -> void:
 		_player_pos = spawn
 	else:
 		_player_pos = ARENA_RECT.get_center()
-	_player_pos = _find_valid_spawn(_player_pos)
+	_player_controller.reset(_light_world)
+	_player_pos = _player_controller.resolve_spawn(_player_pos)
 	_light_runtime.reset(_light_world)
 	_sync_light_runtime_state()
 
@@ -147,29 +150,12 @@ func _setup_scene() -> void:
 # --- Player movement (Milestone 2) ---
 
 func _update_player(delta: float) -> void:
-	var input_dir := Vector2.ZERO
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-		input_dir.y -= 1.0
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
-		input_dir.y += 1.0
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
-		input_dir.x -= 1.0
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
-		input_dir.x += 1.0
-	
-	var mouse_world := get_global_mouse_position()
-	if mouse_world.distance_to(_player_pos) > 8.0:
-		_facing = (mouse_world - _player_pos).normalized()
-	
-	if input_dir.length() > 0.0:
-		input_dir = input_dir.normalized()
-		var target_pos := LightLabCollision.resolve_circle_motion_in_space(
-			_player_pos,
-			PLAYER_RADIUS,
-			input_dir * PLAYER_SPEED * delta,
-			_collision_space()
-		)
-		_player_pos = _clamp_player_to_arena(target_pos)
+	if _player_controller == null:
+		return
+	var player_state := _player_controller.step(_player_pos, _facing, get_global_mouse_position(), delta)
+	_player_pos = Vector2(player_state.get("position", _player_pos))
+	_facing = Vector2(player_state.get("facing", _facing))
+	if _player_node != null:
 		_player_node.position = _player_pos
 
 func _update_overlay_ui() -> void:
@@ -252,31 +238,6 @@ func entity_count() -> int:
 		return 0
 	return _light_world.light_entities.size()
 
-func _collision_space() -> Dictionary:
-	if _light_world == null:
-		return {"segments": [], "circles": []}
-	return _light_world.collision_space()
-
-func _clamp_player_to_arena(pos: Vector2) -> Vector2:
-	return Vector2(
-		clampf(pos.x, ARENA_RECT.position.x + PLAYER_RADIUS, ARENA_RECT.end.x - PLAYER_RADIUS),
-		clampf(pos.y, ARENA_RECT.position.y + PLAYER_RADIUS, ARENA_RECT.end.y - PLAYER_RADIUS)
-	)
-
-func _find_valid_spawn(target: Vector2) -> Vector2:
-	var candidate := _clamp_player_to_arena(target)
-	var collision_space := _collision_space()
-	if not LightLabCollision.is_circle_blocked_in_space(candidate, PLAYER_RADIUS, collision_space):
-		return candidate
-	for ring in range(1, 7):
-		for step in range(16):
-			var angle := TAU * float(step) / 16.0
-			var probe := candidate + Vector2.RIGHT.rotated(angle) * float(ring) * 20.0
-			probe = _clamp_player_to_arena(probe)
-			if not LightLabCollision.is_circle_blocked_in_space(probe, PLAYER_RADIUS, collision_space):
-				return probe
-	return _clamp_player_to_arena(ARENA_RECT.get_center())
-
 # --- Shared lighting runtime bootstrap (Milestone 3, decomposed) ---
 
 func _setup_light_runtime() -> void:
@@ -287,6 +248,14 @@ func _setup_light_runtime() -> void:
 		"flashlight_range": FLASHLIGHT_RANGE,
 		"flashlight_half_angle": FLASHLIGHT_HALF_ANGLE,
 		"beam_offset": BEAM_OFFSET
+	})
+
+func _setup_player_controller() -> void:
+	_player_controller = ExplorationPlayerController.new()
+	_player_controller.configure({
+		"arena_rect": ARENA_RECT,
+		"player_radius": PLAYER_RADIUS,
+		"player_speed": PLAYER_SPEED
 	})
 
 func _sync_light_runtime_state() -> void:
